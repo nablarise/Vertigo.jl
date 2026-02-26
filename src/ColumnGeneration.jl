@@ -4,46 +4,59 @@
 
 module ColumnGeneration
 
-export ColumnGenerationProblem, solve
+# ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
+const ColGen = @__MODULE__
 
-"""
-    ColumnGenerationProblem
+using JuMP
+using MathOptInterface
+const MOI = MathOptInterface
 
-Represents a linear programming problem to be solved via column generation.
+# ── Coluna kernel (DO NOT MODIFY) ──────────────────────────────────────────────
+include("coluna.jl")
 
-Column generation decomposes the problem into a master problem (restricted to a
-subset of columns) and a pricing subproblem (which generates new columns with
-negative reduced cost).
+# ── Utilities ──────────────────────────────────────────────────────────────────
+include("helpers.jl")
+include("moi_solutions.jl")
+include("dw_colgen_iteration.jl")
 
-# Fields
-- `obj::Vector{Float64}`: Objective coefficients for the current set of columns.
-- `constraints::Matrix{Float64}`: Constraint matrix (rows = constraints, cols = columns).
-- `rhs::Vector{Float64}`: Right-hand side values for constraints.
-- `max_iterations::Int`: Maximum number of column generation iterations.
-"""
-struct ColumnGenerationProblem
-    obj::Vector{Float64}
-    constraints::Matrix{Float64}
-    rhs::Vector{Float64}
-    max_iterations::Int
-end
+# ── Core data structures ───────────────────────────────────────────────────────
+include("decomposition_interface.jl")
+include("decomposition_impl.jl")
 
-"""
-    solve(problem::ColumnGenerationProblem) -> Nothing
+# ── Context and phase/stage control ───────────────────────────────────────────
+include("context.jl")
 
-Placeholder entry point for the column generation algorithm.
+# ── Dispatch implementations ───────────────────────────────────────────────────
+include("master_optimization.jl")
+include("reduced_costs.jl")
+include("pricing_optimization.jl")
+include("column_insertion.jl")
+include("dual_bounds.jl")
+include("dw_stabilization.jl")
+include("ip_management.jl")
 
-# Examples
-```jldoctest
-julia> prob = ColumnGenerationProblem([1.0], reshape([1.0], 1, 1), [1.0], 10);
+# ── Adapter stub ───────────────────────────────────────────────────────────────
+include("rk_adapter.jl")
 
-julia> solve(prob) === nothing
-true
-```
-"""
-function solve(problem::ColumnGenerationProblem)
-    # TODO: implement master problem solve and pricing subproblem loop
-    return nothing
-end
+# ── Public API ─────────────────────────────────────────────────────────────────
+
+# Decomposition builder
+export Decomposition, DecompositionBuilder, ConstraintSense, EQUAL_TO, LESS_THAN, GREATER_THAN
+export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
+export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
+export add_coupling_constraint!, build
+
+# Data structures
+export ColumnPool, SpSolution, NonRobustCutManager
+
+# Context and solver entry point
+export ColGenContext, run_column_generation, ColGenOutput
+
+# Decomposition interface query functions
+export subproblem_ids, subproblem_variables, subproblem_fixed_cost, convexity_bounds
+export coupling_constraints, is_minimization, original_cost, coupling_coefficients
+export pure_master_variables, pure_master_cost, pure_master_bounds
+export nonzero_entries, solution_value, subproblem_id
+export has_column, record_column!, get_column_solution, columns, columns_for_subproblem
 
 end # module ColumnGeneration

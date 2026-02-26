@@ -3,11 +3,21 @@ uuid = "e0077815-f5e2-4e39-962d-fa928ae7c9d1"
 version = "0.1.0"
 authors = ["Guillaume Marques <guillaume.marques@nablarise.com>"]
 
-[compat]
-julia = "1.6"
+[deps]
+HiGHS = "87dc4568-4c63-4d18-b0c0-bb2238e4078b"
+JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
+MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [sources]
 Vigil = {url = "git@github.com:nablarise/Vigil.jl.git"}
+
+[compat]
+HiGHS = "1.21.1"
+JuMP = "1.29.4"
+MathOptInterface = "1.49.0"
+Random = "1.11.0"
+julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

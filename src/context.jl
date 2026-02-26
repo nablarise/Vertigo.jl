@@ -1,0 +1,372 @@
+# Copyright (c) 2025 Nablarise. All rights reserved.
+# Author: Guillaume Marques <guillaume@nablarise.com>
+# SPDX-License-Identifier: Proprietary
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# MASTER WRAPPER
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct Master{MoiModel}
+    moi_master::MoiModel
+    convexity_constraints_ub::Dict{Any,Any}
+    convexity_constraints_lb::Dict{Any,Any}
+    eq_art_vars::Dict{Any,Any}
+    leq_art_vars::Dict{Any,Any}
+    geq_art_vars::Dict{Any,Any}
+end
+
+moi_master(m::Master) = m.moi_master
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# PRICING SUBPROBLEM WRAPPER
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct PricingSubproblem{M}
+    moi_model::M
+end
+
+moi_pricing_sp(sp::PricingSubproblem) = sp.moi_model
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLGEN CONTEXT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    ColGenContext{D,M,P,CutM}
+
+Column generation context. Bundles all static data (decomposition), mutable MOI models,
+and runtime structures (column pool, cut manager, artificial variable tracking).
+
+Type parameters:
+  - D: AbstractDecomposition implementation
+  - M: master MOI backend type
+  - P: ColumnPool type
+  - CutM: NonRobustCutManager type
+"""
+struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCutManager}
+    decomp::D
+    master_model::M
+    convexity_ub::Dict{Any,Any}   # sp_id → MOI.ConstraintIndex (LessThan)
+    convexity_lb::Dict{Any,Any}   # sp_id → MOI.ConstraintIndex (GreaterThan)
+    sp_models::Dict{Any,Any}      # sp_id → MOI backend
+    pool::P
+    cuts::CutM
+    eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
+    leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
+    geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
+end
+
+# Core accessors
+is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
+
+function get_master(ctx::ColGenContext)
+    return Master(
+        ctx.master_model,
+        ctx.convexity_ub,
+        ctx.convexity_lb,
+        ctx.eq_art_vars,
+        ctx.leq_art_vars,
+        ctx.geq_art_vars
+    )
+end
+
+function get_pricing_subprobs(ctx::ColGenContext)
+    return Dict{Any,Any}(
+        sp_id => PricingSubproblem(ctx.sp_models[sp_id])
+        for sp_id in subproblem_ids(ctx.decomp)
+    )
+end
+
+get_reform(ctx::ColGenContext) = ctx
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# PHASE / STAGE TYPES
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct ColGenPhaseIterator end
+struct ColGenStageIterator end
+
+struct MixedPhase1and2
+    artificial_var_cost::Float64
+    convexity_artificial_var_cost::Float64
+    function MixedPhase1and2(
+        artificial_var_cost::Float64 = 10000.0,
+        convexity_artificial_var_cost::Float64 = 10000.0
+    )
+        return new(artificial_var_cost, convexity_artificial_var_cost)
+    end
+end
+
+struct ExactStage end
+struct NoStabilization end
+
+new_phase_iterator(::ColGenContext) = ColGenPhaseIterator()
+initial_phase(::ColGenPhaseIterator) = MixedPhase1and2()
+new_stage_iterator(::ColGenContext) = ColGenStageIterator()
+initial_stage(::ColGenStageIterator) = ExactStage()
+
+stop_colgen(::ColGenContext, ::Nothing) = false
+stop_colgen(::ColGenContext, _) = false
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+function setup_reformulation!(ctx::ColGenContext, phase::MixedPhase1and2)
+    model = ctx.master_model
+    sense = is_minimization(ctx.decomp) ? 1 : -1
+    cost = sense * phase.artificial_var_cost
+    convexity_cost = sense * phase.convexity_artificial_var_cost
+
+    # Artificial variables for coupling constraints
+    for (cstr_id, cstr_sense, _rhs) in coupling_constraints(ctx.decomp)
+        if cstr_sense == EQUAL_TO
+            s_pos = add_variable!(model;
+                lower_bound = 0.0,
+                constraint_coeffs = Dict(cstr_id => 1.0),
+                objective_coeff = cost,
+                name = "s_pos[$(cstr_id.value)]"
+            )
+            s_neg = add_variable!(model;
+                lower_bound = 0.0,
+                constraint_coeffs = Dict(cstr_id => -1.0),
+                objective_coeff = cost,
+                name = "s_neg[$(cstr_id.value)]"
+            )
+            ctx.eq_art_vars[cstr_id] = (s_pos, s_neg)
+        elseif cstr_sense == GREATER_THAN
+            s_pos = add_variable!(model;
+                lower_bound = 0.0,
+                constraint_coeffs = Dict(cstr_id => 1.0),
+                objective_coeff = cost,
+                name = "s_geq[$(cstr_id.value)]"
+            )
+            ctx.geq_art_vars[cstr_id] = s_pos
+        elseif cstr_sense == LESS_THAN
+            s_neg = add_variable!(model;
+                lower_bound = 0.0,
+                constraint_coeffs = Dict(cstr_id => -1.0),
+                objective_coeff = cost,
+                name = "s_leq[$(cstr_id.value)]"
+            )
+            ctx.leq_art_vars[cstr_id] = s_neg
+        end
+    end
+
+    # Artificial variables for convexity constraints (LessThan UB)
+    for (sp_id, cstr_idx) in ctx.convexity_ub
+        s_neg = add_variable!(model;
+            lower_bound = 0.0,
+            constraint_coeffs = Dict(cstr_idx => -1.0),
+            objective_coeff = convexity_cost,
+            name = "s_conv_ub[$(sp_id)]"
+        )
+        ctx.leq_art_vars[cstr_idx] = s_neg
+    end
+
+    # Artificial variables for convexity constraints (GreaterThan LB)
+    for (sp_id, cstr_idx) in ctx.convexity_lb
+        s_pos = add_variable!(model;
+            lower_bound = 0.0,
+            constraint_coeffs = Dict(cstr_idx => 1.0),
+            objective_coeff = convexity_cost,
+            name = "s_conv_lb[$(sp_id)]"
+        )
+        ctx.geq_art_vars[cstr_idx] = s_pos
+    end
+
+    # Relax integrality: delete Integer constraints
+    integer_constraints = MOI.get(
+        model,
+        MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Integer}()
+    )
+    for ci in integer_constraints
+        MOI.delete(model, ci)
+    end
+
+    # Relax integrality: delete ZeroOne (binary) constraints, ensure [0,1] bounds
+    binary_constraints = MOI.get(
+        model,
+        MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.ZeroOne}()
+    )
+    for ci in binary_constraints
+        var_idx = MOI.get(model, MOI.ConstraintFunction(), ci)
+        MOI.delete(model, ci)
+        ub_ci = MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(var_idx.value)
+        if !MOI.is_valid(model, ub_ci)
+            MOI.add_constraint(model, var_idx, MOI.LessThan(1.0))
+        end
+        lb_ci = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(var_idx.value)
+        if !MOI.is_valid(model, lb_ci)
+            MOI.add_constraint(model, var_idx, MOI.GreaterThan(0.0))
+        end
+    end
+
+    return nothing
+end
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLGEN ITERATION OUTPUT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct ColGenIterationOutput
+    master_lp_obj::Union{Float64,Nothing}
+    dual_bound::Union{Float64,Nothing}
+    nb_columns_added::Int64
+    master_lp_primal_sol::Any
+    master_ip_primal_sol::Any
+end
+
+colgen_iteration_output_type(::ColGenContext) = ColGenIterationOutput
+
+stop_colgen_phase(::ColGenContext, _, ::Nothing, _, _, _) = false
+
+function stop_colgen_phase(
+    ctx::ColGenContext,
+    ::MixedPhase1and2,
+    colgen_iter_output::ColGenIterationOutput,
+    incumbent_dual_bound,
+    ip_primal_sol,
+    iteration
+)
+    master_lp_obj = colgen_iter_output.master_lp_obj
+    no_column_added = colgen_iter_output.nb_columns_added == 0
+    iteration_limit = iteration > 1000
+    lp_gap_closed = (
+        !isnothing(master_lp_obj) &&
+        !isnothing(incumbent_dual_bound) &&
+        abs(master_lp_obj - incumbent_dual_bound) < 1e-6
+    )
+    return iteration_limit || no_column_added || lp_gap_closed
+end
+
+function new_iteration_output(
+    ::Type{<:ColGenIterationOutput},
+    min_sense,
+    mlp,
+    db,
+    nb_new_cols,
+    new_cut_in_master,
+    infeasible_master,
+    unbounded_master,
+    infeasible_subproblem,
+    unbounded_subproblem,
+    time_limit_reached,
+    master_lp_primal_sol,
+    master_ip_primal_sol,
+    master_lp_dual_sol,
+)
+    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol)
+end
+
+get_dual_bound(output::ColGenIterationOutput) = output.dual_bound
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLGEN PHASE OUTPUT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct ColGenPhaseOutput
+    master_lp_obj::Union{Nothing,Float64}
+    incumbent_dual_bound::Union{Nothing,Float64}
+    nb_iterations::Int
+end
+
+colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
+
+function new_phase_output(
+    ::Type{<:ColGenPhaseOutput},
+    min_sense,
+    phase,
+    stage,
+    colgen_iter_output::ColGenIterationOutput,
+    iteration,
+    inc_dual_bound
+)
+    return ColGenPhaseOutput(colgen_iter_output.master_lp_obj, inc_dual_bound, iteration)
+end
+
+function next_phase(::ColGenPhaseIterator, ::MixedPhase1and2, ::ColGenPhaseOutput)
+    return nothing
+end
+
+function next_stage(::ColGenStageIterator, ::ExactStage, ::ColGenPhaseOutput)
+    return nothing
+end
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLGEN OUTPUT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct ColGenOutput
+    master_lp_obj::Union{Nothing,Float64}
+    incumbent_dual_bound::Union{Nothing,Float64}
+end
+
+colgen_output_type(::ColGenContext) = ColGenOutput
+
+function new_output(::Type{ColGenOutput}, colgen_phase_output::ColGenPhaseOutput)
+    return ColGenOutput(
+        colgen_phase_output.master_lp_obj,
+        colgen_phase_output.incumbent_dual_bound
+    )
+end
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# ITERATION LOGGING
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+function after_colgen_iteration(
+    ctx::ColGenContext,
+    ::MixedPhase1and2,
+    ::ExactStage,
+    colgen_iterations::Int64,
+    ::NoStabilization,
+    colgen_iter_output::ColGenIterationOutput,
+    incumbent_dual_bound,
+    ip_primal_sol
+)
+    print("Iter $colgen_iterations | ")
+    print("Cols: $(colgen_iter_output.nb_columns_added) | ")
+    if !isnothing(incumbent_dual_bound)
+        print("DB: $(round(incumbent_dual_bound, digits=2)) | ")
+    else
+        print("DB: N/A | ")
+    end
+    if !isnothing(colgen_iter_output.master_lp_obj)
+        print("LP: $(round(colgen_iter_output.master_lp_obj, digits=2)) | ")
+    else
+        print("LP: N/A | ")
+    end
+    print("IP: N/A")
+    println()
+end
+
+function is_better_dual_bound(ctx::ColGenContext, dual_bound::Float64, incumbent::Float64)
+    sense = is_minimization(ctx) ? 1 : -1
+    return sense * dual_bound > sense * incumbent
+end
+
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# RUN COLUMN GENERATION ENTRY POINT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    run_column_generation(ctx::ColGenContext) -> ColGenOutput
+
+Run the column generation algorithm on the given context.
+
+# Examples
+```jldoctest
+julia> # (see test for a full example)
+```
+"""
+function run_column_generation(ctx::ColGenContext)
+    return ColGen.run!(ctx, nothing)
+end
