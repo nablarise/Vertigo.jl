@@ -10,6 +10,7 @@ end
 using Vigil
 using ColumnGeneration
 using ColumnGenerationUnitTests
+using ColumnGenerationE2eTests
 
 # Parse command line arguments
 output_file = length(ARGS) >= 1 ? abspath(ARGS[1]) : nothing
@@ -24,7 +25,7 @@ else
 end
 
 watch_and_run(
-    [ColumnGenerationUnitTests],
+    [ColumnGenerationUnitTests, ColumnGenerationE2eTests],
     [ColumnGeneration];
     output_file=output_file,
     format=format

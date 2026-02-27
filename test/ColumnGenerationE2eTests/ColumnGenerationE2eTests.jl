@@ -2,7 +2,7 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-module ColumnGenerationUnitTests
+module ColumnGenerationE2eTests
 
 using Test
 using Random
@@ -37,17 +37,6 @@ end
 # Build ColGenContext for a GAP instance
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-"""
-    build_gap_context(inst) -> ColGenContext
-
-Build a column generation context for the given GAP instance.
-
-The master model contains:
-  - Assignment coupling constraints: Σₖ xₖₜ = 1 for each task t (EqualTo)
-  - Convexity constraints: Σλ ≥ 0 (GreaterThan) and Σλ ≤ 1 (LessThan) per machine
-
-Each subproblem is a binary knapsack for one machine.
-"""
 function build_gap_context(inst::GAPInstance)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
@@ -133,49 +122,14 @@ end
 # Tests
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function test_gap_decomposition_builder()
-    @testset "[gap] decomposition builder" begin
-        inst = random_gap_instance(2, 4)
-        ctx = build_gap_context(inst)
-
-        @test length(collect(subproblem_ids(ctx.decomp))) == 2
-        for k in 1:2
-            vars = subproblem_variables(ctx.decomp, k)
-            @test length(vars) == 4
-            lb, ub = convexity_bounds(ctx.decomp, k)
-            @test lb ≈ 0.0
-            @test ub ≈ 1.0
-            @test subproblem_fixed_cost(ctx.decomp, k) ≈ 0.0
-        end
-        @test length(coupling_constraints(ctx.decomp)) == 4
-        @test is_minimization(ctx.decomp)
-    end
-end
-
-function test_gap_column_pool_populated()
-    @testset "[gap] column pool is populated after CG" begin
-        inst = random_gap_instance(2, 5)
-        ctx = build_gap_context(inst)
-
-        run_column_generation(ctx)
-
-        # Pool must have columns — at least one per machine
-        @test length(ctx.pool.by_master_var) >= 2
-    end
-end
-
-function test_gap_lp_dual_bound_matches_primal()
-    @testset "[gap] LP dual bound approximately equals primal at convergence" begin
+function test_gap_column_generation_converges()
+    @testset "[gap] column generation converges (2 machines, 7 tasks)" begin
         inst = random_gap_instance(2, 7)
         ctx = build_gap_context(inst)
 
         output = run_column_generation(ctx)
 
-        @test !isnothing(output.incumbent_dual_bound)
-        @test !isnothing(output.master_lp_obj)
-
-        gap = abs(output.master_lp_obj - output.incumbent_dual_bound)
-        @test gap <= 1.0  # within 1 unit (tight for LP relaxation)
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
 
@@ -184,9 +138,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function run()
-    test_gap_decomposition_builder()
-    test_gap_column_pool_populated()
-    test_gap_lp_dual_bound_matches_primal()
+    test_gap_column_generation_converges()
 end
 
-end # module ColumnGenerationUnitTests
+end # module ColumnGenerationE2eTests

@@ -9,7 +9,10 @@ using Revise
 using ColumnGeneration
 
 push!(LOAD_PATH, joinpath(@__DIR__, "ColumnGenerationUnitTests"))
+push!(LOAD_PATH, joinpath(@__DIR__, "ColumnGenerationE2eTests"))
 
 using ColumnGenerationUnitTests
+using ColumnGenerationE2eTests
 
 ColumnGenerationUnitTests.run()
+ColumnGenerationE2eTests.run()
