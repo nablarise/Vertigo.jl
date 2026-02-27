@@ -3,6 +3,21 @@
 # SPDX-License-Identifier: Proprietary
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# IP PRIMAL SOLUTION
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    ProjectedIpPrimalSol
+
+An integer-feasible primal solution projected from the LP master solution.
+`selected` maps each master column variable to the integer multiplicity it carries.
+"""
+struct ProjectedIpPrimalSol
+    obj_value::Float64
+    selected::Vector{Tuple{MOI.VariableIndex,Int}}
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # MASTER WRAPPER
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -43,7 +58,7 @@ Type parameters:
   - P: ColumnPool type
   - CutM: NonRobustCutManager type
 """
-struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCutManager}
+mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCutManager}
     decomp::D
     master_model::M
     convexity_ub::Dict{Any,Any}   # sp_id → MOI.ConstraintIndex (LessThan)
@@ -54,6 +69,17 @@ struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCut
     eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
     leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
+    ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
+
+    function ColGenContext(
+        decomp, master_model, convexity_ub, convexity_lb, sp_models,
+        pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars
+    )
+        new{typeof(decomp),typeof(master_model),typeof(pool),typeof(cuts)}(
+            decomp, master_model, convexity_ub, convexity_lb, sp_models,
+            pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing
+        )
+    end
 end
 
 # Core accessors
@@ -458,7 +484,11 @@ function after_colgen_iteration(
     else
         print("LP: N/A | ")
     end
-    print("IP: N/A")
+    if !isnothing(ctx.ip_incumbent)
+        print("IP: $(round(ctx.ip_incumbent.obj_value, digits=2))")
+    else
+        print("IP: N/A")
+    end
     println()
 end
 

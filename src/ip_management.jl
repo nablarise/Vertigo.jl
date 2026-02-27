@@ -2,14 +2,71 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-struct ProjectedIpPrimalSol end
+# ────────────────────────────────────────────────────────────────────────────────────────
+# HELPERS
+# ────────────────────────────────────────────────────────────────────────────────────────
 
-function check_primal_ip_feasibility!(
-    ::MasterPrimalSolution, ::ColGenContext, ::Union{Phase0,Phase1,Phase2}
-)
-    return ProjectedIpPrimalSol(), false
+# Check art vars using already-captured variable_values — avoids querying the MOI model.
+function _has_artificial_vars_in_solution(ctx, mast_primal_sol; tol=1e-5)
+    vars = mast_primal_sol.sol.variable_values
+    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+        (abs(get(vars, s_pos, 0.0)) > tol || abs(get(vars, s_neg, 0.0)) > tol) && return true
+    end
+    for (_, s) in ctx.leq_art_vars
+        abs(get(vars, s, 0.0)) > tol && return true
+    end
+    for (_, s) in ctx.geq_art_vars
+        abs(get(vars, s, 0.0)) > tol && return true
+    end
+    return false
 end
 
-function update_inc_primal_sol!(::ColGenContext, ::Nothing, ::ProjectedIpPrimalSol)
+# Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
+# Returns (ProjectedIpPrimalSol, false) if all values are integral, (nothing, false) if not.
+function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
+    selected = Tuple{MOI.VariableIndex,Int}[]
+    obj = 0.0
+    for (master_var, _, _, cost) in columns(ctx.pool)
+        val = get(mast_primal_sol.sol.variable_values, master_var, 0.0)
+        rounded = round(val)
+        abs(val - rounded) > tol && return nothing, false
+        ival = round(Int, rounded)
+        if ival > 0
+            push!(selected, (master_var, ival))
+            obj += cost * ival
+        end
+    end
+    return ProjectedIpPrimalSol(obj, selected), false
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLUNA INTERFACE
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+function check_primal_ip_feasibility!(
+    mast_primal_sol::MasterPrimalSolution,
+    ctx::ColGenContext,
+    ::Union{Phase0,Phase1,Phase2}
+)
+    _has_artificial_vars_in_solution(ctx, mast_primal_sol) && return nothing, false
+    return _project_if_integral(mast_primal_sol, ctx)
+end
+
+function _is_strictly_better(
+    ctx::ColGenContext,
+    candidate::ProjectedIpPrimalSol,
+    incumbent::ProjectedIpPrimalSol
+)
+    is_minimization(ctx) ? candidate.obj_value < incumbent.obj_value - 1e-6 :
+                           candidate.obj_value > incumbent.obj_value + 1e-6
+end
+
+function update_inc_primal_sol!(
+    ctx::ColGenContext, ::Nothing, new_sol::ProjectedIpPrimalSol
+)
+    current = ctx.ip_incumbent
+    if isnothing(current) || _is_strictly_better(ctx, new_sol, current)
+        ctx.ip_incumbent = new_sol
+    end
     return nothing
 end

@@ -12,6 +12,8 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 using ColumnGeneration
+using ColumnGeneration: MasterPrimalSolution, PrimalMoiSolution,
+    check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -129,6 +131,8 @@ function build_gap_context(inst::GAPInstance)
     return ctx
 end
 
+include("ip_management_tests.jl")
+
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -187,6 +191,7 @@ function run()
     test_gap_decomposition_builder()
     test_gap_column_pool_populated()
     test_gap_lp_dual_bound_matches_primal()
+    test_ip_management()
 end
 
 end # module ColumnGenerationUnitTests
