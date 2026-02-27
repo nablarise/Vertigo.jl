@@ -5,7 +5,7 @@
 struct ProjectedIpPrimalSol end
 
 function check_primal_ip_feasibility!(
-    ::MasterPrimalSolution, ::ColGenContext, ::MixedPhase1and2
+    ::MasterPrimalSolution, ::ColGenContext, ::Union{Phase0,Phase1,Phase2}
 )
     return ProjectedIpPrimalSol(), false
 end

@@ -87,22 +87,20 @@ get_reform(ctx::ColGenContext) = ctx
 struct ColGenPhaseIterator end
 struct ColGenStageIterator end
 
-struct MixedPhase1and2
+struct Phase0
     artificial_var_cost::Float64
     convexity_artificial_var_cost::Float64
-    function MixedPhase1and2(
-        artificial_var_cost::Float64 = 10000.0,
-        convexity_artificial_var_cost::Float64 = 10000.0
-    )
-        return new(artificial_var_cost, convexity_artificial_var_cost)
-    end
+    Phase0(ac=10000.0, cc=10000.0) = new(ac, cc)
 end
+
+struct Phase1 end   # Minimise sum of artificial variables (feasibility)
+struct Phase2 end   # Optimise original objective, no artificial variables
 
 struct ExactStage end
 struct NoStabilization end
 
 new_phase_iterator(::ColGenContext) = ColGenPhaseIterator()
-initial_phase(::ColGenPhaseIterator) = MixedPhase1and2()
+initial_phase(::ColGenPhaseIterator) = Phase0()
 new_stage_iterator(::ColGenContext) = ColGenStageIterator()
 initial_stage(::ColGenStageIterator) = ExactStage()
 
@@ -114,7 +112,7 @@ stop_colgen(::ColGenContext, _) = false
 # SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function setup_reformulation!(ctx::ColGenContext, phase::MixedPhase1and2)
+function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     model = ctx.master_model
     sense = is_minimization(ctx.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
@@ -207,6 +205,51 @@ function setup_reformulation!(ctx::ColGenContext, phase::MixedPhase1and2)
     return nothing
 end
 
+function setup_reformulation!(ctx::ColGenContext, ::Phase1)
+    model = ctx.master_model
+    obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+    sense = is_minimization(ctx.decomp) ? 1.0 : -1.0
+
+    for (master_var, _, _, _) in columns(ctx.pool)
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, 0.0))
+    end
+    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_pos, sense))
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_neg, sense))
+    end
+    for (_, s) in ctx.leq_art_vars
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
+    end
+    for (_, s) in ctx.geq_art_vars
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
+    end
+    return nothing
+end
+
+function setup_reformulation!(ctx::ColGenContext, ::Phase2)
+    model = ctx.master_model
+    obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+
+    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+        MOI.delete(model, s_pos)
+        MOI.delete(model, s_neg)
+    end
+    for (_, s) in ctx.leq_art_vars
+        MOI.delete(model, s)
+    end
+    for (_, s) in ctx.geq_art_vars
+        MOI.delete(model, s)
+    end
+    empty!(ctx.eq_art_vars)
+    empty!(ctx.leq_art_vars)
+    empty!(ctx.geq_art_vars)
+
+    for (master_var, _, _, cost) in columns(ctx.pool)
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, cost))
+    end
+    return nothing
+end
+
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN ITERATION OUTPUT
@@ -226,7 +269,7 @@ stop_colgen_phase(::ColGenContext, _, ::Nothing, _, _, _) = false
 
 function stop_colgen_phase(
     ctx::ColGenContext,
-    ::MixedPhase1and2,
+    ::Union{Phase0,Phase2},
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
     ip_primal_sol,
@@ -241,6 +284,25 @@ function stop_colgen_phase(
         abs(master_lp_obj - incumbent_dual_bound) < 1e-6
     )
     return iteration_limit || no_column_added || lp_gap_closed
+end
+
+function stop_colgen_phase(
+    ctx::ColGenContext,
+    ::Phase1,
+    colgen_iter_output::ColGenIterationOutput,
+    incumbent_dual_bound,
+    ip_primal_sol,
+    iteration
+)
+    # Phase1 has no iteration limit — feasibility must reach true convergence
+    master_lp_obj = colgen_iter_output.master_lp_obj
+    no_column_added = colgen_iter_output.nb_columns_added == 0
+    lp_gap_closed = (
+        !isnothing(master_lp_obj) &&
+        !isnothing(incumbent_dual_bound) &&
+        abs(master_lp_obj - incumbent_dual_bound) < 1e-6
+    )
+    return no_column_added || lp_gap_closed
 end
 
 function new_iteration_output(
@@ -273,12 +335,30 @@ struct ColGenPhaseOutput
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
     nb_iterations::Int
+    has_artificial_vars::Bool   # condition A: art vars active in solution
+    colgen_converged::Bool      # condition D: CG has converged
 end
 
 colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
 
+function has_artificial_vars_in_solution(ctx::ColGenContext, tol=1e-6)::Bool
+    model = ctx.master_model
+    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+        MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
+        MOI.get(model, MOI.VariablePrimal(), s_neg) > tol && return true
+    end
+    for (_, s) in ctx.leq_art_vars
+        MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
+    end
+    for (_, s) in ctx.geq_art_vars
+        MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
+    end
+    return false
+end
+
 function new_phase_output(
     ::Type{<:ColGenPhaseOutput},
+    ctx::ColGenContext,
     min_sense,
     phase,
     stage,
@@ -286,15 +366,36 @@ function new_phase_output(
     iteration,
     inc_dual_bound
 )
-    return ColGenPhaseOutput(colgen_iter_output.master_lp_obj, inc_dual_bound, iteration)
+    mlp = colgen_iter_output.master_lp_obj
+    lp_gap_closed = (
+        !isnothing(mlp) && !isnothing(inc_dual_bound) &&
+        abs(mlp - inc_dual_bound) < 1e-6
+    )
+    converged = lp_gap_closed || colgen_iter_output.nb_columns_added == 0
+    has_art = has_artificial_vars_in_solution(ctx)
+    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged)
 end
 
-function next_phase(::ColGenPhaseIterator, ::MixedPhase1and2, ::ColGenPhaseOutput)
-    return nothing
+function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
+    o.has_artificial_vars && return Phase1()
+    o.colgen_converged    && return nothing
+    return Phase2()   # feasible, iteration limit hit; continue in Phase2
+end
+
+function next_phase(::ColGenPhaseIterator, ::Phase1, o::ColGenPhaseOutput)
+    !o.has_artificial_vars && return Phase2()
+    o.colgen_converged     && return nothing   # infeasible confirmed
+    return Phase1()   # not yet converged; Phase1 has no hard cap — keep going
+end
+
+function next_phase(::ColGenPhaseIterator, ::Phase2, o::ColGenPhaseOutput)
+    o.has_artificial_vars && error("Artificial variables detected in Phase2")
+    o.colgen_converged    && return nothing
+    return Phase2()
 end
 
 function next_stage(::ColGenStageIterator, ::ExactStage, ::ColGenPhaseOutput)
-    return nothing
+    return ExactStage()
 end
 
 
@@ -309,11 +410,9 @@ end
 
 colgen_output_type(::ColGenContext) = ColGenOutput
 
-function new_output(::Type{ColGenOutput}, colgen_phase_output::ColGenPhaseOutput)
-    return ColGenOutput(
-        colgen_phase_output.master_lp_obj,
-        colgen_phase_output.incumbent_dual_bound
-    )
+function new_output(::Type{ColGenOutput}, p::ColGenPhaseOutput)
+    p.has_artificial_vars && return ColGenOutput(nothing, nothing)
+    return ColGenOutput(p.master_lp_obj, p.incumbent_dual_bound)
 end
 
 
@@ -323,7 +422,7 @@ end
 
 function after_colgen_iteration(
     ctx::ColGenContext,
-    ::MixedPhase1and2,
+    ::Union{Phase0,Phase1,Phase2},
     ::ExactStage,
     colgen_iterations::Int64,
     ::NoStabilization,

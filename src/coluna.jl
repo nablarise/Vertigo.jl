@@ -88,7 +88,7 @@ function run_colgen_phase!(context, phase, stage, ip_primal_sol, stab; iter = 1)
         iteration += 1
     end
     O = colgen_phase_output_type(context)
-    return new_phase_output(O, is_minimization(context), phase, stage, colgen_iter_output, iteration, incumbent_dual_bound)
+    return new_phase_output(O, context, is_minimization(context), phase, stage, colgen_iter_output, iteration, incumbent_dual_bound)
 end
 
 function colgen_iteration_output_type end

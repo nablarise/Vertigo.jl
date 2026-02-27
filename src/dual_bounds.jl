@@ -4,7 +4,7 @@
 
 function compute_dual_bound(
     ctx::ColGenContext,
-    ::MixedPhase1and2,
+    ::Union{Phase0,Phase1,Phase2},
     sps_db,
     mast_dual_sol::MasterDualSolution
 )

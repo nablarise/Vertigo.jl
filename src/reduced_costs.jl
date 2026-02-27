@@ -18,30 +18,42 @@ function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
     return get(d, cstr_idx.value, 0.0)
 end
 
-function compute_reduced_costs!(
-    ctx::ColGenContext, ::MixedPhase1and2, mast_dual_sol::MasterDualSolution
+function _compute_sp_reduced_costs(
+    ctx::ColGenContext, mast_dual_sol::MasterDualSolution, sp_id; zero_cost=false
 )
     decomp = ctx.decomp
     dual_values(cstr) = _dual_value(mast_dual_sol, cstr)
-
-    reduced_costs_dict = Dict{Any,Dict{Any,Float64}}()
-    for sp_id in subproblem_ids(decomp)
-        sp_rc = Dict{Any,Float64}()
-        for sp_var in subproblem_variables(decomp, sp_id)
-            rc = original_cost(decomp, sp_id, sp_var)
-            for entry in coupling_coefficients(decomp, sp_id, sp_var)
-                rc -= entry.coefficient * dual_values(entry.constraint_id)
-            end
-            rc -= total_cut_dual_contribution(ctx.cuts, sp_id, sp_var)
-            sp_rc[sp_var] = rc
+    sp_rc = Dict{Any,Float64}()
+    for sp_var in subproblem_variables(decomp, sp_id)
+        rc = zero_cost ? 0.0 : original_cost(decomp, sp_id, sp_var)
+        for entry in coupling_coefficients(decomp, sp_id, sp_var)
+            rc -= entry.coefficient * dual_values(entry.constraint_id)
         end
-        reduced_costs_dict[sp_id] = sp_rc
+        rc -= total_cut_dual_contribution(ctx.cuts, sp_id, sp_var)
+        sp_rc[sp_var] = rc
     end
-
-    return ReducedCosts(reduced_costs_dict)
+    return sp_rc
 end
 
-function update_reduced_costs!(ctx::ColGenContext, ::MixedPhase1and2, red_costs::ReducedCosts)
+function compute_reduced_costs!(
+    ctx::ColGenContext, ::Union{Phase0,Phase2}, mast_dual_sol::MasterDualSolution
+)
+    return ReducedCosts(Dict(
+        sp_id => _compute_sp_reduced_costs(ctx, mast_dual_sol, sp_id)
+        for sp_id in subproblem_ids(ctx.decomp)
+    ))
+end
+
+function compute_reduced_costs!(
+    ctx::ColGenContext, ::Phase1, mast_dual_sol::MasterDualSolution
+)
+    return ReducedCosts(Dict(
+        sp_id => _compute_sp_reduced_costs(ctx, mast_dual_sol, sp_id; zero_cost=true)
+        for sp_id in subproblem_ids(ctx.decomp)
+    ))
+end
+
+function update_reduced_costs!(ctx::ColGenContext, ::Union{Phase0,Phase1,Phase2}, red_costs::ReducedCosts)
     for (sp_id, sp_rc) in red_costs.values
         sp_model = ctx.sp_models[sp_id]
         for (var_index, rc_value) in sp_rc

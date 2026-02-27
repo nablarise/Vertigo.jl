@@ -17,11 +17,13 @@ HiGHS = "1.21.1"
 JuMP = "1.29.4"
 MathOptInterface = "1.49.0"
 Random = "1.11.0"
+ZipFile = "0.10"
 julia = "1.6"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Vigil = "8f3b4e5a-1c2d-4e5f-8a9b-0c1d2e3f4a5b"
+ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
 [targets]
-test = ["Test", "Vigil"]
+test = ["Test", "Vigil", "ZipFile"]

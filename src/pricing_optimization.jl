@@ -8,7 +8,7 @@ struct DefaultPricingStrategy{I}
     pricing_sps::I
 end
 
-function get_pricing_strategy(ctx::ColGenContext, ::MixedPhase1and2)
+function get_pricing_strategy(ctx::ColGenContext, ::Union{Phase0,Phase1,Phase2})
     return DefaultPricingStrategy(get_pricing_subprobs(ctx))
 end
 
