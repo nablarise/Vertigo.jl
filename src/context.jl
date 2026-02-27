@@ -99,6 +99,8 @@ struct Phase2 end   # Optimise original objective, no artificial variables
 struct ExactStage end
 struct NoStabilization end
 
+@enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit
+
 new_phase_iterator(::ColGenContext) = ColGenPhaseIterator()
 initial_phase(::ColGenPhaseIterator) = Phase0()
 new_stage_iterator(::ColGenContext) = ColGenStageIterator()
@@ -261,6 +263,7 @@ struct ColGenIterationOutput
     nb_columns_added::Int64
     master_lp_primal_sol::Any
     master_ip_primal_sol::Any
+    subproblem_infeasible::Bool
 end
 
 colgen_iteration_output_type(::ColGenContext) = ColGenIterationOutput
@@ -321,7 +324,7 @@ function new_iteration_output(
     master_ip_primal_sol,
     master_lp_dual_sol,
 )
-    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol)
+    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol, infeasible_subproblem)
 end
 
 get_dual_bound(output::ColGenIterationOutput) = output.dual_bound
@@ -337,6 +340,7 @@ struct ColGenPhaseOutput
     nb_iterations::Int
     has_artificial_vars::Bool   # condition A: art vars active in solution
     colgen_converged::Bool      # condition D: CG has converged
+    subproblem_infeasible::Bool
 end
 
 colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
@@ -371,27 +375,31 @@ function new_phase_output(
         !isnothing(mlp) && !isnothing(inc_dual_bound) &&
         abs(mlp - inc_dual_bound) < 1e-6
     )
-    converged = lp_gap_closed || colgen_iter_output.nb_columns_added == 0
+    subprob_inf = colgen_iter_output.subproblem_infeasible
+    converged   = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)
     has_art = has_artificial_vars_in_solution(ctx)
-    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged)
+    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf)
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
-    o.has_artificial_vars && return Phase1()
-    o.colgen_converged    && return nothing
-    return Phase2()   # feasible, iteration limit hit; continue in Phase2
+    o.subproblem_infeasible && return nothing
+    o.has_artificial_vars   && return Phase1()
+    o.colgen_converged      && return nothing
+    return Phase2()
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase1, o::ColGenPhaseOutput)
-    !o.has_artificial_vars && return Phase2()
-    o.colgen_converged     && return nothing   # infeasible confirmed
-    return Phase1()   # not yet converged; Phase1 has no hard cap — keep going
+    o.subproblem_infeasible  && return nothing
+    !o.has_artificial_vars   && return Phase2()
+    o.colgen_converged       && return nothing   # infeasible confirmed
+    return Phase1()
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase2, o::ColGenPhaseOutput)
-    o.has_artificial_vars && error("Artificial variables detected in Phase2")
-    o.colgen_converged    && return nothing
-    return Phase2()
+    o.subproblem_infeasible && return nothing
+    o.has_artificial_vars   && error("Artificial variables detected in Phase2")
+    o.colgen_converged      && return nothing
+    return nothing   # iteration limit — stop rather than loop
 end
 
 function next_stage(::ColGenStageIterator, ::ExactStage, ::ColGenPhaseOutput)
@@ -404,6 +412,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 struct ColGenOutput
+    status::ColGenStatus
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
 end
@@ -411,8 +420,15 @@ end
 colgen_output_type(::ColGenContext) = ColGenOutput
 
 function new_output(::Type{ColGenOutput}, p::ColGenPhaseOutput)
-    p.has_artificial_vars && return ColGenOutput(nothing, nothing)
-    return ColGenOutput(p.master_lp_obj, p.incumbent_dual_bound)
+    if p.subproblem_infeasible
+        return ColGenOutput(subproblem_infeasible, nothing, nothing)
+    elseif p.has_artificial_vars && p.colgen_converged
+        return ColGenOutput(master_infeasible, nothing, nothing)
+    elseif p.colgen_converged
+        return ColGenOutput(optimal, p.master_lp_obj, p.incumbent_dual_bound)
+    else
+        return ColGenOutput(iteration_limit, p.master_lp_obj, p.incumbent_dual_bound)
+    end
 end
 
 

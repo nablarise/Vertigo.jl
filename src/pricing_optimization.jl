@@ -87,13 +87,18 @@ function optimize_pricing_problem!(
         return PricingSolution(is_inf, is_unb, 0.0, 0.0, PricingPrimalSolution[])
     end
 
-    sp_obj = MOI.get(sp_model, MOI.ObjectiveValue())
+    # For maximization the SP objective was negated in update_reduced_costs!, so the
+    # raw SP result is min(-rc) = -max(rc).  Convert back so sp_obj = max(rc).
+    sp_obj_raw = MOI.get(sp_model, MOI.ObjectiveValue())
+    sp_obj = is_minimization(ctx) ? sp_obj_raw : -sp_obj_raw
 
     ν_lb = _get_convexity_dual(mast_dual_sol, ctx.convexity_lb, sp_id)
     ν_ub = _get_convexity_dual(mast_dual_sol, ctx.convexity_ub, sp_id)
     fk = subproblem_fixed_cost(ctx.decomp, sp_id)
     reduced_cost = sp_obj + fk - ν_lb - ν_ub
 
+    # Minimization: improving when reduced_cost < -ε (min(rc) is very negative).
+    # Maximization: improving when reduced_cost > +ε (max(rc) is positive).
     is_improving = if is_minimization(ctx)
         reduced_cost < -1e-6
     else

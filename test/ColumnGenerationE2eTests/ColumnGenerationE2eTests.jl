@@ -350,6 +350,7 @@ function test_gap_column_generation_converges()
 
         output = run_column_generation(ctx)
 
+        @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
@@ -376,8 +377,7 @@ function test_gap_infeasible_master()
         ctx  = build_gap_context(inst)
         output = run_column_generation(ctx)
         # Phase0 converges with art vars → Phase1 confirms infeasibility
-        @test isnothing(output.master_lp_obj)
-        @test isnothing(output.incumbent_dual_bound)
+        @test output.status == master_infeasible
     end
 end
 
@@ -386,7 +386,7 @@ function test_gap_infeasible_subproblem()
         inst = gap_infeasible_subproblem()
         ctx = build_gap_context(inst)
         output = run_column_generation(ctx)
-        @test isnothing(output.master_lp_obj)
+        @test output.status == subproblem_infeasible
     end
 end
 
@@ -395,6 +395,7 @@ function test_gap_maximization()
         inst = gap_maximization()
         ctx = build_gap_context_max(inst)
         output = run_column_generation(ctx)
+        @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
@@ -404,6 +405,7 @@ function test_gap_two_identical_machines()
         inst = gap_two_identical_machines()
         ctx = build_gap_context(inst)
         output = run_column_generation(ctx)
+        @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
@@ -413,6 +415,7 @@ function test_gap_three_identical_machines()
         inst = gap_three_identical_machines()
         ctx = build_gap_context(inst)
         output = run_column_generation(ctx)
+        @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
