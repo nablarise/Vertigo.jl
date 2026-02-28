@@ -206,6 +206,7 @@ include("cut_rhs_state.jl")
 include("fixed_var_state.jl")
 include("integrality_state.jl")
 include("local_cut_state.jl")
+include("lp_basis_state.jl")
 
 # Bridge to TreeSearch.transition_to! — must come after all trackers are defined
 include("transition.jl")
@@ -224,6 +225,9 @@ export IntegralityChangeType, relax_integrality, restrict_integrality
 export relax_zero_one, restrict_zero_one, relax_integrality!
 export LocalCut, AddLocalCutChange, RemoveLocalCutChange
 export LocalCutChangeDiff, LocalCutTracker, LocalCutTrackerHelper, next_id!
+export LinearConstraintSet, LinearConstraintIndex
+export LPBasisState, LPBasisDiff, LPBasisTracker
+export capture_basis, update_basis
 export make_transition_callbacks
 
 end # module MathOptState
