@@ -207,6 +207,7 @@ include("fixed_var_state.jl")
 include("integrality_state.jl")
 include("local_cut_state.jl")
 include("lp_basis_state.jl")
+include("column_state.jl")
 
 # Bridge to TreeSearch.transition_to! — must come after all trackers are defined
 include("transition.jl")
@@ -228,6 +229,8 @@ export LocalCutChangeDiff, LocalCutTracker, LocalCutTrackerHelper, next_id!
 export LinearConstraintSet, LinearConstraintIndex
 export LPBasisState, LPBasisDiff, LPBasisTracker
 export capture_basis, update_basis
+export ColumnData, AddColumnChange, RemoveColumnChange
+export ColumnChangeDiff, ColumnTracker, ColumnTrackerHelper
 export make_transition_callbacks
 
 end # module MathOptState
