@@ -140,6 +140,7 @@ include("treesearch/test_strategies.jl")
 include("test_local_cut_tracker.jl")
 include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
+include("test_cut_pool_tracker.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
@@ -206,6 +207,7 @@ function run()
     test_local_cut_tracker()
     test_lp_basis_tracker()
     test_column_tracker()
+    test_cut_pool_tracker()
 end
 
 end # module VertigoUnitTests

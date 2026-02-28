@@ -202,11 +202,11 @@ function new_state end
 
 ### Default Implementations
 include("var_bounds_state.jl")
-include("cut_rhs_state.jl")
 include("fixed_var_state.jl")
 include("integrality_state.jl")
 include("local_cut_state.jl")
 include("lp_basis_state.jl")
+include("cut_pool_state.jl")
 include("column_state.jl")
 
 # Bridge to TreeSearch.transition_to! — must come after all trackers are defined
@@ -219,7 +219,8 @@ export merge_forward_change_diff, merge_backward_change_diff
 export root_state, helper, transform_model!, new_state
 export DomainChangeTrackerHelper, DomainChangeTracker
 export LowerBoundVarChange, UpperBoundVarChange, DomainChangeDiff
-export CutRhsChange, CutRhsChangeDiff, CutsTracker
+export GlobalCut, ActivateGlobalCutChange, DeactivateGlobalCutChange
+export GlobalCutPoolDiff, GlobalCutPoolTracker, GlobalCutPoolHelper, register_cut!
 export FixVarChange, UnfixVarChange, FixVarChangeDiff, FixVarChangeTracker
 export IntegralityStateTracker, IntegralityChange, IntegralityChangeDiff
 export IntegralityChangeType, relax_integrality, restrict_integrality
