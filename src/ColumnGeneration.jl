@@ -10,6 +10,7 @@ const ColGen = @__MODULE__
 using JuMP
 using MathOptInterface
 const MOI = MathOptInterface
+using Printf
 
 # ── Coluna kernel (DO NOT MODIFY) ──────────────────────────────────────────────
 include("coluna.jl")
@@ -34,6 +35,7 @@ include("column_insertion.jl")
 include("dual_bounds.jl")
 include("dw_stabilization.jl")
 include("ip_management.jl")
+include("logger.jl")
 
 # ── Adapter stub ───────────────────────────────────────────────────────────────
 include("rk_adapter.jl")
@@ -50,7 +52,7 @@ export add_coupling_constraint!, build
 export ColumnPool, SpSolution, NonRobustCutManager
 
 # Context and solver entry point
-export ColGenContext, run_column_generation, ColGenOutput
+export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput
 export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit
 
 # Decomposition interface query functions

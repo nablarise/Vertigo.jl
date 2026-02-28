@@ -463,7 +463,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function after_colgen_iteration(
-    ctx::ColGenContext,
+    ::ColGenContext,
     ::Union{Phase0,Phase1,Phase2},
     ::ExactStage,
     colgen_iterations::Int64,
@@ -472,24 +472,7 @@ function after_colgen_iteration(
     incumbent_dual_bound,
     ip_primal_sol
 )
-    print("Iter $colgen_iterations | ")
-    print("Cols: $(colgen_iter_output.nb_columns_added) | ")
-    if !isnothing(incumbent_dual_bound)
-        print("DB: $(round(incumbent_dual_bound, digits=2)) | ")
-    else
-        print("DB: N/A | ")
-    end
-    if !isnothing(colgen_iter_output.master_lp_obj)
-        print("LP: $(round(colgen_iter_output.master_lp_obj, digits=2)) | ")
-    else
-        print("LP: N/A | ")
-    end
-    if !isnothing(ctx.ip_incumbent)
-        print("IP: $(round(ctx.ip_incumbent.obj_value, digits=2))")
-    else
-        print("IP: N/A")
-    end
-    println()
+    # do nothing
 end
 
 function is_better_dual_bound(ctx::ColGenContext, dual_bound::Float64, incumbent::Float64)

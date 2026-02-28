@@ -228,7 +228,7 @@ function build_gap_context(inst::GAPInstance)
     conv_lb_map = Dict{Any,Any}(k => index(conv_lb[k]) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────────────
-    ctx = ColGenContext(
+    inner_ctx = ColGenContext(
         decomp,
         master_model,
         conv_ub_map,
@@ -240,6 +240,7 @@ function build_gap_context(inst::GAPInstance)
         Dict{Any,Any}(),
         Dict{Any,Any}()
     )
+    ctx = ColGenLoggerContext(inner_ctx)
 
     return ctx
 end
@@ -309,7 +310,7 @@ function build_gap_context_max(inst::GAPInstance)
     conv_lb_map = Dict{Any,Any}(k => index(conv_lb[k]) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────────────
-    ctx = ColGenContext(
+    inner_ctx = ColGenContext(
         decomp,
         master_model,
         conv_ub_map,
@@ -321,6 +322,7 @@ function build_gap_context_max(inst::GAPInstance)
         Dict{Any,Any}(),
         Dict{Any,Any}()
     )
+    ctx = ColGenLoggerContext(inner_ctx)
 
     return ctx
 end
