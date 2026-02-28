@@ -137,6 +137,7 @@ include("ip_management_tests.jl")
 include("treesearch/test_node.jl")
 include("treesearch/test_search_loop.jl")
 include("treesearch/test_strategies.jl")
+include("test_local_cut_tracker.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
@@ -200,6 +201,7 @@ function run()
     test_treesearch_node()
     test_treesearch_search_loop()
     test_treesearch_strategies()
+    test_local_cut_tracker()
 end
 
 end # module VertigoUnitTests
