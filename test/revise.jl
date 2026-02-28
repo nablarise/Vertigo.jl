@@ -6,13 +6,13 @@
 # Revise will automatically pick up changes to ColumnGeneration source files.
 
 using Revise
-using ColumnGeneration
+using Vertigo
 
-push!(LOAD_PATH, joinpath(@__DIR__, "ColumnGenerationUnitTests"))
-push!(LOAD_PATH, joinpath(@__DIR__, "ColumnGenerationE2eTests"))
+push!(LOAD_PATH, joinpath(@__DIR__, "VertigoUnitTests"))
+push!(LOAD_PATH, joinpath(@__DIR__, "VertigoE2eTests"))
 
-using ColumnGenerationUnitTests
-using ColumnGenerationE2eTests
+using VertigoUnitTests
+using VertigoE2eTests
 
-ColumnGenerationUnitTests.run()
-ColumnGenerationE2eTests.run()
+VertigoUnitTests.run()
+VertigoE2eTests.run()

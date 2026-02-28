@@ -8,6 +8,14 @@ module Vertigo
 include("ColGen/ColGen.jl")
 using .ColGen
 
+# ── MOI model state tracker ───────────────────────────────────────────────────
+include("MathOptState/MathOptState.jl")
+using .MathOptState
+
+# ── General-purpose tree search ───────────────────────────────────────────────
+include("TreeSearch/TreeSearch.jl")
+using .TreeSearch
+
 # ── Adapter stub ──────────────────────────────────────────────────────────────
 include("rk_adapter.jl")
 

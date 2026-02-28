@@ -14,6 +14,8 @@ const MOI = MathOptInterface
 using Vertigo
 using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
     check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2
+using Vertigo.TreeSearch
+using Vertigo.MathOptState
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -132,6 +134,9 @@ function build_gap_context(inst::GAPInstance)
 end
 
 include("ip_management_tests.jl")
+include("treesearch/test_node.jl")
+include("treesearch/test_search_loop.jl")
+include("treesearch/test_strategies.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
@@ -192,6 +197,9 @@ function run()
     test_gap_column_pool_populated()
     test_gap_lp_dual_bound_matches_primal()
     test_ip_management()
+    test_treesearch_node()
+    test_treesearch_search_loop()
+    test_treesearch_strategies()
 end
 
 end # module VertigoUnitTests
