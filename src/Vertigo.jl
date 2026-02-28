@@ -5,7 +5,7 @@
 module Vertigo
 
 # ── Column generation algorithm ───────────────────────────────────────────────
-include("colgen.jl")
+include("ColGen/ColGen.jl")
 using .ColGen
 
 # ── Adapter stub ──────────────────────────────────────────────────────────────
