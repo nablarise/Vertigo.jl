@@ -2,7 +2,7 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-module ColumnGenerationUnitTests
+module VertigoUnitTests
 
 using Test
 using Random
@@ -11,8 +11,8 @@ using HiGHS
 using MathOptInterface
 const MOI = MathOptInterface
 
-using ColumnGeneration
-using ColumnGeneration: MasterPrimalSolution, PrimalMoiSolution,
+using Vertigo
+using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
     check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -194,4 +194,4 @@ function run()
     test_ip_management()
 end
 
-end # module ColumnGenerationUnitTests
+end # module VertigoUnitTests

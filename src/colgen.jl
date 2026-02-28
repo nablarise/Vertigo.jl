@@ -2,32 +2,34 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-module ColumnGeneration
-
-# ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
-const ColGen = @__MODULE__
+module ColGen
 
 using JuMP
 using MathOptInterface
 const MOI = MathOptInterface
 using Printf
 
-# ── Coluna kernel (DO NOT MODIFY) ──────────────────────────────────────────────
+# ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
+const ColGen = @__MODULE__
+
+# ── Coluna kernel (DO NOT MODIFY) ─────────────────────────────────────────────
 include("coluna.jl")
 
-# ── Utilities ──────────────────────────────────────────────────────────────────
+# ── Utilities ─────────────────────────────────────────────────────────────────
 include("helpers.jl")
 include("moi_solutions.jl")
 include("dw_colgen_iteration.jl")
 
-# ── Core data structures ───────────────────────────────────────────────────────
+# ── Decomposition interface (abstract types + function stubs) ─────────────────
 include("decomposition_interface.jl")
+
+# ── Concrete decomposition and column pool ────────────────────────────────────
 include("decomposition_impl.jl")
 
 # ── Context and phase/stage control ───────────────────────────────────────────
 include("context.jl")
 
-# ── Dispatch implementations ───────────────────────────────────────────────────
+# ── Dispatch implementations ──────────────────────────────────────────────────
 include("master_optimization.jl")
 include("reduced_costs.jl")
 include("pricing_optimization.jl")
@@ -37,10 +39,7 @@ include("dw_stabilization.jl")
 include("ip_management.jl")
 include("logger.jl")
 
-# ── Adapter stub ───────────────────────────────────────────────────────────────
-include("rk_adapter.jl")
-
-# ── Public API ─────────────────────────────────────────────────────────────────
+# ── Exports ───────────────────────────────────────────────────────────────────
 
 # Decomposition builder
 export Decomposition, DecompositionBuilder, ConstraintSense, EQUAL_TO, LESS_THAN, GREATER_THAN
@@ -62,4 +61,4 @@ export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id
 export has_column, record_column!, get_column_solution, columns, columns_for_subproblem
 
-end # module ColumnGeneration
+end # module ColGen

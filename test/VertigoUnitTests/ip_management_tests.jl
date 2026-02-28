@@ -35,7 +35,7 @@ function test_ip_project_integral_solution()
         var_values = Dict{MOI.VariableIndex,Float64}(mv1 => 1.0, mv2 => 0.0)
         sol = _make_primal_sol(var_values)
 
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
 
         @test !isnothing(result)
         @test cut == false
@@ -54,7 +54,7 @@ function test_ip_project_fractional_solution()
         var_values = Dict{MOI.VariableIndex,Float64}(mv => 0.5)
         sol = _make_primal_sol(var_values)
 
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
         @test isnothing(result)
         @test cut == false
     end
@@ -66,7 +66,7 @@ function test_ip_project_empty_pool()
         ctx = build_gap_context(inst)
 
         sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}())
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
 
         @test !isnothing(result)
         @test result.obj_value ≈ 0.0
@@ -83,7 +83,7 @@ function test_ip_project_missing_var_defaults_zero()
         _add_test_column!(ctx, 503, 1, 9.0)
         # Primal sol does not mention the column var → defaults to 0.0 (integral, ival=0)
         sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}())
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
 
         @test !isnothing(result)
         @test cut == false
@@ -101,7 +101,7 @@ function test_ip_project_near_integer_within_tol()
         # 1.0 - 1e-6 is within tol=1e-5 of 1.0 → integral
         var_values = Dict{MOI.VariableIndex,Float64}(mv => 1.0 - 1e-6)
         sol = _make_primal_sol(var_values)
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
 
         @test !isnothing(result)
         @test cut == false
@@ -118,7 +118,7 @@ function test_ip_project_multiplicity_greater_than_one()
         # val=3.0 → rounded=3, ival=3
         var_values = Dict{MOI.VariableIndex,Float64}(mv => 3.0)
         sol = _make_primal_sol(var_values)
-        result, cut = ColumnGeneration._project_if_integral(sol, ctx)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
 
         @test !isnothing(result)
         @test cut == false
@@ -144,12 +144,12 @@ function test_ip_has_art_eq_active()
         # s_pos active
         var_values = Dict{MOI.VariableIndex,Float64}(s_pos => 0.5, s_neg => 0.0)
         sol = _make_primal_sol(var_values)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol) == true
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol) == true
 
         # both zero
         var_values2 = Dict{MOI.VariableIndex,Float64}(s_pos => 0.0, s_neg => 0.0)
         sol2 = _make_primal_sol(var_values2)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol2) == false
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol2) == false
     end
 end
 
@@ -164,12 +164,12 @@ function test_ip_has_art_leq_active()
 
         var_values = Dict{MOI.VariableIndex,Float64}(s => 1e-4)
         sol = _make_primal_sol(var_values)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol) == true
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol) == true
 
         # within tolerance
         var_values2 = Dict{MOI.VariableIndex,Float64}(s => 1e-6)
         sol2 = _make_primal_sol(var_values2)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol2) == false
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol2) == false
     end
 end
 
@@ -184,11 +184,11 @@ function test_ip_has_art_geq_active()
 
         var_values = Dict{MOI.VariableIndex,Float64}(s => 2e-5)
         sol = _make_primal_sol(var_values)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol) == true
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol) == true
 
         var_values2 = Dict{MOI.VariableIndex,Float64}(s => 0.0)
         sol2 = _make_primal_sol(var_values2)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol2) == false
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol2) == false
     end
 end
 
@@ -199,7 +199,7 @@ function test_ip_has_art_no_art_vars()
 
         var_values = Dict{MOI.VariableIndex,Float64}(MOI.VariableIndex(5) => 100.0)
         sol = _make_primal_sol(var_values)
-        @test ColumnGeneration._has_artificial_vars_in_solution(ctx, sol) == false
+        @test Vertigo.ColGen._has_artificial_vars_in_solution(ctx, sol) == false
     end
 end
 
@@ -267,7 +267,7 @@ function test_ip_update_incumbent_first_solution()
         ctx = build_gap_context(inst)
 
         @test isnothing(ctx.ip_incumbent)
-        sol = ColumnGeneration.ProjectedIpPrimalSol(42.0, [])
+        sol = Vertigo.ColGen.ProjectedIpPrimalSol(42.0, [])
         update_inc_primal_sol!(ctx, nothing, sol)
         @test !isnothing(ctx.ip_incumbent)
         @test ctx.ip_incumbent.obj_value ≈ 42.0
@@ -280,8 +280,8 @@ function test_ip_update_incumbent_better_min()
         ctx = build_gap_context(inst)
         @test is_minimization(ctx.decomp)
 
-        update_inc_primal_sol!(ctx, nothing, ColumnGeneration.ProjectedIpPrimalSol(50.0, []))
-        update_inc_primal_sol!(ctx, nothing, ColumnGeneration.ProjectedIpPrimalSol(40.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(50.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(40.0, []))
         @test ctx.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -291,8 +291,8 @@ function test_ip_update_incumbent_worse_rejected_min()
         inst = random_gap_instance(1, 1; seed=16)
         ctx = build_gap_context(inst)
 
-        update_inc_primal_sol!(ctx, nothing, ColumnGeneration.ProjectedIpPrimalSol(40.0, []))
-        update_inc_primal_sol!(ctx, nothing, ColumnGeneration.ProjectedIpPrimalSol(60.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(40.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(60.0, []))
         @test ctx.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -304,16 +304,16 @@ function test_ip_is_strictly_better_max()
         ctx = build_gap_context(inst)  # GAP is minimization
 
         # Test the helper directly with manual sense logic
-        sol_good = ColumnGeneration.ProjectedIpPrimalSol(100.0, [])
-        sol_bad  = ColumnGeneration.ProjectedIpPrimalSol(50.0, [])
+        sol_good = Vertigo.ColGen.ProjectedIpPrimalSol(100.0, [])
+        sol_bad  = Vertigo.ColGen.ProjectedIpPrimalSol(50.0, [])
 
         # For minimization: lower is better
-        @test ColumnGeneration._is_strictly_better(ctx, sol_bad, sol_good) == true
-        @test ColumnGeneration._is_strictly_better(ctx, sol_good, sol_bad) == false
+        @test Vertigo.ColGen._is_strictly_better(ctx, sol_bad, sol_good) == true
+        @test Vertigo.ColGen._is_strictly_better(ctx, sol_good, sol_bad) == false
 
         # Equal values: not strictly better
-        sol_eq = ColumnGeneration.ProjectedIpPrimalSol(50.0, [])
-        @test ColumnGeneration._is_strictly_better(ctx, sol_bad, sol_eq) == false
+        sol_eq = Vertigo.ColGen.ProjectedIpPrimalSol(50.0, [])
+        @test Vertigo.ColGen._is_strictly_better(ctx, sol_bad, sol_eq) == false
     end
 end
 

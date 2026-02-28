@@ -2,7 +2,7 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-module ColumnGenerationE2eTests
+module VertigoE2eTests
 
 using Test
 using Random
@@ -12,7 +12,7 @@ using MathOptInterface
 using ZipFile
 const MOI = MathOptInterface
 
-using ColumnGeneration
+using Vertigo
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -436,4 +436,4 @@ function run()
     test_gap_three_identical_machines()
 end
 
-end # module ColumnGenerationE2eTests
+end # module VertigoE2eTests
