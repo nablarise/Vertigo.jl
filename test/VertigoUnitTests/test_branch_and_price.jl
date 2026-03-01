@@ -34,4 +34,30 @@ function test_branch_and_price()
                   output.incumbent.obj_value + 1e-6
         end
     end
+
+    @testset "[branch_and_price] logger runs without error" begin
+        inst = random_gap_instance(2, 4; seed=42)
+        ctx = build_gap_context(inst)
+        output = redirect_stdout(devnull) do
+            run_branch_and_price(
+                ctx; node_limit = 100, log = true
+            )
+        end
+        @test output.status in (:optimal, :node_limit)
+        @test output.nodes_explored >= 1
+    end
+
+    @testset "[branch_and_price] logger result matches non-logger" begin
+        inst = random_gap_instance(2, 4; seed=42)
+        ctx1 = build_gap_context(inst)
+        out1 = run_branch_and_price(ctx1; node_limit = 50)
+
+        ctx2 = build_gap_context(inst)
+        out2 = redirect_stdout(devnull) do
+            run_branch_and_price(ctx2; node_limit = 50, log = true)
+        end
+
+        @test out1.status == out2.status
+        @test out1.nodes_explored == out2.nodes_explored
+    end
 end

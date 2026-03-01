@@ -137,10 +137,43 @@ function TreeSearch.on_feasible_solution!(
     return
 end
 
+# ── TreeSearch logger protocol ───────────────────────────────────────────
+
+function TreeSearch.ts_incumbent_value(s::BPSpace)
+    return isnothing(s.incumbent) ? nothing : s.incumbent.obj_value
+end
+
+function TreeSearch.ts_best_dual_bound(s::BPSpace)
+    return s.best_dual_bound
+end
+
+function TreeSearch.ts_is_minimization(s::BPSpace)
+    return ColGen.is_minimization(s.ctx)
+end
+
+function TreeSearch.ts_nodes_explored(s::BPSpace)
+    return s.nodes_explored
+end
+
+function TreeSearch.ts_search_status_message(s::BPSpace)
+    inc = s.incumbent
+    if !isnothing(inc)
+        db = s.best_dual_bound
+        if abs(inc.obj_value - db) < s.tol
+            return "Optimal solution found."
+        end
+    end
+    if s.nodes_explored >= s.node_limit
+        return "Node limit reached."
+    end
+    return isnothing(inc) ? "No feasible solution found." :
+        "Search complete."
+end
+
 # ── Entry point ──────────────────────────────────────────────────────────
 
 """
-    run_branch_and_price(ctx; strategy, node_limit, tol) -> BPOutput
+    run_branch_and_price(ctx; strategy, node_limit, tol, log) -> BPOutput
 
 Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on column variables.
@@ -150,14 +183,20 @@ node and most-fractional branching on column variables.
 - `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
 - `node_limit::Int`: Maximum nodes to explore (default: 10000).
 - `tol::Float64`: Numerical tolerance (default: 1e-6).
+- `log::Bool`: Enable VERTIGO-styled per-node logging (default: false).
 """
 function run_branch_and_price(
     ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
-    tol::Float64 = 1e-6
+    tol::Float64 = 1e-6,
+    log::Bool = false
 )
     space = BPSpace(ctx; node_limit = node_limit, tol = tol)
     evaluator = BPEvaluator()
+    if log
+        ts_ctx = TreeSearch.TreeSearchLoggerContext(space, evaluator)
+        return TreeSearch.search(strategy, ts_ctx)
+    end
     return TreeSearch.search(strategy, space, evaluator)
 end

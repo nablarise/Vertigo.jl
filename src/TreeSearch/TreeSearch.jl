@@ -5,6 +5,7 @@
 module TreeSearch
 
 using DataStructures
+using Printf
 
 # Node status enum
 include("node_status.jl")
@@ -17,6 +18,9 @@ include("interface.jl")
 
 # Generic search loop
 include("search_loop.jl")
+
+# Logger context
+include("logger.jl")
 
 # Strategies
 include("strategies/depth_first.jl")
@@ -38,5 +42,8 @@ export BreadthFirstStrategy
 export AbstractBestFirstStrategy, DualBoundBestFirstStrategy, get_priority
 export BeamSearchStrategy
 export LimitedDiscrepancyStrategy, DiscrepancyData, filter_by_discrepancy
+export TreeSearchLoggerContext
+export ts_incumbent_value, ts_best_dual_bound, ts_is_minimization
+export ts_nodes_explored, ts_search_status_message
 
 end # module TreeSearch

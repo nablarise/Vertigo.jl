@@ -47,5 +47,6 @@ export has_column, record_column!, get_column_solution, columns, columns_for_sub
 
 # Branch-and-price
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
+export TreeSearchLoggerContext
 
 end # module Vertigo
