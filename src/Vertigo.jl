@@ -16,6 +16,10 @@ using .MathOptState
 include("TreeSearch/TreeSearch.jl")
 using .TreeSearch
 
+# ── Branch-cut-price ─────────────────────────────────────────────────────────
+include("BranchCutPrice/BranchCutPrice.jl")
+using .BranchCutPrice
+
 # ── Adapter stub ──────────────────────────────────────────────────────────────
 include("rk_adapter.jl")
 
@@ -40,5 +44,8 @@ export coupling_constraints, is_minimization, original_cost, coupling_coefficien
 export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id
 export has_column, record_column!, get_column_solution, columns, columns_for_subproblem
+
+# Branch-and-price
+export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 
 end # module Vertigo

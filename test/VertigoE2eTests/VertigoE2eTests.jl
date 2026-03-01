@@ -423,6 +423,12 @@ function test_gap_three_identical_machines()
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# Branch-and-price e2e tests
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+include("test_branch_and_price_e2e.jl")
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -434,6 +440,14 @@ function run()
     test_gap_maximization()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
+
+    test_bp_gap_converges()
+    #test_bp_gap_benchmark_instances()
+    test_bp_gap_infeasible_master()
+    test_bp_gap_infeasible_subproblem()
+    test_bp_gap_maximization()
+    test_bp_gap_two_identical_machines()
+    test_bp_gap_three_identical_machines()
 end
 
 end # module VertigoE2eTests

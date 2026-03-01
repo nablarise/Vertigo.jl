@@ -101,8 +101,16 @@ function apply_change!(backend, change::LowerBoundVarChange, helper::DomainChang
     @assert !haskey(helper.map_eq, change.var_id)
     ci = get(helper.map_lb, change.var_id, nothing)
     if isnothing(ci)
-        new_ci = MOI.add_constraint(backend, change.var_id, MOI.GreaterThan(change.new_lb))
-        helper.map_lb[change.var_id] = new_ci
+        # Variable may already have a bound from column insertion;
+        # discover it before attempting to add a duplicate.
+        existing = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(change.var_id.value)
+        if MOI.is_valid(backend, existing)
+            helper.map_lb[change.var_id] = existing
+            MOI.set(backend, MOI.ConstraintSet(), existing, MOI.GreaterThan(change.new_lb))
+        else
+            new_ci = MOI.add_constraint(backend, change.var_id, MOI.GreaterThan(change.new_lb))
+            helper.map_lb[change.var_id] = new_ci
+        end
         @debug "add constraint $(change.var_id) => $(change.new_lb)"
     else
         MOI.set(backend, MOI.ConstraintSet(), ci, MOI.GreaterThan(change.new_lb))
@@ -138,9 +146,17 @@ function apply_change!(backend, change::UpperBoundVarChange, helper::DomainChang
     ci = get(helper.map_ub, change.var_id, nothing)
 
     if isnothing(ci)
-       new_ci = MOI.add_constraint(backend, change.var_id, MOI.LessThan(change.new_ub))
-       helper.map_ub[change.var_id] = new_ci
-       @debug "add constraint $(change.var_id) <= $(change.new_ub)"
+        # Variable may already have a bound from column insertion;
+        # discover it before attempting to add a duplicate.
+        existing = MOI.ConstraintIndex{MOI.VariableIndex,MOI.LessThan{Float64}}(change.var_id.value)
+        if MOI.is_valid(backend, existing)
+            helper.map_ub[change.var_id] = existing
+            MOI.set(backend, MOI.ConstraintSet(), existing, MOI.LessThan(change.new_ub))
+        else
+            new_ci = MOI.add_constraint(backend, change.var_id, MOI.LessThan(change.new_ub))
+            helper.map_ub[change.var_id] = new_ci
+        end
+        @debug "add constraint $(change.var_id) <= $(change.new_ub)"
     else
         MOI.set(backend, MOI.ConstraintSet(), ci, MOI.LessThan(change.new_ub))
         @debug "set constraint to $(change.var_id) <= $(change.new_ub)"
