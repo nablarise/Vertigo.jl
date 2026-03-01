@@ -32,6 +32,7 @@ mutable struct BPSpace <: TreeSearch.AbstractSearchSpace
     incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
     last_ip_incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
     best_dual_bound::Float64
+    open_node_bounds::Dict{Int,Float64}
     nodes_explored::Int
     node_limit::Int
     tol::Float64
@@ -58,6 +59,7 @@ function BPSpace(
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
         ColGen.is_minimization(ctx) ? -Inf : Inf,
+        Dict{Int,Float64}(),
         0, node_limit, tol
     )
 end
@@ -65,12 +67,14 @@ end
 # ── TreeSearch interface ─────────────────────────────────────────────────
 
 function TreeSearch.new_root(space::BPSpace)
-    return TreeSearch.root_node(
+    node = TreeSearch.root_node(
         space.id_counter,
         MathOptState.DomainChangeDiff(),
         MathOptState.DomainChangeDiff(),
         BPNodeData()
     )
+    space.open_node_bounds[node.id] = node.dual_bound
+    return node
 end
 
 function TreeSearch.stop(space::BPSpace, _)
@@ -99,6 +103,18 @@ function TreeSearch.transition!(space::BPSpace, current, next)
     return
 end
 
+function _recompute_global_dual_bound!(space::BPSpace)
+    bounds = space.open_node_bounds
+    if isempty(bounds)
+        space.best_dual_bound = ColGen.is_minimization(space.ctx) ?
+            -Inf : Inf
+        return
+    end
+    space.best_dual_bound = ColGen.is_minimization(space.ctx) ?
+        minimum(values(bounds)) : maximum(values(bounds))
+    return
+end
+
 function TreeSearch.branch!(space::BPSpace, node)
     primal_values = Dict{MOI.VariableIndex,Float64}()
     for v in MOI.get(space.backend, MOI.ListOfVariableIndices())
@@ -124,10 +140,15 @@ function TreeSearch.branch!(space::BPSpace, node)
         cg_output.incumbent_dual_bound
     end
 
-    return create_branching_children(
+    children = create_branching_children(
         space.id_counter, node, branch_var, branch_val,
         sp_id, space.ctx, db
     )
+    for child in children
+        space.open_node_bounds[child.id] = child.dual_bound
+    end
+    _recompute_global_dual_bound!(space)
+    return children
 end
 
 function TreeSearch.on_feasible_solution!(
