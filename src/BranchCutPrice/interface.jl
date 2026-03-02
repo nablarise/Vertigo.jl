@@ -16,3 +16,8 @@ bp_pool(ctx::ColGen.ColGenLoggerContext) = ctx.inner.pool
 
 bp_decomp(ctx::ColGen.ColGenContext) = ctx.decomp
 bp_decomp(ctx::ColGen.ColGenLoggerContext) = ctx.inner.decomp
+
+bp_branching_constraints(ctx::ColGen.ColGenContext) =
+    ctx.branching_constraints
+bp_branching_constraints(ctx::ColGen.ColGenLoggerContext) =
+    ctx.inner.branching_constraints

@@ -30,6 +30,16 @@ function _compute_sp_reduced_costs(
             rc -= entry.coefficient * dual_values(entry.constraint_id)
         end
         rc -= total_cut_dual_contribution(ctx.cuts, sp_id, sp_var)
+        for bc in ctx.branching_constraints
+            σ = _dual_value(mast_dual_sol, bc.constraint_index)
+            iszero(σ) && continue
+            for ov in mapping_to_original(decomp, sp_id, sp_var)
+                if ov == bc.orig_var
+                    rc -= σ
+                    break
+                end
+            end
+        end
         sp_rc[sp_var] = rc
     end
     return sp_rc

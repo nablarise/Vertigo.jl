@@ -22,12 +22,15 @@ BPNodeData() = BPNodeData(nothing)
     BPSpace <: TreeSearch.AbstractSearchSpace
 
 Search space for branch-and-price. Wraps the CG context, the MOI
-backend, and domain change tracking.
+backend, domain/cut tracking, and branching metadata.
 """
 mutable struct BPSpace <: TreeSearch.AbstractSearchSpace
     ctx::Any
     backend::Any
     domain_helper::MathOptState.DomainChangeTrackerHelper
+    cut_tracker::MathOptState.LocalCutTracker
+    cut_helper::MathOptState.LocalCutTrackerHelper
+    branching_cut_info::Dict{Int,Any}
     id_counter::TreeSearch.NodeIdCounter
     incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
     last_ip_incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
@@ -54,8 +57,14 @@ function BPSpace(
     domain_helper = MathOptState.transform_model!(
         tracker, master
     )
+    cut_tracker = MathOptState.LocalCutTracker()
+    cut_helper = MathOptState.transform_model!(
+        cut_tracker, master
+    )
     return BPSpace(
         ctx, master, domain_helper,
+        cut_tracker, cut_helper,
+        Dict{Int,Any}(),
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
         ColGen.is_minimization(ctx) ? -Inf : Inf,
@@ -67,10 +76,18 @@ end
 # ── TreeSearch interface ─────────────────────────────────────────────────
 
 function TreeSearch.new_root(space::BPSpace)
+    empty_fwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff()
+    )
+    empty_bwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff()
+    )
     node = TreeSearch.root_node(
         space.id_counter,
-        MathOptState.DomainChangeDiff(),
-        MathOptState.DomainChangeDiff(),
+        empty_fwd,
+        empty_bwd,
         BPNodeData()
     )
     space.open_node_bounds[node.id] = node.dual_bound
@@ -99,7 +116,7 @@ end
 
 function TreeSearch.transition!(space::BPSpace, current, next)
     fwd!, bwd! = MathOptState.make_transition_callbacks(
-        space.backend, space.domain_helper
+        space.backend, (space.domain_helper, space.cut_helper)
     )
     TreeSearch.transition_to!(current, next, fwd!, bwd!)
     return
@@ -128,12 +145,11 @@ function TreeSearch.branch!(space::BPSpace, node)
         primal_values[v] = val
     end
 
-    branch_var, sp_id = most_fractional_column(
+    orig_var, x_val = most_fractional_original_variable(
         space.ctx, primal_values; tol = space.tol
     )
-    isnothing(branch_var) && return typeof(node)[]
+    isnothing(orig_var) && return typeof(node)[]
 
-    branch_val = primal_values[branch_var]
     cg_output = node.user_data.cg_output
     db = if isnothing(cg_output) ||
             isnothing(cg_output.incumbent_dual_bound)
@@ -142,10 +158,13 @@ function TreeSearch.branch!(space::BPSpace, node)
         cg_output.incumbent_dual_bound
     end
 
-    children = create_branching_children(
-        space.id_counter, node, branch_var, branch_val,
-        sp_id, space.ctx, db
+    children, cut_info = create_branching_children(
+        space.id_counter, node, orig_var, x_val,
+        space.ctx, db, space.cut_tracker
     )
+    for (cut_id, ov) in cut_info
+        space.branching_cut_info[cut_id] = ov
+    end
     for child in children
         space.open_node_bounds[child.id] = child.dual_bound
     end
@@ -199,7 +218,7 @@ end
     run_branch_and_price(ctx; strategy, node_limit, tol, log) -> BPOutput
 
 Run the branch-and-price algorithm using column generation at each
-node and most-fractional branching on column variables.
+node and most-fractional branching on original variables.
 
 # Arguments
 - `ctx`: Column generation context (`ColGenContext` or `ColGenLoggerContext`).

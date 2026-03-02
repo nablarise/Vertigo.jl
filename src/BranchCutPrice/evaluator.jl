@@ -10,11 +10,23 @@ node and returns CUTOFF, FEASIBLE, or BRANCH.
 """
 struct BPEvaluator <: TreeSearch.AbstractNodeEvaluator end
 
+function _rebuild_branching_constraints!(space::BPSpace)
+    bcs = bp_branching_constraints(space.ctx)
+    empty!(bcs)
+    for (cut_id, ci) in space.cut_helper.active_cuts
+        ov = space.branching_cut_info[cut_id]
+        push!(bcs, ColGen.ActiveBranchingConstraint(ci, ov))
+    end
+    return
+end
+
 function TreeSearch.evaluate!(
     ::BPEvaluator, space::BPSpace, node
 )
     space.nodes_explored += 1
     delete!(space.open_node_bounds, node.id)
+
+    _rebuild_branching_constraints!(space)
     cg_output = ColGen.run_column_generation(space.ctx)
     node.user_data = BPNodeData(cg_output)
 

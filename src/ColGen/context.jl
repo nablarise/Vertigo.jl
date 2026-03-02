@@ -43,6 +43,21 @@ end
 moi_pricing_sp(sp::PricingSubproblem) = sp.moi_model
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# ACTIVE BRANCHING CONSTRAINT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    ActiveBranchingConstraint
+
+A branching constraint currently active in the master LP. Maps a MOI constraint
+(added via `LocalCutTracker`) to the original variable it branches on.
+"""
+struct ActiveBranchingConstraint
+    constraint_index::Any
+    orig_var::Any
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN CONTEXT
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -70,6 +85,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
     leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
+    branching_constraints::Vector{ActiveBranchingConstraint}
 
     function ColGenContext(
         decomp, master_model, convexity_ub, convexity_lb, sp_models,
@@ -77,7 +93,8 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
     )
         new{typeof(decomp),typeof(master_model),typeof(pool),typeof(cuts)}(
             decomp, master_model, convexity_ub, convexity_lb, sp_models,
-            pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing
+            pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing,
+            ActiveBranchingConstraint[]
         )
     end
 end

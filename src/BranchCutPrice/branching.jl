@@ -3,68 +3,109 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    most_fractional_column(ctx, primal_values; tol=1e-6)
+    most_fractional_original_variable(ctx, primal_values; tol=1e-6)
 
-Find the column variable with the most fractional LP value (closest
-to the midpoint between its floor and ceil). Returns `(var, sp_id)`
-or `(nothing, nothing)` if all columns are integral.
+Project the master LP solution to original-variable space and find the
+most fractional original variable (closest to 0.5). Returns
+`(orig_var, x_val)` or `(nothing, nothing)` if all are integral.
 """
-function most_fractional_column(
+function most_fractional_original_variable(
     ctx,
     primal_values::Dict{MOI.VariableIndex,Float64};
     tol::Float64 = 1e-6
 )
-    best_var = nothing
-    best_sp_id = nothing
-    best_frac = 1.0
+    decomp = bp_decomp(ctx)
+    pool = bp_pool(ctx)
+    x_values = ColGen.project_to_original(
+        decomp, pool, v -> get(primal_values, v, 0.0)
+    )
 
-    for (master_var, sp_id, _, _) in ColGen.columns(bp_pool(ctx))
-        val = get(primal_values, master_var, 0.0)
-        frac_part = val - floor(val)
+    best_var = nothing
+    best_val = 0.0
+    best_dist = 1.0
+
+    for (orig_var, x_val) in x_values
+        frac_part = x_val - floor(x_val)
         (frac_part < tol || frac_part > 1.0 - tol) && continue
         dist = abs(frac_part - 0.5)
-        if dist < best_frac
-            best_frac = dist
-            best_var = master_var
-            best_sp_id = sp_id
+        if dist < best_dist
+            best_dist = dist
+            best_var = orig_var
+            best_val = x_val
         end
     end
-    return best_var, best_sp_id
+    return best_var, best_val
 end
 
 """
-    create_branching_children(id_counter, parent, branch_var, branch_val,
-                              sp_id, ctx, dual_bound)
+    create_branching_children(id_counter, parent, orig_var, x_val,
+                              ctx, dual_bound, cut_tracker)
 
-Create left and right child nodes by branching on `branch_var`.
-Left child: UB(branch_var) = floor(branch_val).
-Right child: LB(branch_var) = ceil(branch_val).
-Backward diffs restore original bounds (LB=0, UB=convexity_ub).
+Create left and right child nodes by branching on original variable
+`orig_var`. Each child adds a robust branching constraint as a
+`LocalCut` via tuple diffs `(DomainChangeDiff, LocalCutChangeDiff)`.
+
+Left child:  Σ_j λ_j · a_{i,j} ≤ ⌊x_val⌋
+Right child: Σ_j λ_j · a_{i,j} ≥ ⌈x_val⌉
 """
 function create_branching_children(
-    id_counter, parent, branch_var, branch_val,
-    sp_id, ctx, dual_bound
+    id_counter, parent, orig_var, x_val,
+    ctx, dual_bound, cut_tracker
 )
-    floor_val = floor(branch_val)
-    ceil_val = ceil(branch_val)
-    _, conv_ub = ColGen.convexity_bounds(bp_decomp(ctx), sp_id)
+    decomp = bp_decomp(ctx)
+    pool = bp_pool(ctx)
+    floor_val = floor(x_val)
+    ceil_val = ceil(x_val)
 
-    left_fwd = MathOptState.DomainChangeDiff(
-        MathOptState.LowerBoundVarChange[],
-        [MathOptState.UpperBoundVarChange(branch_var, floor_val)]
+    # Build constraint terms for all existing columns
+    terms = MOI.ScalarAffineTerm{Float64}[]
+    for (master_var, sp_id, sol, _) in ColGen.columns(pool)
+        coeff = ColGen.compute_branching_column_coefficient(
+            decomp, orig_var, sp_id, sol
+        )
+        if !iszero(coeff)
+            push!(terms, MOI.ScalarAffineTerm(coeff, master_var))
+        end
+    end
+
+    # Left child: ≤ floor(x_val)
+    id_left = MathOptState.next_id!(cut_tracker)
+    left_cut = MathOptState.LocalCut(
+        id_left, terms, MOI.LessThan(floor_val)
     )
-    left_bwd = MathOptState.DomainChangeDiff(
-        MathOptState.LowerBoundVarChange[],
-        [MathOptState.UpperBoundVarChange(branch_var, conv_ub)]
+    left_fwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff(
+            [MathOptState.AddLocalCutChange(left_cut)],
+            MathOptState.RemoveLocalCutChange[]
+        )
+    )
+    left_bwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff(
+            MathOptState.AddLocalCutChange[],
+            [MathOptState.RemoveLocalCutChange(left_cut)]
+        )
     )
 
-    right_fwd = MathOptState.DomainChangeDiff(
-        [MathOptState.LowerBoundVarChange(branch_var, ceil_val)],
-        MathOptState.UpperBoundVarChange[]
+    # Right child: ≥ ceil(x_val)
+    id_right = MathOptState.next_id!(cut_tracker)
+    right_cut = MathOptState.LocalCut(
+        id_right, terms, MOI.GreaterThan(ceil_val)
     )
-    right_bwd = MathOptState.DomainChangeDiff(
-        [MathOptState.LowerBoundVarChange(branch_var, 0.0)],
-        MathOptState.UpperBoundVarChange[]
+    right_fwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff(
+            [MathOptState.AddLocalCutChange(right_cut)],
+            MathOptState.RemoveLocalCutChange[]
+        )
+    )
+    right_bwd = (
+        MathOptState.DomainChangeDiff(),
+        MathOptState.LocalCutChangeDiff(
+            MathOptState.AddLocalCutChange[],
+            [MathOptState.RemoveLocalCutChange(right_cut)]
+        )
     )
 
     left = TreeSearch.child_node(
@@ -77,5 +118,5 @@ function create_branching_children(
         dual_bound = dual_bound,
         user_data = BPNodeData()
     )
-    return [left, right]
+    return [left, right], [(id_left, orig_var), (id_right, orig_var)]
 end

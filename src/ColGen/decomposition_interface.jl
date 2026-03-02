@@ -158,6 +158,28 @@ function compute_dual_bound_y_contribution(decomp::AbstractDecomposition, dual_v
 end
 
 """
+    compute_branching_column_coefficient(decomp, orig_var, sp_id, sol) -> Float64
+
+Coefficient of a column λ in a branching constraint on original variable `orig_var`.
+Equals Σ_{(z,v) ∈ sol} v · [z maps to orig_var].
+"""
+function compute_branching_column_coefficient(
+    decomp::AbstractDecomposition, orig_var, sp_id,
+    sol::AbstractSubproblemSolution
+)
+    coeff = 0.0
+    for (sp_var, val) in nonzero_entries(sol)
+        for ov in mapping_to_original(decomp, sp_id, sp_var)
+            if ov == orig_var
+                coeff += val
+                break
+            end
+        end
+    end
+    return coeff
+end
+
+"""
     project_to_original(decomp, pool, master_primal_values) -> Dict{Any, Float64}
 
 Project master LP solution (λ̄, ȳ) back to original variable space x̄.

@@ -333,6 +333,7 @@ end
 
 # (class, agents, jobs, expected_dual_bound)
 # Subset of Pigatti et al. (2005) Table 1 — tractable at the root node.
+# Instance name (letter, number of machine, number of items, Root LB, Optimal solution)
 const BENCHMARK_INSTANCES = [
     #('C', 5,  100, 1930),
     #('C', 10, 100, 1400),
@@ -444,7 +445,7 @@ function run()
     for i in 1:10
         println("---------")
     end
-    test_bp_gap_benchmark_instances()
+    test_bp_gap_a_instances()
 end
 
 end # module VertigoE2eTests

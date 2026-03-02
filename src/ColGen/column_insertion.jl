@@ -57,6 +57,16 @@ function insert_columns!(
         for (k, v) in coupling_coeffs; all_coeffs[k] = v; end
         for (k, v) in cut_coeffs; all_coeffs[k] = v; end
 
+        # 4b. Branching constraint coefficients
+        for bc in ctx.branching_constraints
+            coeff = compute_branching_column_coefficient(
+                decomp, bc.orig_var, sp_id, sol
+            )
+            if !iszero(coeff)
+                all_coeffs[bc.constraint_index] = coeff
+            end
+        end
+
         # 5. Convexity constraint membership (coefficient = 1.0)
         if haskey(ctx.convexity_ub, sp_id)
             all_coeffs[ctx.convexity_ub[sp_id]] = 1.0
@@ -104,6 +114,16 @@ function insert_columns!(
         all_coeffs = Dict{Any,Float64}()
         for (k, v) in coupling_coeffs; all_coeffs[k] = v; end
         for (k, v) in cut_coeffs; all_coeffs[k] = v; end
+
+        # 4b. Branching constraint coefficients
+        for bc in ctx.branching_constraints
+            coeff = compute_branching_column_coefficient(
+                decomp, bc.orig_var, sp_id, sol
+            )
+            if !iszero(coeff)
+                all_coeffs[bc.constraint_index] = coeff
+            end
+        end
 
         # 5. Convexity constraint membership (coefficient = 1.0)
         if haskey(ctx.convexity_ub, sp_id)
