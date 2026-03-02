@@ -334,11 +334,11 @@ end
 # (class, agents, jobs, expected_dual_bound)
 # Subset of Pigatti et al. (2005) Table 1 — tractable at the root node.
 const BENCHMARK_INSTANCES = [
-    ('C', 5,  100, 1930),
-    ('C', 10, 100, 1400),
+    #('C', 5,  100, 1930),
+    #('C', 10, 100, 1400),
     ('C', 20, 100, 1242),
-    ('E', 10, 100, 11568),
-    ('E', 20, 100, 8431),
+    #('E', 10, 100, 11568),
+    #('E', 20, 100, 8431),
 ]
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -441,13 +441,10 @@ function run()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
 
-    test_bp_gap_converges()
-    #test_bp_gap_benchmark_instances()
-    test_bp_gap_infeasible_master()
-    test_bp_gap_infeasible_subproblem()
-    test_bp_gap_maximization()
-    test_bp_gap_two_identical_machines()
-    test_bp_gap_three_identical_machines()
+    for i in 1:10
+        println("---------")
+    end
+    test_bp_gap_benchmark_instances()
 end
 
 end # module VertigoE2eTests

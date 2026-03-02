@@ -86,6 +86,8 @@ function TreeSearch.output(space::BPSpace)
         db = space.best_dual_bound
         ub = space.incumbent.obj_value
         abs(ub - db) < space.tol ? :optimal : :node_limit
+    elseif space.nodes_explored >= space.node_limit
+        :node_limit
     else
         :infeasible
     end
