@@ -7,6 +7,7 @@ module BranchCutPrice
 using MathOptInterface
 const MOI = MathOptInterface
 
+using Printf
 using ..ColGen
 using ..TreeSearch
 using ..MathOptState
@@ -16,7 +17,9 @@ include("bp_output.jl")
 include("branching.jl")
 include("space.jl")
 include("evaluator.jl")
+include("dot_logger.jl")
 
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
+export BPDotLoggerContext
 
 end # module BranchCutPrice

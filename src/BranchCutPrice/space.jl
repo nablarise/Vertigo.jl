@@ -215,7 +215,8 @@ end
 # ── Entry point ──────────────────────────────────────────────────────────
 
 """
-    run_branch_and_price(ctx; strategy, node_limit, tol, log) -> BPOutput
+    run_branch_and_price(ctx; strategy, node_limit, tol, log,
+                         dot_file) -> BPOutput
 
 Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on original variables.
@@ -226,16 +227,23 @@ node and most-fractional branching on original variables.
 - `node_limit::Int`: Maximum nodes to explore (default: 10000).
 - `tol::Float64`: Numerical tolerance (default: 1e-6).
 - `log::Bool`: Enable VERTIGO-styled per-node logging (default: false).
+- `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
+  (default: `nothing` — no dot file written).
 """
 function run_branch_and_price(
     ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,
-    log::Bool = false
+    log::Bool = false,
+    dot_file::Union{Nothing,String} = nothing
 )
     space = BPSpace(ctx; node_limit = node_limit, tol = tol)
     evaluator = BPEvaluator()
+    if !isnothing(dot_file)
+        dot_ctx = BPDotLoggerContext(space, evaluator, dot_file)
+        return TreeSearch.search(strategy, dot_ctx)
+    end
     if log
         ts_ctx = TreeSearch.TreeSearchLoggerContext(space, evaluator)
         return TreeSearch.search(strategy, ts_ctx)
