@@ -7,8 +7,11 @@
 # (class, agents, jobs, optimal_value)
 const GAP_A_BP_INSTANCES = [
     ('A', 5,  100, 1698),
+    #('A', 5,  200, 3235),
     ('A', 10, 100, 1360),
+    #('A', 10, 200, 2623),
     ('A', 20, 100, 1158),
+    #('A', 20, 200, 2339)
 ]
 
 function test_bp_gap_a_instances()
@@ -17,9 +20,11 @@ function test_bp_gap_a_instances()
         @testset "[bp][$(label)] optimal = $(optimal)" begin
             filepath = get_gap_instance_path(class, agents, jobs)
             inst = parse_gap_file(filepath)
-            ctx = build_gap_context(inst)
+            ctx = build_gap_context(inst; smoothing_alpha=0.5)
+            dot_path = "$class-$agents-$jobs.dot"
             output = run_branch_and_price(
-                ctx; node_limit = 5_000, log = true
+                ctx; node_limit = 5_000, log = false,
+                dot_file = dot_path
             )
 
             @test output.status in (:optimal, :node_limit)
@@ -42,6 +47,13 @@ function test_bp_gap_a_instances()
                 @test abs(output.incumbent.obj_value - optimal) <=
                     1e-4
             end
+
+            # Dot file structural validity
+            @test isfile(dot_path)
+            dot_content = read(dot_path, String)
+            @test startswith(dot_content, "digraph BCP_Tree {")
+            @test endswith(strip(dot_content), "}")
+            @test occursin(r"n\d+ \[label=", dot_content)
         end
     end
 end
