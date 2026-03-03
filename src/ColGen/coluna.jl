@@ -49,7 +49,7 @@ function run!(context, ip_primal_sol; iter = 1)
         stage = next_stage(stage_it, stage, phase_output)
     end
     O = colgen_output_type(context)
-    return new_output(O, phase_output)
+    return new_output(O, context, phase_output)
 end
 
 

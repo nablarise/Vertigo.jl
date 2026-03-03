@@ -85,6 +85,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
     leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
+    ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
 
     function ColGenContext(
@@ -94,7 +95,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
         new{typeof(decomp),typeof(master_model),typeof(pool),typeof(cuts)}(
             decomp, master_model, convexity_ub, convexity_lb, sp_models,
             pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing,
-            ActiveBranchingConstraint[]
+            nothing, ActiveBranchingConstraint[]
         )
     end
 end
@@ -121,6 +122,16 @@ function get_pricing_subprobs(ctx::ColGenContext)
 end
 
 get_reform(ctx::ColGenContext) = ctx
+
+function _dual_bound_dominated(ctx, dual_bound, ip_bound)
+    isnothing(ip_bound) && return false
+    isnothing(dual_bound) && return false
+    if is_minimization(ctx)
+        return dual_bound >= ip_bound - 1e-6
+    else
+        return dual_bound <= ip_bound + 1e-6
+    end
+end
 
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -329,7 +340,11 @@ function stop_colgen_phase(
         !isnothing(incumbent_dual_bound) &&
         abs(master_lp_obj - incumbent_dual_bound) < 1e-6
     )
-    return iteration_limit || no_column_added || lp_gap_closed
+    ip_pruned = _dual_bound_dominated(
+        ctx, incumbent_dual_bound, ctx.ip_primal_bound
+    )
+    return iteration_limit || no_column_added ||
+           lp_gap_closed || ip_pruned
 end
 
 function stop_colgen_phase(
@@ -458,19 +473,33 @@ struct ColGenOutput
     status::ColGenStatus
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
+    ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
 end
 
 colgen_output_type(::ColGenContext) = ColGenOutput
 
-function new_output(::Type{ColGenOutput}, p::ColGenPhaseOutput)
+function new_output(
+    ::Type{ColGenOutput}, ctx::ColGenContext, p::ColGenPhaseOutput
+)
+    ip = ctx.ip_incumbent
     if p.subproblem_infeasible
-        return ColGenOutput(subproblem_infeasible, nothing, nothing)
+        return ColGenOutput(
+            subproblem_infeasible, nothing, nothing, ip
+        )
     elseif p.has_artificial_vars && p.colgen_converged
-        return ColGenOutput(master_infeasible, nothing, nothing)
+        return ColGenOutput(
+            master_infeasible, nothing, nothing, ip
+        )
     elseif p.colgen_converged
-        return ColGenOutput(optimal, p.master_lp_obj, p.incumbent_dual_bound)
+        return ColGenOutput(
+            optimal, p.master_lp_obj,
+            p.incumbent_dual_bound, ip
+        )
     else
-        return ColGenOutput(iteration_limit, p.master_lp_obj, p.incumbent_dual_bound)
+        return ColGenOutput(
+            iteration_limit, p.master_lp_obj,
+            p.incumbent_dual_bound, ip
+        )
     end
 end
 

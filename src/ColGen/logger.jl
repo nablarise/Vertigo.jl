@@ -33,6 +33,7 @@ new_stage_iterator(lctx::ColGenLoggerContext)                        = new_stage
 setup_stabilization!(lctx::ColGenLoggerContext, master)              = setup_stabilization!(lctx.inner, master)
 stop_colgen(lctx::ColGenLoggerContext, args...)                      = stop_colgen(lctx.inner, args...)
 colgen_output_type(lctx::ColGenLoggerContext)                        = colgen_output_type(lctx.inner)
+new_output(O, lctx::ColGenLoggerContext, args...)                    = new_output(O, lctx.inner, args...)
 stop_colgen_phase(lctx::ColGenLoggerContext, args...)                = stop_colgen_phase(lctx.inner, args...)
 is_better_dual_bound(lctx::ColGenLoggerContext, args...)             = is_better_dual_bound(lctx.inner, args...)
 colgen_phase_output_type(lctx::ColGenLoggerContext)                  = colgen_phase_output_type(lctx.inner)

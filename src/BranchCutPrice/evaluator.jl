@@ -26,6 +26,12 @@ function TreeSearch.evaluate!(
     space.nodes_explored += 1
     delete!(space.open_node_bounds, node.id)
 
+    # Pass incumbent bound to CG for early pruning
+    raw_ctx = space.ctx isa ColGen.ColGenLoggerContext ?
+        space.ctx.inner : space.ctx
+    raw_ctx.ip_primal_bound = isnothing(space.incumbent) ?
+        nothing : space.incumbent.obj_value
+
     _rebuild_branching_constraints!(space)
     cg_output = ColGen.run_column_generation(space.ctx)
     node.user_data = BPNodeData(cg_output)
@@ -59,7 +65,7 @@ function TreeSearch.evaluate!(
     end
 
     # Detect new IP-feasible solution from CG
-    ip_sol = bp_ip_incumbent(space.ctx)
+    ip_sol = cg_output.ip_incumbent
     if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
         space.last_ip_incumbent = ip_sol
         if isnothing(space.incumbent) ||
