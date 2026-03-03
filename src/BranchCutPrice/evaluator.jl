@@ -78,5 +78,19 @@ function TreeSearch.evaluate!(
         end
     end
 
+    # Restricted master IP heuristic
+    if space.rmp_heuristic
+        rmp_sol = solve_restricted_master_ip!(space, cg_output)
+        if !isnothing(rmp_sol)
+            if isnothing(space.incumbent) ||
+               (ColGen.is_minimization(space.ctx) ?
+                    rmp_sol.obj_value < space.incumbent.obj_value - space.tol :
+                    rmp_sol.obj_value > space.incumbent.obj_value + space.tol)
+                space.incumbent = rmp_sol
+                _recompute_global_dual_bound!(space)
+            end
+        end
+    end
+
     return TreeSearch.BRANCH
 end

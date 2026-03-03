@@ -17,6 +17,7 @@ include("bp_output.jl")
 include("branching.jl")
 include("space.jl")
 include("evaluator.jl")
+include("rmp_heuristic.jl")
 include("dot_logger.jl")
 
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price

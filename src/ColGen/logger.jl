@@ -19,6 +19,11 @@ end
 
 const _VRT_HDR = "    ITER        OBJ (LP)       BEST DUAL        DUAL BND       IP PRIMAL   COLS   TIME (s)"
 const _VRT_SEP = "  ------   -------------   -------------   -------------   -------------   ----   --------"
+const _VRT_HDR_ALPHA = "    ALPHA"
+const _VRT_SEP_ALPHA = "   ------"
+
+_fmt_alpha(::NoStabilization) = ""
+_fmt_alpha(s::WentgesSmoothing) = @sprintf("   %6.4f", s.smooth_dual_sol_coeff)
 
 _fmt_val(::Nothing) = "          N/A"
 function _fmt_val(x::Float64)
@@ -76,11 +81,12 @@ end
 
 function after_colgen_iteration(
     lctx::ColGenLoggerContext, phase, _stage,
-    colgen_iterations, _stab, out, incumbent_dual_bound, _ip_primal_sol
+    colgen_iterations, stab, out, incumbent_dual_bound, _ip_primal_sol
 )
     if !lctx.header_printed
-        println(_VRT_HDR)
-        println(_VRT_SEP)
+        has_alpha = lctx.inner.smoothing_alpha > 0.0
+        println(_VRT_HDR * (has_alpha ? _VRT_HDR_ALPHA : ""))
+        println(_VRT_SEP * (has_alpha ? _VRT_SEP_ALPHA : ""))
         lctx.header_printed = true
     end
     iter_tag = phase isa Phase0 ? "" : phase isa Phase1 ? "#" : "##"
@@ -91,7 +97,8 @@ function after_colgen_iteration(
     ip_val = isnothing(lctx.inner.ip_incumbent) ? nothing :
              lctx.inner.ip_incumbent.obj_value
     t      = time() - lctx.cg_start_time
-    @printf "  %s   %s   %s   %s   %s   %4d   %8.2f\n" iter_str _fmt_val(lp) _fmt_val(db) _fmt_val(db2) _fmt_val(ip_val) out.nb_columns_added t
+    @printf "  %s   %s   %s   %s   %s   %4d   %8.2f" iter_str _fmt_val(lp) _fmt_val(db) _fmt_val(db2) _fmt_val(ip_val) out.nb_columns_added t
+    println(_fmt_alpha(stab))
 end
 
 # ── Entry point ───────────────────────────────────────────────────────────────

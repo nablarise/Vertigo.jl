@@ -77,15 +77,23 @@ function _dot_shape_and_color(s::DotNodeStatus)
     return ("doubleoctagon", "gold")
 end
 
+function _dot_status_text(s::DotNodeStatus)
+    s == DotBranched && return "branched"
+    s == DotPrunedInfeasible && return "infeasible"
+    s == DotPrunedBound && return "pruned (bound)"
+    return "IP feasible"
+end
+
 function _write_dot_node(io::IO, node, dot_status::DotNodeStatus,
-                         dual_bound)
+                         dual_bound, incumbent_value)
     shape, color = _dot_shape_and_color(dot_status)
-    db_str = if isnothing(dual_bound)
-        "N/A"
-    else
+    db_str = isnothing(dual_bound) ? "N/A" :
         @sprintf("%.2f", dual_bound)
-    end
-    label = "Node $(node.id)\\nDB = $(db_str)"
+    ip_str = isnothing(incumbent_value) ? "\u2014" :
+        @sprintf("%.2f", incumbent_value)
+    status_str = _dot_status_text(dot_status)
+    label = "Node $(node.id)\\nDB = $(db_str)" *
+        "\\nIP* = $(ip_str)\\n$(status_str)"
     println(
         io,
         "  n$(node.id) [label=\"$(label)\", " *
@@ -147,7 +155,11 @@ function TreeSearch.search(
             dual_bound = isnothing(cg_out) ? nothing :
                 cg_out.incumbent_dual_bound
 
-            _write_dot_node(io, next_node, dot_status, dual_bound)
+            inc_val = isnothing(space.incumbent) ? nothing :
+                space.incumbent.obj_value
+            _write_dot_node(
+                io, next_node, dot_status, dual_bound, inc_val
+            )
 
             # Edge from parent
             if !isnothing(next_node.parent)

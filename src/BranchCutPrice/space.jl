@@ -39,10 +39,13 @@ mutable struct BPSpace <: TreeSearch.AbstractSearchSpace
     nodes_explored::Int
     node_limit::Int
     tol::Float64
+    rmp_time_limit::Float64
+    rmp_heuristic::Bool
 end
 
 """
-    BPSpace(ctx; node_limit=10_000, tol=1e-6)
+    BPSpace(ctx; node_limit=10_000, tol=1e-6, rmp_time_limit=60.0,
+            rmp_heuristic=true)
 
 Create a branch-and-price search space from a column generation
 context. Registers existing variable bound constraints for tracking.
@@ -50,7 +53,9 @@ context. Registers existing variable bound constraints for tracking.
 function BPSpace(
     ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
     node_limit::Int = 10_000,
-    tol::Float64 = 1e-6
+    tol::Float64 = 1e-6,
+    rmp_time_limit::Float64 = 60.0,
+    rmp_heuristic::Bool = true
 )
     master = bp_master_model(ctx)
     tracker = MathOptState.DomainChangeTracker()
@@ -69,7 +74,8 @@ function BPSpace(
         nothing, nothing,
         ColGen.is_minimization(ctx) ? -Inf : Inf,
         Dict{Int,Float64}(),
-        0, node_limit, tol
+        0, node_limit, tol, rmp_time_limit,
+        rmp_heuristic
     )
 end
 
@@ -215,8 +221,9 @@ end
 # ── Entry point ──────────────────────────────────────────────────────────
 
 """
-    run_branch_and_price(ctx; strategy, node_limit, tol, log,
-                         dot_file) -> BPOutput
+    run_branch_and_price(ctx; strategy, node_limit, tol,
+                         rmp_time_limit, rmp_heuristic,
+                         log, dot_file) -> BPOutput
 
 Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on original variables.
@@ -226,6 +233,10 @@ node and most-fractional branching on original variables.
 - `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
 - `node_limit::Int`: Maximum nodes to explore (default: 10000).
 - `tol::Float64`: Numerical tolerance (default: 1e-6).
+- `rmp_time_limit::Float64`: Time limit in seconds for restricted master
+  IP heuristic at each node (default: 60.0).
+- `rmp_heuristic::Bool`: Run the restricted master IP heuristic at each
+  node to find feasible solutions (default: true).
 - `log::Bool`: Enable VERTIGO-styled per-node logging (default: false).
 - `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
   (default: `nothing` — no dot file written).
@@ -235,10 +246,18 @@ function run_branch_and_price(
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,
+    rmp_time_limit::Float64 = 60.0,
+    rmp_heuristic::Bool = true,
     log::Bool = false,
     dot_file::Union{Nothing,String} = nothing
 )
-    space = BPSpace(ctx; node_limit = node_limit, tol = tol)
+    space = BPSpace(
+        ctx;
+        node_limit = node_limit,
+        tol = tol,
+        rmp_time_limit = rmp_time_limit,
+        rmp_heuristic = rmp_heuristic
+    )
     evaluator = BPEvaluator()
     if !isnothing(dot_file)
         dot_ctx = BPDotLoggerContext(space, evaluator, dot_file)
