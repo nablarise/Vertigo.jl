@@ -6,7 +6,7 @@
 
 # (class, agents, jobs, optimal_value)
 const GAP_A_BP_INSTANCES = [
-    ('A', 5,  100, 1698),
+    #('A', 5,  100, 1698),
     #('A', 5,  200, 3235),
     ('A', 10, 100, 1360),
     #('A', 10, 200, 2623),

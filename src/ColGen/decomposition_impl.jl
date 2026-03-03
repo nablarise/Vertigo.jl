@@ -173,6 +173,8 @@ is_minimization(d::Decomposition) = d.minimize
 
 Concrete subproblem solution with sorted entries for deterministic order and
 cheap deduplication via fingerprint hash.
+
+`obj_value` is the pricing subproblem objective (reduced-cost objective).
 """
 struct SpSolution{S,V} <: AbstractSubproblemSolution
     sp_id::S
@@ -181,13 +183,11 @@ struct SpSolution{S,V} <: AbstractSubproblemSolution
     fingerprint::UInt64
 end
 
-function SpSolution(sp_id::S, obj_value::Float64, entries::Vector{Tuple{V,Float64}}) where {S,V}
-    # Sort by variable index value for canonical ordering + cheap deduplication.
-    # MOI.VariableIndex has a .value::Int64 field; other V types must also support .value.
+function SpSolution(sp_id::S, obj_value::Float64, entries::Vector{Tuple{MOI.VariableIndex,Float64}}) where {S}
     sorted = sort(entries; by = e -> e[1].value)
     filter!(e -> !iszero(e[2]), sorted)
     fp = hash(map(e -> (e[1].value, round(e[2]; digits=10)), sorted))
-    return SpSolution{S,V}(sp_id, obj_value, sorted, fp)
+    return SpSolution{S,MOI.VariableIndex}(sp_id, obj_value, sorted, fp)
 end
 
 subproblem_id(sol::SpSolution) = sol.sp_id
@@ -207,6 +207,12 @@ end
 # PART 8: COLUMN POOL
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+"""
+    ColumnRecord{S,V}
+
+A column stored in the pool. `original_cost` is the column's cost in the
+master's original objective.
+"""
 struct ColumnRecord{S,V}
     sp_id::S
     solution::SpSolution{S,V}
