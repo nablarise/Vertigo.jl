@@ -22,9 +22,9 @@ function _has_artificial_vars_in_solution(ctx, mast_primal_sol; tol=1e-5)
 end
 
 # Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
-# Returns (ProjectedIpPrimalSol, false) if all values are integral, (nothing, false) if not.
+# Returns (MasterIpPrimalSol, false) if all values are integral, (nothing, false) if not.
 function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
-    selected = Tuple{MOI.VariableIndex,Int}[]
+    non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     obj = 0.0
     for (master_var, _, _, cost) in columns(ctx.pool)
         val = get(mast_primal_sol.sol.variable_values, master_var, 0.0)
@@ -32,11 +32,11 @@ function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
         abs(val - rounded) > tol && return nothing, false
         ival = round(Int, rounded)
         if ival > 0
-            push!(selected, (master_var, ival))
+            push!(non_zero_integral, (master_var, ival))
             obj += cost * ival
         end
     end
-    return ProjectedIpPrimalSol(obj, selected), false
+    return MasterIpPrimalSol(obj, non_zero_integral), false
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -54,15 +54,15 @@ end
 
 function _is_strictly_better(
     ctx::ColGenContext,
-    candidate::ProjectedIpPrimalSol,
-    incumbent::ProjectedIpPrimalSol
+    candidate::MasterIpPrimalSol,
+    incumbent::MasterIpPrimalSol
 )
     is_minimization(ctx) ? candidate.obj_value < incumbent.obj_value - 1e-6 :
                            candidate.obj_value > incumbent.obj_value + 1e-6
 end
 
 function update_inc_primal_sol!(
-    ctx::ColGenContext, ::Nothing, new_sol::ProjectedIpPrimalSol
+    ctx::ColGenContext, ::Nothing, new_sol::MasterIpPrimalSol
 )
     current = ctx.ip_incumbent
     if isnothing(current) || _is_strictly_better(ctx, new_sol, current)

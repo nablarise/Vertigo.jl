@@ -15,7 +15,7 @@ Result of a branch-and-price run.
 """
 struct BPOutput
     status::Symbol
-    incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
+    incumbent::Union{Nothing,ColGen.MasterIpPrimalSol}
     best_dual_bound::Float64
     nodes_explored::Int
 end

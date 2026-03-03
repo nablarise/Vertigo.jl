@@ -7,14 +7,33 @@
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ProjectedIpPrimalSol
+    MasterIpPrimalSol
 
-An integer-feasible primal solution projected from the LP master solution.
-`selected` maps each master column variable to the integer multiplicity it carries.
+An IP-feasible primal solution of the restricted master problem,
+expressed in terms of master variables (columns and pure master
+variables).
+
+# Fields
+- `obj_value`: objective value of the solution.
+- `non_zero_integral`: integer variables (columns or pure master)
+  with nonzero multiplicity.
+- `non_zero_continuous`: continuous pure master variables with
+  nonzero value.
 """
-struct ProjectedIpPrimalSol
+struct MasterIpPrimalSol
     obj_value::Float64
-    selected::Vector{Tuple{MOI.VariableIndex,Int}}
+    non_zero_integral::Vector{Tuple{MOI.VariableIndex,Int}}
+    non_zero_continuous::Vector{Tuple{MOI.VariableIndex,Float64}}
+end
+
+function MasterIpPrimalSol(
+    obj_value::Float64,
+    non_zero_integral::Vector{Tuple{MOI.VariableIndex,Int}}
+)
+    return MasterIpPrimalSol(
+        obj_value, non_zero_integral,
+        Tuple{MOI.VariableIndex,Float64}[]
+    )
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -84,7 +103,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
     eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
     leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
     geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
-    ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
+    ip_incumbent::Union{Nothing,MasterIpPrimalSol}
     ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
     smoothing_alpha::Float64
@@ -475,7 +494,7 @@ struct ColGenOutput
     status::ColGenStatus
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
-    ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
+    ip_incumbent::Union{Nothing,MasterIpPrimalSol}
 end
 
 colgen_output_type(::ColGenContext) = ColGenOutput

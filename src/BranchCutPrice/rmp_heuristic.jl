@@ -7,10 +7,10 @@
 
 Solve the restricted master problem as a MIP to find IP-feasible
 solutions from fractional LP relaxations. Adds integrality
-constraints to column variables, solves, then restores the LP
-relaxation for branching.
+constraints to column variables and integer pure master variables,
+solves, then restores the LP relaxation for branching.
 
-Returns a `ColGen.ProjectedIpPrimalSol` if a feasible IP solution
+Returns a `ColGen.MasterIpPrimalSol` if a feasible IP solution
 is found, `nothing` otherwise.
 """
 function solve_restricted_master_ip!(
@@ -24,12 +24,22 @@ function solve_restricted_master_ip!(
 
     backend = space.backend
     pool = bp_pool(space.ctx)
+    decomp = bp_decomp(space.ctx)
 
-    # Add integrality constraints to column variables.
+    # Add integrality constraints to column variables and integer
+    # pure master variables.
     int_cis = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Integer}[]
     for (master_var, _, _, _) in ColGen.columns(pool)
         ci = MOI.add_constraint(backend, master_var, MOI.Integer())
         push!(int_cis, ci)
+    end
+    for pmv in ColGen.pure_master_variables(decomp)
+        if ColGen.pure_master_is_integer(decomp, pmv)
+            ci = MOI.add_constraint(
+                backend, pmv.id, MOI.Integer()
+            )
+            push!(int_cis, ci)
+        end
     end
 
     isempty(int_cis) && return nothing
@@ -41,15 +51,32 @@ function solve_restricted_master_ip!(
     result = nothing
     if MOI.get(backend, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
         obj = MOI.get(backend, MOI.ObjectiveValue())
-        selected = Tuple{MOI.VariableIndex,Int}[]
+        nz_int = Tuple{MOI.VariableIndex,Int}[]
+        nz_cont = Tuple{MOI.VariableIndex,Float64}[]
         for (master_var, _, _, _) in ColGen.columns(pool)
             val = MOI.get(backend, MOI.VariablePrimal(), master_var)
             if val > 0.5
-                push!(selected, (master_var, round(Int, val)))
+                push!(nz_int, (master_var, round(Int, val)))
             end
         end
-        if !isempty(selected)
-            result = ColGen.ProjectedIpPrimalSol(obj, selected)
+        for pmv in ColGen.pure_master_variables(decomp)
+            val = MOI.get(
+                backend, MOI.VariablePrimal(), pmv.id
+            )
+            if ColGen.pure_master_is_integer(decomp, pmv)
+                if abs(val) > 0.5
+                    push!(nz_int, (pmv.id, round(Int, val)))
+                end
+            else
+                if abs(val) > 1e-6
+                    push!(nz_cont, (pmv.id, val))
+                end
+            end
+        end
+        if !isempty(nz_int) || !isempty(nz_cont)
+            result = ColGen.MasterIpPrimalSol(
+                obj, nz_int, nz_cont
+            )
         end
     end
 

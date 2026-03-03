@@ -32,8 +32,8 @@ mutable struct BPSpace <: TreeSearch.AbstractSearchSpace
     cut_helper::MathOptState.LocalCutTrackerHelper
     branching_cut_info::Dict{Int,Any}
     id_counter::TreeSearch.NodeIdCounter
-    incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
-    last_ip_incumbent::Union{Nothing,ColGen.ProjectedIpPrimalSol}
+    incumbent::Union{Nothing,ColGen.MasterIpPrimalSol}
+    last_ip_incumbent::Union{Nothing,ColGen.MasterIpPrimalSol}
     best_dual_bound::Float64
     open_node_bounds::Dict{Int,Float64}
     nodes_explored::Int

@@ -40,8 +40,8 @@ function test_ip_project_integral_solution()
         @test !isnothing(result)
         @test cut == false
         @test result.obj_value ≈ 7.0
-        @test length(result.selected) == 1
-        @test result.selected[1] == (mv1, 1)
+        @test length(result.non_zero_integral) == 1
+        @test result.non_zero_integral[1] == (mv1, 1)
     end
 end
 
@@ -70,7 +70,7 @@ function test_ip_project_empty_pool()
 
         @test !isnothing(result)
         @test result.obj_value ≈ 0.0
-        @test isempty(result.selected)
+        @test isempty(result.non_zero_integral)
         @test cut == false
     end
 end
@@ -88,7 +88,7 @@ function test_ip_project_missing_var_defaults_zero()
         @test !isnothing(result)
         @test cut == false
         @test result.obj_value ≈ 0.0
-        @test isempty(result.selected)
+        @test isempty(result.non_zero_integral)
     end
 end
 
@@ -123,7 +123,7 @@ function test_ip_project_multiplicity_greater_than_one()
         @test !isnothing(result)
         @test cut == false
         @test result.obj_value ≈ 6.0
-        @test result.selected[1] == (mv, 3)
+        @test result.non_zero_integral[1] == (mv, 3)
     end
 end
 
@@ -267,7 +267,7 @@ function test_ip_update_incumbent_first_solution()
         ctx = build_gap_context(inst)
 
         @test isnothing(ctx.ip_incumbent)
-        sol = Vertigo.ColGen.ProjectedIpPrimalSol(42.0, [])
+        sol = Vertigo.ColGen.MasterIpPrimalSol(42.0, Tuple{MOI.VariableIndex,Int}[])
         update_inc_primal_sol!(ctx, nothing, sol)
         @test !isnothing(ctx.ip_incumbent)
         @test ctx.ip_incumbent.obj_value ≈ 42.0
@@ -280,8 +280,8 @@ function test_ip_update_incumbent_better_min()
         ctx = build_gap_context(inst)
         @test is_minimization(ctx.decomp)
 
-        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(50.0, []))
-        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(40.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[]))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]))
         @test ctx.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -291,8 +291,8 @@ function test_ip_update_incumbent_worse_rejected_min()
         inst = random_gap_instance(1, 1; seed=16)
         ctx = build_gap_context(inst)
 
-        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(40.0, []))
-        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.ProjectedIpPrimalSol(60.0, []))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]))
+        update_inc_primal_sol!(ctx, nothing, Vertigo.ColGen.MasterIpPrimalSol(60.0, Tuple{MOI.VariableIndex,Int}[]))
         @test ctx.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -304,15 +304,15 @@ function test_ip_is_strictly_better_max()
         ctx = build_gap_context(inst)  # GAP is minimization
 
         # Test the helper directly with manual sense logic
-        sol_good = Vertigo.ColGen.ProjectedIpPrimalSol(100.0, [])
-        sol_bad  = Vertigo.ColGen.ProjectedIpPrimalSol(50.0, [])
+        sol_good = Vertigo.ColGen.MasterIpPrimalSol(100.0, Tuple{MOI.VariableIndex,Int}[])
+        sol_bad  = Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[])
 
         # For minimization: lower is better
         @test Vertigo.ColGen._is_strictly_better(ctx, sol_bad, sol_good) == true
         @test Vertigo.ColGen._is_strictly_better(ctx, sol_good, sol_bad) == false
 
         # Equal values: not strictly better
-        sol_eq = Vertigo.ColGen.ProjectedIpPrimalSol(50.0, [])
+        sol_eq = Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[])
         @test Vertigo.ColGen._is_strictly_better(ctx, sol_bad, sol_eq) == false
     end
 end
