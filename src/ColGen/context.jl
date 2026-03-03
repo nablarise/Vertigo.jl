@@ -290,6 +290,9 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase1)
     for (master_var, _, _, _) in columns(ctx.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, 0.0))
     end
+    for pmv in pure_master_variables(ctx.decomp)
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(pmv.id, 0.0))
+    end
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_pos, sense))
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_neg, sense))
@@ -323,6 +326,10 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase2)
 
     for (master_var, _, _, cost) in columns(ctx.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, cost))
+    end
+    for pmv in pure_master_variables(ctx.decomp)
+        MOI.modify(model, obj_type,
+            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ctx.decomp, pmv)))
     end
     return nothing
 end
