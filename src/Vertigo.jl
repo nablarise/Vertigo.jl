@@ -37,6 +37,7 @@ export ColumnPool, SpSolution, NonRobustCutManager
 # Context and solver entry point
 export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput
 export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit
+export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost, convexity_bounds

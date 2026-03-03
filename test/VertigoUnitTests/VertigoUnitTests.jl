@@ -143,6 +143,7 @@ include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
 include("test_cut_pool_tracker.jl")
 include("test_branch_and_price.jl")
+include("test_stabilization.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
@@ -212,6 +213,7 @@ function run()
     test_column_tracker()
     test_cut_pool_tracker()
     test_branch_and_price()
+    test_stabilization()
 end
 
 end # module VertigoUnitTests

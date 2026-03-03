@@ -87,15 +87,17 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
     ip_incumbent::Union{Nothing,ProjectedIpPrimalSol}
     ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
+    smoothing_alpha::Float64
 
     function ColGenContext(
         decomp, master_model, convexity_ub, convexity_lb, sp_models,
-        pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars
+        pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars;
+        smoothing_alpha::Float64 = 0.0
     )
         new{typeof(decomp),typeof(master_model),typeof(pool),typeof(cuts)}(
             decomp, master_model, convexity_ub, convexity_lb, sp_models,
             pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing,
-            nothing, ActiveBranchingConstraint[]
+            nothing, ActiveBranchingConstraint[], smoothing_alpha
         )
     end
 end

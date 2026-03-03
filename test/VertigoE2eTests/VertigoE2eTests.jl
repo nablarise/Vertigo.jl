@@ -163,7 +163,7 @@ end
 # Build ColGenContext for a GAP instance
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function build_gap_context(inst::GAPInstance)
+function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -238,7 +238,8 @@ function build_gap_context(inst::GAPInstance)
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -423,6 +424,26 @@ function test_gap_three_identical_machines()
     end
 end
 
+function test_gap_wentges_smoothing()
+    @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
+        inst = random_gap_instance(2, 7)
+        ctx = build_gap_context(inst; smoothing_alpha=0.5)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+    end
+end
+
+function test_gap_wentges_smoothing_larger()
+    @testset "[gap] Wentges smoothing converges (3 machines, 30 tasks, α=0.5)" begin
+        inst = gap_two_identical_machines()
+        ctx = build_gap_context(inst; smoothing_alpha=0.5)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+    end
+end
+
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Branch-and-price e2e tests
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -441,6 +462,8 @@ function run()
     test_gap_maximization()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
+    test_gap_wentges_smoothing()
+    test_gap_wentges_smoothing_larger()
 
     for i in 1:10
         println("---------")
