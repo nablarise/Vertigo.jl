@@ -220,55 +220,60 @@ struct ColumnRecord{S,V}
 end
 
 """
-    ColumnPool{M,S,V}
+    ColumnPool{C,S,V}
 
-Triple-indexed column pool: by master var, by subproblem, and by fingerprint for O(1) dedup.
+Triple-indexed column pool: by column variable, by subproblem, and by
+fingerprint for O(1) dedup.
+
+- `C`: column variable index type (e.g. `MOI.VariableIndex`)
+- `S`: subproblem identifier type
+- `V`: subproblem variable index type (e.g. `MOI.VariableIndex`)
 """
-mutable struct ColumnPool{M,S,V} <: AbstractColumnPool
-    by_master_var::Dict{M,ColumnRecord{S,V}}
-    by_subproblem::Dict{S,Vector{M}}
+mutable struct ColumnPool{C,S,V} <: AbstractColumnPool
+    by_column_var::Dict{C,ColumnRecord{S,V}}
+    by_subproblem::Dict{S,Vector{C}}
     fingerprints::Dict{S,Set{UInt64}}
 end
 
-function ColumnPool{M,S,V}() where {M,S,V}
+function ColumnPool{C,S,V}() where {C,S,V}
     return ColumnPool(
-        Dict{M,ColumnRecord{S,V}}(),
-        Dict{S,Vector{M}}(),
+        Dict{C,ColumnRecord{S,V}}(),
+        Dict{S,Vector{C}}(),
         Dict{S,Set{UInt64}}()
     )
 end
 
 function record_column!(
-    pool::ColumnPool{M,S,V}, master_var::M, sp_id::S, sol::SpSolution{S,V}, cost::Float64
-) where {M,S,V}
-    pool.by_master_var[master_var] = ColumnRecord(sp_id, sol, cost)
-    sp_cols = get!(Vector{M}, pool.by_subproblem, sp_id)
-    push!(sp_cols, master_var)
+    pool::ColumnPool{C,S,V}, col_var::C, sp_id::S, sol::SpSolution{S,V}, cost::Float64
+) where {C,S,V}
+    pool.by_column_var[col_var] = ColumnRecord(sp_id, sol, cost)
+    sp_cols = get!(Vector{C}, pool.by_subproblem, sp_id)
+    push!(sp_cols, col_var)
     fp_set = get!(Set{UInt64}, pool.fingerprints, sp_id)
     push!(fp_set, sol.fingerprint)
     return nothing
 end
 
-function get_column_solution(pool::ColumnPool, master_var)
-    record = get(pool.by_master_var, master_var, nothing)
+function get_column_solution(pool::ColumnPool, col_var)
+    record = get(pool.by_column_var, col_var, nothing)
     return isnothing(record) ? nothing : record.solution
 end
 
-get_column_sp_id(pool::ColumnPool, master_var) = pool.by_master_var[master_var].sp_id
-get_column_cost(pool::ColumnPool, master_var) = pool.by_master_var[master_var].original_cost
+get_column_sp_id(pool::ColumnPool, col_var) = pool.by_column_var[col_var].sp_id
+get_column_cost(pool::ColumnPool, col_var) = pool.by_column_var[col_var].original_cost
 
 function columns(pool::ColumnPool)
     return (
-        (mv, rec.sp_id, rec.solution, rec.original_cost)
-        for (mv, rec) in pool.by_master_var
+        (cv, rec.sp_id, rec.solution, rec.original_cost)
+        for (cv, rec) in pool.by_column_var
     )
 end
 
-function columns_for_subproblem(pool::ColumnPool{M,S,V}, sp_id::S) where {M,S,V}
-    master_vars = get(pool.by_subproblem, sp_id, M[])
+function columns_for_subproblem(pool::ColumnPool{C,S,V}, sp_id::S) where {C,S,V}
+    col_vars = get(pool.by_subproblem, sp_id, C[])
     return (
-        (mv, pool.by_master_var[mv].solution, pool.by_master_var[mv].original_cost)
-        for mv in master_vars
+        (cv, pool.by_column_var[cv].solution, pool.by_column_var[cv].original_cost)
+        for cv in col_vars
     )
 end
 

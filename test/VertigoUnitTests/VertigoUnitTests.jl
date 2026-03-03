@@ -13,7 +13,8 @@ const MOI = MathOptInterface
 
 using Vertigo
 using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
-    check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2
+    check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2,
+    get_column_sp_id, get_column_cost
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
 
@@ -146,6 +147,7 @@ include("test_branch_and_price.jl")
 include("test_stabilization.jl")
 include("test_setup_reformulation.jl")
 include("test_insert_columns.jl")
+include("test_column_pool.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Tests
@@ -178,7 +180,7 @@ function test_gap_column_pool_populated()
         run_column_generation(ctx)
 
         # Pool must have columns — at least one per machine
-        @test length(ctx.pool.by_master_var) >= 2
+        @test length(ctx.pool.by_column_var) >= 2
     end
 end
 
@@ -218,6 +220,7 @@ function run()
     test_stabilization()
     test_setup_reformulation()
     test_insert_columns()
+    test_column_pool()
 end
 
 end # module VertigoUnitTests

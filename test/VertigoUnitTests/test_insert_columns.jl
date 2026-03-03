@@ -160,9 +160,9 @@ function test_insert_columns_single_column()
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
         @test n == 1
-        @test length(ctx.pool.by_master_var) == 1
+        @test length(ctx.pool.by_column_var) == 1
 
-        col_var = first(keys(ctx.pool.by_master_var))
+        col_var = first(keys(ctx.pool.by_column_var))
 
         @test _obj_coeff(model, col_var) ≈ 3.0
         @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
@@ -194,10 +194,10 @@ function test_insert_columns_two_columns()
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
         @test n == 2
-        @test length(ctx.pool.by_master_var) == 2
+        @test length(ctx.pool.by_column_var) == 2
 
         # Identify columns by cost
-        col_vars = collect(keys(ctx.pool.by_master_var))
+        col_vars = collect(keys(ctx.pool.by_column_var))
         costs = [_obj_coeff(model, v) for v in col_vars]
         var_a = col_vars[findfirst(c -> c ≈ 3.0, costs)]
         var_b = col_vars[findfirst(c -> c ≈ 5.0, costs)]
@@ -240,7 +240,7 @@ function test_insert_columns_duplicate_skipped()
             Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
         )
         @test n2 == 0
-        @test length(ctx.pool.by_master_var) == 1
+        @test length(ctx.pool.by_column_var) == 1
     end
 end
 
@@ -264,7 +264,7 @@ function test_insert_columns_mixed_sp_variables()
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
         @test n == 1
 
-        col_var = first(keys(ctx.pool.by_master_var))
+        col_var = first(keys(ctx.pool.by_column_var))
 
         @test _obj_coeff(model, col_var) ≈ 13.0
         @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
@@ -287,8 +287,8 @@ function test_insert_columns_pool_records_original_cost()
 
         Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
-        col_var = first(keys(ctx.pool.by_master_var))
-        entry = ctx.pool.by_master_var[col_var]
+        col_var = first(keys(ctx.pool.by_column_var))
+        entry = ctx.pool.by_column_var[col_var]
 
         @test entry.original_cost ≈ 3.0
         @test entry.sp_id == 1
@@ -303,7 +303,7 @@ function test_insert_columns_empty_set()
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
         @test n == 0
-        @test isempty(ctx.pool.by_master_var)
+        @test isempty(ctx.pool.by_column_var)
     end
 end
 
