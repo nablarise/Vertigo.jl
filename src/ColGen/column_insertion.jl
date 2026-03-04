@@ -3,40 +3,6 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    _add_column_variable!(model, all_coeffs, objective_coeff) -> MOI.VariableIndex
-
-Add a new non-negative column variable to the master MOI model.
-"""
-function _add_column_variable!(
-    model, all_coeffs::Dict{TaggedCI,Float64},
-    objective_coeff::Float64
-)
-    var = MOI.add_variable(model)
-    MOI.add_constraint(model, var, MOI.GreaterThan(0.0))
-
-    if !iszero(objective_coeff)
-        MOI.modify(
-            model,
-            MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-            MOI.ScalarCoefficientChange(var, objective_coeff)
-        )
-    end
-
-    for (tagged_ci, coeff) in all_coeffs
-        if !iszero(coeff)
-            with_typed_ci(tagged_ci) do ci
-                MOI.modify(
-                    model, ci,
-                    MOI.ScalarCoefficientChange(var, coeff)
-                )
-            end
-        end
-    end
-
-    return var
-end
-
-"""
     _objective_cost(::Phase0, col_cost) -> Float64
     _objective_cost(::Phase1, col_cost) -> Float64
     _objective_cost(::Phase2, col_cost) -> Float64
@@ -93,7 +59,11 @@ function insert_columns!(
         end
 
         obj_coeff = _objective_cost(phase, col_cost)
-        col_var = _add_column_variable!(model, all_coeffs, obj_coeff)
+        col_var = add_variable!(model;
+            lower_bound = 0.0,
+            constraint_coeffs = all_coeffs,
+            objective_coeff = obj_coeff
+        )
         record_column!(ctx.pool, col_var, sp_id, sol, col_cost)
 
         cols_inserted += 1
