@@ -8,16 +8,24 @@
 
 const _SAF = MOI.ScalarAffineFunction{Float64}
 
+const _VI = MOI.VariableIndex
+
 @enum CIKind::UInt8 begin
     SAF_EQ   # ConstraintIndex{SAF, EqualTo{Float64}}
     SAF_LEQ  # ConstraintIndex{SAF, LessThan{Float64}}
     SAF_GEQ  # ConstraintIndex{SAF, GreaterThan{Float64}}
+    VI_EQ    # ConstraintIndex{VariableIndex, EqualTo{Float64}}
+    VI_LEQ   # ConstraintIndex{VariableIndex, LessThan{Float64}}
+    VI_GEQ   # ConstraintIndex{VariableIndex, GreaterThan{Float64}}
 end
 
 function _ci_type(kind::CIKind)
-    kind == SAF_EQ && return MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}
+    kind == SAF_EQ  && return MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}
     kind == SAF_LEQ && return MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}
-    return MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}
+    kind == SAF_GEQ && return MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}
+    kind == VI_EQ   && return MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}
+    kind == VI_LEQ  && return MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}
+    return MOI.ConstraintIndex{_VI,MOI.GreaterThan{Float64}}
 end
 
 """
@@ -42,21 +50,18 @@ TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) =
     TaggedCI(ci.value, SAF_LEQ)
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}) =
     TaggedCI(ci.value, SAF_GEQ)
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}) =
+    TaggedCI(ci.value, VI_EQ)
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}) =
+    TaggedCI(ci.value, VI_LEQ)
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.GreaterThan{Float64}}) =
+    TaggedCI(ci.value, VI_GEQ)
+TaggedCI(ci::MOI.ConstraintIndex{F,S}) where {F,S} =
+    error("unsupported constraint type: $F-in-$S")
 
 @inline function with_typed_ci(f, idx::TaggedCI)
-    if idx.kind == SAF_EQ
-        return f(MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}(
-            idx.value
-        ))
-    elseif idx.kind == SAF_LEQ
-        return f(MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}(
-            idx.value
-        ))
-    else
-        return f(MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}(
-            idx.value
-        ))
-    end
+    ci_type = _ci_type(idx.kind)
+    return f(ci_type(idx.value))
 end
 
 """

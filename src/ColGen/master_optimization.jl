@@ -16,7 +16,6 @@ end
 Base.show(io::IO, sol::MasterPrimalSolution) = show(io, sol.sol)
 Base.show(io::IO, sol::MasterDualSolution) = show(io, sol.sol)
 
-recompute_cost(dual_sol::MasterDualSolution, model) = recompute_cost(dual_sol.sol, model)
 
 struct MasterSolution
     moi_termination_status::MOI.TerminationStatusCode
@@ -50,21 +49,14 @@ function _populate_variable_values(model)
 end
 
 function _populate_constraint_duals(model)
-    constraint_duals = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}()
+    constraint_duals = Dict{TaggedCI,Float64}()
     dual_status = MOI.get(model, MOI.DualStatus())
+    dual_status == MOI.FEASIBLE_POINT || return constraint_duals
     sense = MOI.get(model, MOI.ObjectiveSense()) == MOI.MAX_SENSE ? -1 : 1
-    if dual_status == MOI.FEASIBLE_POINT
-        constraint_types = MOI.get(model, MOI.ListOfConstraintTypesPresent())
-        for (F, S) in constraint_types
-            constraint_indices = MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
-            if !isempty(constraint_indices)
-                constraint_type = typeof(first(constraint_indices))
-                constraint_duals[constraint_type] = Dict{Int64,Float64}()
-                for constraint_index in constraint_indices
-                    dual_value = MOI.get(model, MOI.ConstraintDual(), constraint_index)
-                    constraint_duals[constraint_type][constraint_index.value] = sense * dual_value
-                end
-            end
+    for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
+        for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+            dual_val = MOI.get(model, MOI.ConstraintDual(), ci)
+            constraint_duals[TaggedCI(ci)] = sense * dual_val
         end
     end
     return constraint_duals
