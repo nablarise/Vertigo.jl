@@ -8,22 +8,28 @@
 
 const _SAF = MOI.ScalarAffineFunction{Float64}
 
-@enum ConstraintSense begin
-    GREATER_THAN  # ax ≥ b
-    LESS_THAN     # ax ≤ b
-    EQUAL_TO      # ax = b
+@enum CIKind::UInt8 begin
+    SAF_EQ   # ConstraintIndex{SAF, EqualTo{Float64}}
+    SAF_LEQ  # ConstraintIndex{SAF, LessThan{Float64}}
+    SAF_GEQ  # ConstraintIndex{SAF, GreaterThan{Float64}}
+end
+
+function _ci_type(kind::CIKind)
+    kind == SAF_EQ && return MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}
+    kind == SAF_LEQ && return MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}
+    return MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}
 end
 
 """
     TaggedCI
 
 Concrete isbits representation of a `MOI.ConstraintIndex{SAF,S}`.
-Stores the index value and a constraint sense tag to recover the
-concrete type at MOI call boundaries via `with_typed_ci`.
+Stores the index value and a `CIKind` tag to recover the concrete
+type at MOI call boundaries via `with_typed_ci`.
 """
 struct TaggedCI
     value::Int64
-    kind::ConstraintSense
+    kind::CIKind
 end
 @assert isbitstype(TaggedCI)
 function Base.isless(a::TaggedCI, b::TaggedCI)
@@ -31,18 +37,18 @@ function Base.isless(a::TaggedCI, b::TaggedCI)
 end
 
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) =
-    TaggedCI(ci.value, EQUAL_TO)
+    TaggedCI(ci.value, SAF_EQ)
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) =
-    TaggedCI(ci.value, LESS_THAN)
+    TaggedCI(ci.value, SAF_LEQ)
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}) =
-    TaggedCI(ci.value, GREATER_THAN)
+    TaggedCI(ci.value, SAF_GEQ)
 
 @inline function with_typed_ci(f, idx::TaggedCI)
-    if idx.kind == EQUAL_TO
+    if idx.kind == SAF_EQ
         return f(MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}(
             idx.value
         ))
-    elseif idx.kind == LESS_THAN
+    elseif idx.kind == SAF_LEQ
         return f(MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}(
             idx.value
         ))
@@ -128,6 +134,12 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 # PART 5: THE DECOMPOSITION STRUCT
 # ────────────────────────────────────────────────────────────────────────────────────────
+
+@enum ConstraintSense begin
+    GREATER_THAN  # ax ≥ b
+    LESS_THAN     # ax ≤ b
+    EQUAL_TO      # ax = b
+end
 
 """
     Decomposition{S,V,X,C,Y}

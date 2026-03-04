@@ -66,9 +66,9 @@ function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
 end
 
 function _dual_value(dual_sol::MasterDualSolution, idx::TaggedCI)
-    return with_typed_ci(idx) do ci
-        _dual_value(dual_sol, ci)
-    end
+    d = get(dual_sol.sol.constraint_duals, _ci_type(idx.kind), nothing)
+    isnothing(d) && return 0.0
+    return get(d, idx.value, 0.0)
 end
 
 # Hot path: sorted duals built once, shared across subproblems.
