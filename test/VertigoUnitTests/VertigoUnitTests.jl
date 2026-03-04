@@ -69,8 +69,8 @@ function build_gap_context(inst::GAPInstance)
     master_model = backend(master_jump)
 
     # ── Subproblem models ─────────────────────────────────────────────────────
-    sp_models = Dict{Any,Any}()
-    sp_var_indices = Dict{Int,Vector{MOI.VariableIndex}}()
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
 
     for k in K
         sp_jump = Model(HiGHS.Optimizer)
@@ -80,27 +80,27 @@ function build_gap_context(inst::GAPInstance)
         @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k])
         @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
 
-        sp_models[k] = backend(sp_jump)
-        sp_var_indices[k] = [index(z[t]) for t in T]
+        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
     end
 
     # ── Build Decomposition ───────────────────────────────────────────────────
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DecompositionBuilder{Int,SpVar,Tuple{Int,Int},CstrId,Nothing}(minimize=true)
+    builder = DecompositionBuilder{SpVar,Tuple{Int,Int},CstrId,Nothing}(minimize=true)
 
     for k in K
-        add_subproblem!(builder, k, 0.0, 0.0, 1.0)
+        add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
     end
 
     for k in K
         for t in T
-            sp_var = sp_var_indices[k][t]
-            add_sp_variable!(builder, k, sp_var, inst.cost[k, t])
+            sp_var = sp_var_indices[PricingSubproblemId(k)][t]
+            add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, k, sp_var, cstr_idx, 1.0)
-            add_mapping!(builder, (k, t), k, sp_var)
+            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
 
@@ -111,11 +111,11 @@ function build_gap_context(inst::GAPInstance)
     decomp = build(builder)
 
     # ── Column pool ───────────────────────────────────────────────────────────
-    pool = ColumnPool{MOI.VariableIndex,Int,SpVar}()
+    pool = ColumnPool{MOI.VariableIndex,SpVar}()
 
     # ── Convexity constraint indices ──────────────────────────────────────────
-    conv_ub_map = Dict{Any,Any}(k => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{Any,Any}(k => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────────────
     ctx = ColGenContext(
@@ -160,12 +160,13 @@ function test_gap_decomposition_builder()
 
         @test length(collect(subproblem_ids(ctx.decomp))) == 2
         for k in 1:2
-            vars = subproblem_variables(ctx.decomp, k)
+            sp_id = PricingSubproblemId(k)
+            vars = subproblem_variables(ctx.decomp, sp_id)
             @test length(vars) == 4
-            lb, ub = convexity_bounds(ctx.decomp, k)
+            lb, ub = convexity_bounds(ctx.decomp, sp_id)
             @test lb ≈ 0.0
             @test ub ≈ 1.0
-            @test subproblem_fixed_cost(ctx.decomp, k) ≈ 0.0
+            @test subproblem_fixed_cost(ctx.decomp, sp_id) ≈ 0.0
         end
         @test length(coupling_constraints(ctx.decomp)) == 4
         @test is_minimization(ctx.decomp)

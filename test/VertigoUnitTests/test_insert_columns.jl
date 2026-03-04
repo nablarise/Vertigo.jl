@@ -95,37 +95,38 @@ function build_insert_columns_context()
     OrigVar = Tuple{Int,Int}
 
     builder = DecompositionBuilder{
-        Int,SpVar,OrigVar,CstrEq,Nothing
+        SpVar,OrigVar,CstrEq,Nothing
     }(minimize=true)
 
-    add_subproblem!(builder, 1, 0.0, 0.0, 1.0)
+    add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 1.0)
 
     z1 = MOI.VariableIndex(1)
     z2 = MOI.VariableIndex(2)
 
-    add_sp_variable!(builder, 1, z1, 3.0)
-    add_coupling_coefficient!(builder, 1, z1, c1, 2.0)
-    add_coupling_coefficient!(builder, 1, z1, c2, 1.0)
-    add_mapping!(builder, (1, 1), 1, z1)   # z1 → x₁
+    sp1 = PricingSubproblemId(1)
+    add_sp_variable!(builder, sp1, z1, 3.0)
+    add_coupling_coefficient!(builder, sp1, z1, c1, 2.0)
+    add_coupling_coefficient!(builder, sp1, z1, c2, 1.0)
+    add_mapping!(builder, (1, 1), sp1, z1)   # z1 → x₁
 
-    add_sp_variable!(builder, 1, z2, 5.0)
-    add_coupling_coefficient!(builder, 1, z2, c2, 4.0)
-    add_mapping!(builder, (1, 2), 1, z2)   # z2 → x₂
+    add_sp_variable!(builder, sp1, z2, 5.0)
+    add_coupling_coefficient!(builder, sp1, z2, c2, 4.0)
+    add_mapping!(builder, (1, 2), sp1, z2)   # z2 → x₂
 
     add_coupling_constraint!(builder, c1, EQUAL_TO, 1.0)
     add_coupling_constraint!(builder, c2, EQUAL_TO, 1.0)
 
     decomp = build(builder)
 
-    pool = ColumnPool{MOI.VariableIndex,Int,SpVar}()
+    pool = ColumnPool{MOI.VariableIndex,SpVar}()
 
-    conv_ub_map = Dict{Any,Any}(1 => conv_ub)
-    conv_lb_map = Dict{Any,Any}(1 => conv_lb)
+    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_ub)
+    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_lb)
 
     ctx = ColGenContext(
         decomp, model,
         conv_ub_map, conv_lb_map,
-        Dict{Any,Any}(),
+        Dict{PricingSubproblemId,Any}(),
         pool,
         NonRobustCutManager{CstrEq}(),
         Dict{Any,Any}(), Dict{Any,Any}(), Dict{Any,Any}()
@@ -151,9 +152,9 @@ function test_insert_columns_single_column()
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
-        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol, true
+            PricingSubproblemId(1), sol, true
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -178,14 +179,14 @@ function test_insert_columns_two_columns()
         ctx, refs = build_insert_columns_context()
         model = ctx.master_model
 
-        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
-        sol_b = Vertigo.ColGen._SpSolution(1, 5.0, [(refs.z2, 1.0)])
+        sol_a = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)])
 
         pricing_a = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol_a, true
+            PricingSubproblemId(1), sol_a, true
         )
         pricing_b = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol_b, true
+            PricingSubproblemId(1), sol_b, true
         )
         columns = Vertigo.ColGen.GeneratedColumns(
             [pricing_a, pricing_b]
@@ -224,9 +225,9 @@ function test_insert_columns_duplicate_skipped()
     @testset "[insert_columns] duplicate column skipped" begin
         ctx, refs = build_insert_columns_context()
 
-        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol, true
+            PricingSubproblemId(1), sol, true
         )
 
         n1 = Vertigo.ColGen.insert_columns!(
@@ -254,10 +255,10 @@ function test_insert_columns_mixed_sp_variables()
         # c1 = 2*1 + 0*2 = 2, c2 = 1*1 + 4*2 = 9
         # br(x₁) = 1 (only z1 maps to x₁)
         sol = Vertigo.ColGen._SpSolution(
-            1, 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
+            PricingSubproblemId(1), 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol, true
+            PricingSubproblemId(1), sol, true
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -279,9 +280,9 @@ function test_insert_columns_pool_records_original_cost()
     @testset "[insert_columns] pool records original cost" begin
         ctx, refs = build_insert_columns_context()
 
-        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            1, sol, true
+            PricingSubproblemId(1), sol, true
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -291,7 +292,7 @@ function test_insert_columns_pool_records_original_cost()
         entry = ctx.pool.by_column_var[col_var]
 
         @test column_original_cost(entry) ≈ 3.0
-        @test column_sp_id(entry) == 1
+        @test column_sp_id(entry) == PricingSubproblemId(1)
     end
 end
 
@@ -299,7 +300,7 @@ function test_insert_columns_empty_set()
     @testset "[insert_columns] empty column set" begin
         ctx, _ = build_insert_columns_context()
 
-        columns = Vertigo.ColGen.GeneratedColumns(Vertigo.ColGen.PricingPrimalSolution{Int}[])
+        columns = Vertigo.ColGen.GeneratedColumns(Vertigo.ColGen.PricingPrimalSolution[])
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
         @test n == 0

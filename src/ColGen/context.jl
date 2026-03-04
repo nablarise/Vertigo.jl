@@ -42,8 +42,8 @@ end
 
 struct Master{MoiModel}
     moi_master::MoiModel
-    convexity_constraints_ub::Dict{Any,Any}
-    convexity_constraints_lb::Dict{Any,Any}
+    convexity_constraints_ub::Dict{PricingSubproblemId,Any}
+    convexity_constraints_lb::Dict{PricingSubproblemId,Any}
     eq_art_vars::Dict{Any,Any}
     leq_art_vars::Dict{Any,Any}
     geq_art_vars::Dict{Any,Any}
@@ -96,9 +96,9 @@ Type parameters:
 mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCutManager}
     decomp::D
     master_model::M
-    convexity_ub::Dict{Any,Any}   # sp_id → MOI.ConstraintIndex (LessThan)
-    convexity_lb::Dict{Any,Any}   # sp_id → MOI.ConstraintIndex (GreaterThan)
-    sp_models::Dict{Any,Any}      # sp_id → MOI backend
+    convexity_ub::Dict{PricingSubproblemId,Any}
+    convexity_lb::Dict{PricingSubproblemId,Any}
+    sp_models::Dict{PricingSubproblemId,Any}
     pool::P
     cuts::CutM
     eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
@@ -141,7 +141,7 @@ function get_master(ctx::ColGenContext)
 end
 
 function get_pricing_subprobs(ctx::ColGenContext)
-    return Dict{Any,Any}(
+    return Dict{PricingSubproblemId,Any}(
         sp_id => PricingSubproblem(ctx.sp_models[sp_id])
         for sp_id in subproblem_ids(ctx.decomp)
     )

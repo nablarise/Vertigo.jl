@@ -31,21 +31,20 @@ get_primal_sols(sol::PricingSolution) = sol.primal_sols
 get_primal_bound(sol::PricingSolution) = sol.primal_bound
 get_dual_bound(sol::PricingSolution) = sol.dual_bound
 
-struct PricingPrimalSolution{S}
-    sp_id::S
-    solution::_SpSolution{S,MOI.VariableIndex}
+struct PricingPrimalSolution
+    sp_id::PricingSubproblemId
+    solution::_SpSolution{MOI.VariableIndex}
     is_improving::Bool
 end
 
 # ── Set of columns ────────────────────────────────────────────────────────────
 
-struct GeneratedColumns{S}
-    collection::Vector{PricingPrimalSolution{S}}
+struct GeneratedColumns
+    collection::Vector{PricingPrimalSolution}
 end
 
-function set_of_columns(ctx::ColGenContext)
-    S = _sp_id_type(ctx.decomp)
-    return GeneratedColumns(PricingPrimalSolution{S}[])
+function set_of_columns(::ColGenContext)
+    return GeneratedColumns(PricingPrimalSolution[])
 end
 
 function push_in_set!(set::GeneratedColumns, sol::PricingPrimalSolution)

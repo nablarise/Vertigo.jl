@@ -46,6 +46,7 @@ include("logger.jl")
 # ── Exports ───────────────────────────────────────────────────────────────────
 
 # Decomposition builder
+export PricingSubproblemId
 export Decomposition, DecompositionBuilder, ConstraintSense, EQUAL_TO, LESS_THAN, GREATER_THAN
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!

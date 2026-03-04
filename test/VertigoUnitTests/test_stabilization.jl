@@ -40,8 +40,8 @@ function _build_stab_ctx(; alpha=0.5)
     @objective(master_jump, Min, 0)
     master_model = JuMP.backend(master_jump)
 
-    sp_models = Dict{Any,Any}()
-    sp_var_indices = Dict{Int,Vector{MOI.VariableIndex}}()
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
     for k in K
         sp_jump = JuMP.Model(HiGHS.Optimizer)
         JuMP.set_silent(sp_jump)
@@ -50,26 +50,26 @@ function _build_stab_ctx(; alpha=0.5)
             sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k]
         )
         @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
-        sp_models[k] = JuMP.backend(sp_jump)
-        sp_var_indices[k] = [JuMP.index(z[t]) for t in T]
+        sp_models[PricingSubproblemId(k)] = JuMP.backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [JuMP.index(z[t]) for t in T]
     end
 
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    builder = DecompositionBuilder{Int,SpVar,Tuple{Int,Int},CstrId,Nothing}(
+    builder = DecompositionBuilder{SpVar,Tuple{Int,Int},CstrId,Nothing}(
         minimize=true
     )
     for k in K
-        add_subproblem!(builder, k, 0.0, 0.0, 1.0)
+        add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
     end
     for k in K, t in T
-        sp_var = sp_var_indices[k][t]
-        add_sp_variable!(builder, k, sp_var, inst.cost[k, t])
+        sp_var = sp_var_indices[PricingSubproblemId(k)][t]
+        add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
         cstr_idx = JuMP.index(assignment[t])
-        add_coupling_coefficient!(builder, k, sp_var, cstr_idx, 1.0)
-        add_mapping!(builder, (k, t), k, sp_var)
+        add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+        add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
     end
     for t in T
         add_coupling_constraint!(
@@ -78,12 +78,12 @@ function _build_stab_ctx(; alpha=0.5)
     end
     decomp = build(builder)
 
-    pool = ColumnPool{MOI.VariableIndex,Int,SpVar}()
-    conv_ub_map = Dict{Any,Any}(
-        k => JuMP.index(conv_ub[k]) for k in K
+    pool = ColumnPool{MOI.VariableIndex,SpVar}()
+    conv_ub_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => JuMP.index(conv_ub[k]) for k in K
     )
-    conv_lb_map = Dict{Any,Any}(
-        k => JuMP.index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => JuMP.index(conv_lb[k]) for k in K
     )
 
     ctx = ColGenContext(
@@ -242,7 +242,7 @@ function test_bound_improvement_updates_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # For minimization, improving means pseudo_db > best_lagrangian_bound
     update_stabilization_after_pricing_optim!(
@@ -261,7 +261,7 @@ function test_no_improvement_keeps_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # First call sets bound to 10.0
     update_stabilization_after_pricing_optim!(
@@ -284,7 +284,7 @@ function test_misprice_inactive()
     stab = setup_stabilization!(ctx, master)
     stab.cur_smooth_dual_sol_coeff = 0.0
 
-    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution[])
     dual = _make_dual_sol(0.0)
     @test check_misprice(stab, gen_cols, dual) == false
 end
@@ -332,7 +332,7 @@ function test_decrease_alpha()
 
     # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
     # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution{Int}[])
+    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
 
     old_alpha = stab.smooth_dual_sol_coeff
@@ -360,7 +360,7 @@ function test_increase_alpha()
     stab.stab_center = center_dual
 
     # Direction product = 1.0 * (1.0 - 3.0) = -2.0 ≤ 0 → increase α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution{Int}[])
+    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
 
     old_alpha = stab.smooth_dual_sol_coeff

@@ -106,10 +106,10 @@ function build_phase_test_context()
     SpVar = MOI.VariableIndex
     CstrEq = typeof(c1)
     builder = DecompositionBuilder{
-        Int,SpVar,Nothing,CstrEq,MOI.VariableIndex
+        SpVar,Nothing,CstrEq,MOI.VariableIndex
     }(minimize=true)
 
-    add_subproblem!(builder, 1, 0.0, 0.0, 2.0)
+    add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 2.0)
     add_coupling_constraint!(builder, c1, EQUAL_TO, 1.0)
 
     add_pure_master_variable!(
@@ -125,20 +125,21 @@ function build_phase_test_context()
     decomp = build(builder)
 
     # Column pool with two columns.
-    pool = ColumnPool{MOI.VariableIndex,Int,SpVar}()
+    pool = ColumnPool{MOI.VariableIndex,SpVar}()
     sp_var_dummy = MOI.VariableIndex(9999)
-    sol1 = Vertigo.ColGen._SpSolution(1, 5.0, [(sp_var_dummy, 1.0)])
-    sol2 = Vertigo.ColGen._SpSolution(1, 8.0, [(sp_var_dummy, 1.0)])
-    record_column!(pool, λ1, 1, sol1, 5.0)
-    record_column!(pool, λ2, 1, sol2, 8.0)
+    sp1 = PricingSubproblemId(1)
+    sol1 = Vertigo.ColGen._SpSolution(sp1, 5.0, [(sp_var_dummy, 1.0)])
+    sol2 = Vertigo.ColGen._SpSolution(sp1, 8.0, [(sp_var_dummy, 1.0)])
+    record_column!(pool, λ1, sp1, sol1, 5.0)
+    record_column!(pool, λ2, sp1, sol2, 8.0)
 
-    conv_ub = Dict{Any,Any}(1 => c2)
-    conv_lb = Dict{Any,Any}(1 => c3)
+    conv_ub = Dict{PricingSubproblemId,Any}(sp1 => c2)
+    conv_lb = Dict{PricingSubproblemId,Any}(sp1 => c3)
 
     ctx = ColGenContext(
         decomp, model,
         conv_ub, conv_lb,
-        Dict{Any,Any}(),   # no subproblem models
+        Dict{PricingSubproblemId,Any}(),
         pool,
         NonRobustCutManager{CstrEq}(),
         Dict{Any,Any}(), Dict{Any,Any}(), Dict{Any,Any}()
