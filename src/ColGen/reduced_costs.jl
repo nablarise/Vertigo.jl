@@ -83,7 +83,9 @@ function _compute_sp_reduced_costs(
         rc -= _merge_dual_contrib(
             coupling_coefficients(decomp, sp_id, sp_var), sorted_duals
         )
+        # TODO: O(n_cuts) per variable — needs batch/merge optimization.
         rc -= total_cut_dual_contribution(ctx.cuts, sp_id, sp_var)
+        # TODO: O(n_bc × n_orig_per_var) per variable — needs optimization.
         for bc in ctx.branching_constraints
             σ = _dual_value(mast_dual_sol, bc.constraint_index)
             iszero(σ) && continue
