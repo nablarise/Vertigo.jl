@@ -47,6 +47,7 @@ struct Master{MoiModel}
     eq_art_vars::Dict{Any,Any}
     leq_art_vars::Dict{Any,Any}
     geq_art_vars::Dict{Any,Any}
+    coupling_constraint_ids::Vector{TaggedCI}
 end
 
 moi_master(m::Master) = m.moi_master
@@ -125,13 +126,17 @@ end
 is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
 
 function get_master(ctx::ColGenContext)
+    cc_ids = TaggedCI[
+        TaggedCI(cid) for (cid, _, _) in coupling_constraints(ctx.decomp)
+    ]
     return Master(
         ctx.master_model,
         ctx.convexity_ub,
         ctx.convexity_lb,
         ctx.eq_art_vars,
         ctx.leq_art_vars,
-        ctx.geq_art_vars
+        ctx.geq_art_vars,
+        cc_ids
     )
 end
 

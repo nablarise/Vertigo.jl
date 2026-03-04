@@ -127,7 +127,10 @@ function _convex_combination(
     end
 
     obj = alpha * center.sol.obj_value + one_minus_alpha * out.sol.obj_value
-    return MasterDualSolution(DualMoiSolution(obj, combined))
+    return MasterDualSolution(
+        DualMoiSolution(obj, combined),
+        out.coupling_constraint_ids
+    )
 end
 
 function get_stab_dual_sol(

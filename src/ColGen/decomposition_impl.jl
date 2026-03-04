@@ -22,6 +22,7 @@ struct TaggedCI
     kind::CIKind
 end
 @assert isbitstype(TaggedCI)
+Base.isless(a::TaggedCI, b::TaggedCI) = (a.kind, a.value) < (b.kind, b.value)
 
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) =
     TaggedCI(ci.value, EQ_KIND)
@@ -491,13 +492,17 @@ function build(b::DecompositionBuilder{S,V,X,C,Y}) where {S,V,X,C,Y}
             push!(grp, (cstr_id, coeff))
         end
 
-        # Build CSR in the same order as the variables list (deterministic)
+        # Build CSR in the same order as the variables list (deterministic).
+        # Each variable's slice is sorted by TaggedCI to enable merge-based
+        # reduced cost computation (two-pointer merge with sorted duals).
         for sp_var in variables
             haskey(grouped, sp_var) || continue
             range_start = length(entries) + 1
             for (cstr_id, coeff) in grouped[sp_var]
                 push!(entries, CouplingEntry(TaggedCI(cstr_id), coeff))
             end
+            # @view into Vector is mutable — sort! operates in-place
+            sort!(@view(entries[range_start:end]); by = e -> e.constraint_id)
             offsets[sp_var] = range_start:length(entries)
         end
 

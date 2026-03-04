@@ -10,25 +10,34 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     MasterDualSolution, DualMoiSolution, GeneratedColumns,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
-    Phase0, Phase1, Phase2
+    Phase0, Phase1, Phase2, TaggedCI
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────
 
-function _make_dual_sol(obj::Float64, duals::Dict)
+function _make_dual_sol(
+    obj::Float64, duals::Dict;
+    cc_ids::Vector{TaggedCI}=TaggedCI[]
+)
     constraint_duals = Dict{
         Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}
     }()
     for (ctype, inner) in duals
         constraint_duals[ctype] = inner
     end
-    return MasterDualSolution(DualMoiSolution(obj, constraint_duals))
+    return MasterDualSolution(
+        DualMoiSolution(obj, constraint_duals), cc_ids
+    )
 end
 
 function _make_dual_sol(obj::Float64)
     return MasterDualSolution(
-        DualMoiSolution(obj, Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}())
+        DualMoiSolution(
+            obj,
+            Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}()
+        ),
+        TaggedCI[]
     )
 end
 
@@ -162,8 +171,8 @@ function test_convex_combination_arithmetic()
     d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
         EqCstr => Dict(1 => 0.0, 2 => 0.0)
     )
-    center = MasterDualSolution(DualMoiSolution(100.0, d_center))
-    out = MasterDualSolution(DualMoiSolution(0.0, d_out))
+    center = MasterDualSolution(DualMoiSolution(100.0, d_center), TaggedCI[])
+    out = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
     combined = _convex_combination(center, out, 0.5)
     eq_duals = combined.sol.constraint_duals[EqCstr]
@@ -185,8 +194,8 @@ function test_convex_combination_disjoint_types()
     d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
         LtCstr => Dict(1 => 6.0)
     )
-    center = MasterDualSolution(DualMoiSolution(10.0, d_center))
-    out = MasterDualSolution(DualMoiSolution(20.0, d_out))
+    center = MasterDualSolution(DualMoiSolution(10.0, d_center), TaggedCI[])
+    out = MasterDualSolution(DualMoiSolution(20.0, d_out), TaggedCI[])
 
     combined = _convex_combination(center, out, 0.3)
     # EqCstr: 0.3*4.0 + 0.7*0.0 = 1.2
@@ -333,8 +342,8 @@ function test_decrease_alpha()
     d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
         EqCstr => Dict(1 => 3.0)
     )
-    center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center))
-    out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out))
+    center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
+    out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
     stab.stab_center = center_dual
 
@@ -367,8 +376,8 @@ function test_increase_alpha()
     d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
         EqCstr => Dict(1 => 1.0)
     )
-    center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center))
-    out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out))
+    center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
+    out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
     stab.stab_center = center_dual
 

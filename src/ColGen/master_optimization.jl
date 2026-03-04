@@ -8,6 +8,9 @@ end
 
 struct MasterDualSolution
     sol::DualMoiSolution
+    # Coupling constraint IDs used to filter the full dual solution and
+    # build a sorted dual vector for merge-based reduced cost computation.
+    coupling_constraint_ids::Vector{TaggedCI}
 end
 
 Base.show(io::IO, sol::MasterPrimalSolution) = show(io, sol.sol)
@@ -76,7 +79,10 @@ function optimize_master_lp_problem!(master, ::ColGenContext)
 
     dual_obj_value = MOI.get(moi_master(master), MOI.DualObjectiveValue())
     constraint_duals = _populate_constraint_duals(moi_master(master))
-    dual_sol = MasterDualSolution(DualMoiSolution(dual_obj_value, constraint_duals))
+    dual_sol = MasterDualSolution(
+        DualMoiSolution(dual_obj_value, constraint_duals),
+        master.coupling_constraint_ids
+    )
 
     return MasterSolution(
         MOI.get(moi_master(master), MOI.TerminationStatus()),
