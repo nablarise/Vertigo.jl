@@ -202,16 +202,17 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
 
     # Artificial variables for coupling constraints
     for (cstr_id, cstr_sense, _rhs) in coupling_constraints(ctx.decomp)
+        tagged = TaggedCI(cstr_id)
         if cstr_sense == EQUAL_TO
             s_pos = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => 1.0),
+                constraint_coeffs = Dict(tagged => 1.0),
                 objective_coeff = cost,
                 name = "s_pos[$(cstr_id.value)]"
             )
             s_neg = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => -1.0),
+                constraint_coeffs = Dict(tagged => -1.0),
                 objective_coeff = cost,
                 name = "s_neg[$(cstr_id.value)]"
             )
@@ -219,7 +220,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
         elseif cstr_sense == GREATER_THAN
             s_pos = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => 1.0),
+                constraint_coeffs = Dict(tagged => 1.0),
                 objective_coeff = cost,
                 name = "s_geq[$(cstr_id.value)]"
             )
@@ -227,7 +228,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
         elseif cstr_sense == LESS_THAN
             s_neg = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => -1.0),
+                constraint_coeffs = Dict(tagged => -1.0),
                 objective_coeff = cost,
                 name = "s_leq[$(cstr_id.value)]"
             )
@@ -239,7 +240,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     for (sp_id, cstr_idx) in ctx.convexity_ub
         s_neg = add_variable!(model;
             lower_bound = 0.0,
-            constraint_coeffs = Dict(cstr_idx => -1.0),
+            constraint_coeffs = Dict(TaggedCI(cstr_idx) => -1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_ub[$(sp_id)]"
         )
@@ -250,7 +251,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     for (sp_id, cstr_idx) in ctx.convexity_lb
         s_pos = add_variable!(model;
             lower_bound = 0.0,
-            constraint_coeffs = Dict(cstr_idx => 1.0),
+            constraint_coeffs = Dict(TaggedCI(cstr_idx) => 1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_lb[$(sp_id)]"
         )

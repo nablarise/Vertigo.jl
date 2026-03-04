@@ -6,9 +6,11 @@
     _add_column_variable!(model, all_coeffs, objective_coeff) -> MOI.VariableIndex
 
 Add a new non-negative column variable to the master MOI model.
-Avoids the type constraint on add_variable! by using MOI calls directly.
 """
-function _add_column_variable!(model, all_coeffs, objective_coeff::Float64)
+function _add_column_variable!(
+    model, all_coeffs::Dict{TaggedCI,Float64},
+    objective_coeff::Float64
+)
     var = MOI.add_variable(model)
     MOI.add_constraint(model, var, MOI.GreaterThan(0.0))
 
@@ -20,9 +22,14 @@ function _add_column_variable!(model, all_coeffs, objective_coeff::Float64)
         )
     end
 
-    for (cstr_ref, coeff) in all_coeffs
+    for (tagged_ci, coeff) in all_coeffs
         if !iszero(coeff)
-            MOI.modify(model, cstr_ref, MOI.ScalarCoefficientChange(var, coeff))
+            with_typed_ci(tagged_ci) do ci
+                MOI.modify(
+                    model, ci,
+                    MOI.ScalarCoefficientChange(var, coeff)
+                )
+            end
         end
     end
 
@@ -61,28 +68,28 @@ function insert_columns!(
         )
         cut_coeffs = compute_column_cut_coefficients(ctx.cuts, sol)
 
-        all_coeffs = Dict{Any,Float64}()
+        all_coeffs = Dict{TaggedCI,Float64}()
         for (tagged_ci, v) in coupling_coeffs
-            with_typed_ci(tagged_ci) do ci
-                all_coeffs[ci] = v
-            end
+            all_coeffs[tagged_ci] = v
         end
-        for (k, v) in cut_coeffs; all_coeffs[k] = v; end
+        for (k, v) in cut_coeffs
+            all_coeffs[TaggedCI(k)] = v
+        end
 
         for bc in ctx.branching_constraints
             coeff = compute_branching_column_coefficient(
                 decomp, bc.orig_var, sp_id, sol
             )
             if !iszero(coeff)
-                all_coeffs[bc.constraint_index] = coeff
+                all_coeffs[TaggedCI(bc.constraint_index)] = coeff
             end
         end
 
         if haskey(ctx.convexity_ub, sp_id)
-            all_coeffs[ctx.convexity_ub[sp_id]] = 1.0
+            all_coeffs[TaggedCI(ctx.convexity_ub[sp_id])] = 1.0
         end
         if haskey(ctx.convexity_lb, sp_id)
-            all_coeffs[ctx.convexity_lb[sp_id]] = 1.0
+            all_coeffs[TaggedCI(ctx.convexity_lb[sp_id])] = 1.0
         end
 
         obj_coeff = _objective_cost(phase, col_cost)

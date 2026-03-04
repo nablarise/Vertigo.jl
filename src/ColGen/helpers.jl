@@ -25,7 +25,7 @@ function add_variable!(
     lower_bound = nothing,
     upper_bound = nothing,
     variable_type = nothing,
-    constraint_coeffs::Dict{<:MOI.ConstraintIndex,Float64} = Dict{MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},<:MOI.AbstractSet},Float64}(),
+    constraint_coeffs::Dict{TaggedCI,Float64} = Dict{TaggedCI,Float64}(),
     objective_coeff::Float64 = 0.0,
     name = nothing
 )
@@ -46,21 +46,23 @@ function add_variable!(
         MOI.add_constraint(model, var, variable_type)
     end
 
-    for (constraint_ref, coeff) in constraint_coeffs
+    for (tagged_ci, coeff) in constraint_coeffs
         if coeff != 0.0
-            @assert MOI.is_valid(model, constraint_ref) "Invalid constraint reference: $constraint_ref not found in model"
-            current_func = MOI.get(model, MOI.ConstraintFunction(), constraint_ref)
-            new_term = MOI.ScalarAffineTerm(coeff, var)
-            new_func = MOI.ScalarAffineFunction([current_func.terms..., new_term], current_func.constant)
-            MOI.set(model, MOI.ConstraintFunction(), constraint_ref, new_func)
+            with_typed_ci(tagged_ci) do ci
+                MOI.modify(
+                    model, ci,
+                    MOI.ScalarCoefficientChange(var, coeff)
+                )
+            end
         end
     end
 
     if objective_coeff != 0.0
-        current_obj = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-        new_term = MOI.ScalarAffineTerm(objective_coeff, var)
-        new_obj = MOI.ScalarAffineFunction([current_obj.terms..., new_term], current_obj.constant)
-        MOI.set(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), new_obj)
+        MOI.modify(
+            model,
+            MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+            MOI.ScalarCoefficientChange(var, objective_coeff)
+        )
     end
 
     return var

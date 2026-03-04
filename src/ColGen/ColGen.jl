@@ -16,7 +16,6 @@ const ColGen = @__MODULE__
 include("coluna.jl")
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
-include("helpers.jl")
 include("dw_colgen_iteration.jl")
 
 # ── Decomposition interface (abstract types + function stubs) ─────────────────
@@ -27,6 +26,9 @@ include("decomposition_impl.jl")
 
 # ── MOI solution types (needs TaggedCI from decomposition_impl.jl) ────────────
 include("moi_solutions.jl")
+
+# ── Helpers (needs TaggedCI from decomposition_impl.jl) ──────────────────────
+include("helpers.jl")
 
 # ── Context and phase/stage control ───────────────────────────────────────────
 include("context.jl")
