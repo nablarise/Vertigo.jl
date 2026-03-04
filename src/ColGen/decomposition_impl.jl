@@ -8,35 +8,41 @@
 
 const _SAF = MOI.ScalarAffineFunction{Float64}
 
-@enum CIKind::UInt8 EQ_KIND LEQ_KIND GEQ_KIND
+@enum ConstraintSense begin
+    GREATER_THAN  # ax ≥ b
+    LESS_THAN     # ax ≤ b
+    EQUAL_TO      # ax = b
+end
 
 """
     TaggedCI
 
 Concrete isbits representation of a `MOI.ConstraintIndex{SAF,S}`.
-Stores the index value and a kind tag to recover the concrete type
-at MOI call boundaries via `with_typed_ci`.
+Stores the index value and a constraint sense tag to recover the
+concrete type at MOI call boundaries via `with_typed_ci`.
 """
 struct TaggedCI
     value::Int64
-    kind::CIKind
+    kind::ConstraintSense
 end
 @assert isbitstype(TaggedCI)
-Base.isless(a::TaggedCI, b::TaggedCI) = (a.kind, a.value) < (b.kind, b.value)
+function Base.isless(a::TaggedCI, b::TaggedCI)
+    return (a.kind, a.value) < (b.kind, b.value)
+end
 
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) =
-    TaggedCI(ci.value, EQ_KIND)
+    TaggedCI(ci.value, EQUAL_TO)
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) =
-    TaggedCI(ci.value, LEQ_KIND)
+    TaggedCI(ci.value, LESS_THAN)
 TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}) =
-    TaggedCI(ci.value, GEQ_KIND)
+    TaggedCI(ci.value, GREATER_THAN)
 
 @inline function with_typed_ci(f, idx::TaggedCI)
-    if idx.kind == EQ_KIND
+    if idx.kind == EQUAL_TO
         return f(MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}(
             idx.value
         ))
-    elseif idx.kind == LEQ_KIND
+    elseif idx.kind == LESS_THAN
         return f(MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}(
             idx.value
         ))
@@ -120,18 +126,7 @@ end
 
 
 # ────────────────────────────────────────────────────────────────────────────────────────
-# PART 5: CONSTRAINT SENSE ENUM
-# ────────────────────────────────────────────────────────────────────────────────────────
-
-@enum ConstraintSense begin
-    GREATER_THAN  # ax ≥ b
-    LESS_THAN     # ax ≤ b
-    EQUAL_TO      # ax = b
-end
-
-
-# ────────────────────────────────────────────────────────────────────────────────────────
-# PART 6: THE DECOMPOSITION STRUCT
+# PART 5: THE DECOMPOSITION STRUCT
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
