@@ -94,9 +94,7 @@ function build_insert_columns_context()
     # X = Tuple{Int,Int} for original variable mappings
     OrigVar = Tuple{Int,Int}
 
-    builder = DecompositionBuilder{
-        SpVar,OrigVar,CstrEq,Nothing
-    }(minimize=true)
+    builder = DecompositionBuilder{OrigVar,CstrEq}(minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 1.0)
 
@@ -118,7 +116,7 @@ function build_insert_columns_context()
 
     decomp = build(builder)
 
-    pool = ColumnPool{MOI.VariableIndex,SpVar}()
+    pool = ColumnPool()
 
     conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_ub)
     conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_lb)

@@ -82,7 +82,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ColGenContext{D,M,P,CutM}
+    ColGenContext{D,M,CutM}
 
 Column generation context. Bundles all static data (decomposition), mutable MOI models,
 and runtime structures (column pool, cut manager, artificial variable tracking).
@@ -90,16 +90,15 @@ and runtime structures (column pool, cut manager, artificial variable tracking).
 Type parameters:
   - D: AbstractDecomposition implementation
   - M: master MOI backend type
-  - P: ColumnPool type
   - CutM: NonRobustCutManager type
 """
-mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonRobustCutManager}
+mutable struct ColGenContext{D<:AbstractDecomposition,M,CutM<:NonRobustCutManager}
     decomp::D
     master_model::M
     convexity_ub::Dict{PricingSubproblemId,Any}
     convexity_lb::Dict{PricingSubproblemId,Any}
     sp_models::Dict{PricingSubproblemId,Any}
-    pool::P
+    pool::ColumnPool
     cuts::CutM
     eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
     leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
@@ -114,7 +113,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,P<:ColumnPool,CutM<:NonR
         pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars;
         smoothing_alpha::Float64 = 0.0
     )
-        new{typeof(decomp),typeof(master_model),typeof(pool),typeof(cuts)}(
+        new{typeof(decomp),typeof(master_model),typeof(cuts)}(
             decomp, master_model, convexity_ub, convexity_lb, sp_models,
             pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing,
             nothing, ActiveBranchingConstraint[], smoothing_alpha

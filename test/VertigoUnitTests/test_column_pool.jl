@@ -61,7 +61,7 @@ end
 
 function test_column_pool_record_and_retrieve()
     @testset "[column_pool] record and retrieve" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0)])
@@ -78,7 +78,7 @@ end
 
 function test_column_pool_get_column_solution_missing()
     @testset "[column_pool] get_column_solution returns nothing" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         @test get_column_solution(pool, MOI.VariableIndex(999)) === nothing
     end
@@ -86,7 +86,7 @@ end
 
 function test_column_pool_columns_for_subproblem()
     @testset "[column_pool] columns_for_subproblem" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
@@ -119,7 +119,7 @@ end
 
 function test_column_pool_columns_iterator()
     @testset "[column_pool] columns iterator" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
@@ -143,7 +143,7 @@ end
 
 function test_column_pool_has_column_duplicate()
     @testset "[column_pool] has_column detects duplicate" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0)])
@@ -163,7 +163,7 @@ end
 
 function test_column_pool_has_column_different_values()
     @testset "[column_pool] has_column distinguishes different values" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         sol_a = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0)])
@@ -179,7 +179,7 @@ end
 
 function test_column_pool_has_column_different_subproblem()
     @testset "[column_pool] has_column is subproblem-scoped" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         z1 = MOI.VariableIndex(1)
         sol = Vertigo.ColGen._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0)])
@@ -195,7 +195,7 @@ end
 
 function test_column_pool_empty()
     @testset "[column_pool] empty pool" begin
-        pool = ColumnPool{MOI.VariableIndex,MOI.VariableIndex}()
+        pool = ColumnPool()
 
         @test isempty(collect(columns(pool)))
 

@@ -58,7 +58,7 @@ function _build_stab_ctx(; alpha=0.5)
     CstrId = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    builder = DecompositionBuilder{SpVar,Tuple{Int,Int},CstrId,Nothing}(
+    builder = DecompositionBuilder{Tuple{Int,Int},CstrId}(
         minimize=true
     )
     for k in K
@@ -78,7 +78,7 @@ function _build_stab_ctx(; alpha=0.5)
     end
     decomp = build(builder)
 
-    pool = ColumnPool{MOI.VariableIndex,SpVar}()
+    pool = ColumnPool()
     conv_ub_map = Dict{PricingSubproblemId,Any}(
         PricingSubproblemId(k) => JuMP.index(conv_ub[k]) for k in K
     )

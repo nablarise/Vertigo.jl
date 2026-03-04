@@ -86,21 +86,21 @@ end
 @assert isbitstype(CouplingEntry)
 
 """
-    CouplingCoefficients{V}
+    CouplingCoefficients
 
 CSR-style storage for coupling coefficients of SP variables.
 Iterating over a sp_var's coefficients is a @view into a flat array — allocation-free.
 """
-struct CouplingCoefficients{V}
+struct CouplingCoefficients
     entries::Vector{CouplingEntry}
-    offsets::Dict{V,UnitRange{Int}}
+    offsets::Dict{_VI,UnitRange{Int}}
 end
 
-function CouplingCoefficients{V}() where {V}
-    return CouplingCoefficients(CouplingEntry[], Dict{V,UnitRange{Int}}())
+function CouplingCoefficients()
+    return CouplingCoefficients(CouplingEntry[], Dict{_VI,UnitRange{Int}}())
 end
 
-@inline function get_coefficients(cc::CouplingCoefficients{V}, sp_var::V) where {V}
+@inline function get_coefficients(cc::CouplingCoefficients, sp_var::_VI)
     range = get(cc.offsets, sp_var, 1:0)
     return @view cc.entries[range]
 end
@@ -110,10 +110,10 @@ end
 # PART 2: SUBPROBLEM DATA
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-struct SubproblemData{V}
-    variables::Vector{V}
-    original_costs::Dict{V,Float64}
-    coupling_coeffs::CouplingCoefficients{V}
+struct SubproblemData
+    variables::Vector{_VI}
+    original_costs::Dict{_VI,Float64}
+    coupling_coeffs::CouplingCoefficients
     fixed_cost::Float64
     convexity_lb::Float64
     convexity_ub::Float64
@@ -124,8 +124,8 @@ end
 # PART 3: PURE MASTER VARIABLE DATA
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-struct PureMasterVariableData{Y}
-    id::Y
+struct PureMasterVariableData
+    id::_VI
     cost::Float64
     lb::Float64
     ub::Float64
@@ -138,9 +138,9 @@ end
 # PART 4: FORWARD MAPPING M (x → z)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-struct ForwardMapping{X,V}
-    forward::Dict{X,Vector{Tuple{PricingSubproblemId,V}}}
-    inverse_set::Dict{Tuple{PricingSubproblemId,V},Vector{X}}
+struct ForwardMapping{X}
+    forward::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
+    inverse_set::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
     all_orig_vars::Vector{X}
 end
 
@@ -156,20 +156,18 @@ end
 end
 
 """
-    Decomposition{V,X,C,Y}
+    Decomposition{X,C}
 
 Immutable concrete implementation of AbstractDecomposition.
 
 Type parameters:
-  - V: SP variable identifier type (e.g., MOI.VariableIndex)
   - X: original/linking variable identifier type
   - C: constraint identifier type (e.g., MOI.ConstraintIndex)
-  - Y: pure master variable identifier type
 """
-struct Decomposition{V,X,C,Y} <: AbstractDecomposition
-    subproblems::Dict{PricingSubproblemId,SubproblemData{V}}
-    pure_master_vars::Vector{PureMasterVariableData{Y}}
-    mapping::ForwardMapping{X,V}
+struct Decomposition{X,C} <: AbstractDecomposition
+    subproblems::Dict{PricingSubproblemId,SubproblemData}
+    pure_master_vars::Vector{PureMasterVariableData}
+    mapping::ForwardMapping{X}
     coupling_cstrs::Vector{Tuple{C,ConstraintSense,Float64}}
     minimize::Bool
 end
@@ -231,32 +229,32 @@ is_minimization(d::Decomposition) = d.minimize
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    _SpSolution{V}
+    _SpSolution
 
 Concrete subproblem solution with sorted entries for deterministic order and
 cheap deduplication via fingerprint hash.
 
 `obj_value` is the pricing subproblem objective (reduced-cost objective).
 """
-struct _SpSolution{V} <: AbstractSubproblemSolution
+struct _SpSolution <: AbstractSubproblemSolution
     sp_id::PricingSubproblemId
     obj_value::Float64
-    entries::Vector{Tuple{V,Float64}}  # sorted by sp_var
+    entries::Vector{Tuple{_VI,Float64}}  # sorted by sp_var
     fingerprint::UInt64
 end
 
-function _SpSolution(sp_id::PricingSubproblemId, obj_value::Float64, entries::Vector{Tuple{MOI.VariableIndex,Float64}})
+function _SpSolution(sp_id::PricingSubproblemId, obj_value::Float64, entries::Vector{Tuple{_VI,Float64}})
     sorted = sort(entries; by = e -> e[1].value)
     filter!(e -> !iszero(e[2]), sorted)
     fp = hash(map(e -> (e[1].value, round(e[2]; digits=10)), sorted))
-    return _SpSolution{MOI.VariableIndex}(sp_id, obj_value, sorted, fp)
+    return _SpSolution(sp_id, obj_value, sorted, fp)
 end
 
 subproblem_id(sol::_SpSolution) = sol.sp_id
 objective_value(sol::_SpSolution) = sol.obj_value
 @inline nonzero_entries(sol::_SpSolution) = sol.entries
 
-function solution_value(sol::_SpSolution{V}, sp_var::V) where {V}
+function solution_value(sol::_SpSolution, sp_var::_VI)
     idx = searchsortedfirst(sol.entries, (sp_var, -Inf); by=first)
     if idx <= length(sol.entries) && first(sol.entries[idx]) == sp_var
         return sol.entries[idx][2]
@@ -270,14 +268,14 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ColumnRecord{V}
+    ColumnRecord
 
 A column stored in the pool. `original_cost` is the column's cost in the
 master's original objective.
 """
-struct ColumnRecord{V}
+struct ColumnRecord
     sp_id::PricingSubproblemId
-    solution::_SpSolution{V}
+    solution::_SpSolution
     original_cost::Float64
 end
 
@@ -287,24 +285,21 @@ pricing_objective_value(rec::ColumnRecord) = rec.solution.obj_value
 column_nonzero_entries(rec::ColumnRecord) = rec.solution.entries
 
 """
-    ColumnPool{C,V}
+    ColumnPool
 
 Triple-indexed column pool: by column variable, by subproblem, and by
 fingerprint for O(1) dedup.
-
-- `C`: column variable index type (e.g. `MOI.VariableIndex`)
-- `V`: subproblem variable index type (e.g. `MOI.VariableIndex`)
 """
-mutable struct ColumnPool{C,V} <: AbstractColumnPool
-    by_column_var::Dict{C,ColumnRecord{V}}
-    by_subproblem::Dict{PricingSubproblemId,Vector{C}}
+mutable struct ColumnPool <: AbstractColumnPool
+    by_column_var::Dict{_VI,ColumnRecord}
+    by_subproblem::Dict{PricingSubproblemId,Vector{_VI}}
     fingerprints::Dict{PricingSubproblemId,Set{UInt64}}
 end
 
-function ColumnPool{C,V}() where {C,V}
+function ColumnPool()
     return ColumnPool(
-        Dict{C,ColumnRecord{V}}(),
-        Dict{PricingSubproblemId,Vector{C}}(),
+        Dict{_VI,ColumnRecord}(),
+        Dict{PricingSubproblemId,Vector{_VI}}(),
         Dict{PricingSubproblemId,Set{UInt64}}()
     )
 end
@@ -316,11 +311,11 @@ Register a column in the pool, indexing it by column variable, subproblem,
 and fingerprint.
 """
 function record_column!(
-    pool::ColumnPool{C,V}, col_var::C, sp_id::PricingSubproblemId,
-    sol::_SpSolution{V}, original_cost::Float64
-) where {C,V}
+    pool::ColumnPool, col_var::_VI, sp_id::PricingSubproblemId,
+    sol::_SpSolution, original_cost::Float64
+)
     pool.by_column_var[col_var] = ColumnRecord(sp_id, sol, original_cost)
-    sp_cols = get!(Vector{C}, pool.by_subproblem, sp_id)
+    sp_cols = get!(Vector{_VI}, pool.by_subproblem, sp_id)
     push!(sp_cols, col_var)
     fp_set = get!(Set{UInt64}, pool.fingerprints, sp_id)
     push!(fp_set, sol.fingerprint)
@@ -357,8 +352,8 @@ end
 
 Iterate over columns belonging to subproblem `sp_id`.
 """
-function columns_for_subproblem(pool::ColumnPool{C,V}, sp_id::PricingSubproblemId) where {C,V}
-    col_vars = get(pool.by_subproblem, sp_id, C[])
+function columns_for_subproblem(pool::ColumnPool, sp_id::PricingSubproblemId)
+    col_vars = get(pool.by_subproblem, sp_id, _VI[])
     return (
         (cv, pool.by_column_var[cv])
         for cv in col_vars
@@ -382,111 +377,111 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    DecompositionBuilder{V,X,C,Y}
+    DecompositionBuilder{X,C}
 
 Incrementally builds an immutable Decomposition from problem data.
 """
-mutable struct DecompositionBuilder{V,X,C,Y}
+mutable struct DecompositionBuilder{X,C}
     minimize::Bool
-    sp_variables::Dict{PricingSubproblemId,Vector{V}}
-    sp_original_costs::Dict{PricingSubproblemId,Dict{V,Float64}}
-    sp_coupling_entries::Dict{PricingSubproblemId,Vector{Tuple{V,C,Float64}}}
+    sp_variables::Dict{PricingSubproblemId,Vector{_VI}}
+    sp_original_costs::Dict{PricingSubproblemId,Dict{_VI,Float64}}
+    sp_coupling_entries::Dict{PricingSubproblemId,Vector{Tuple{_VI,C,Float64}}}
     sp_fixed_costs::Dict{PricingSubproblemId,Float64}
     sp_conv_bounds::Dict{PricingSubproblemId,Tuple{Float64,Float64}}
-    pm_vars::Vector{PureMasterVariableData{Y}}
-    pm_coupling_accum::Dict{Y,Vector{CouplingEntry}}
-    pm_data_accum::Dict{Y,Tuple{Float64,Float64,Float64,Bool}}
-    forward_map::Dict{X,Vector{Tuple{PricingSubproblemId,V}}}
-    inverse_map::Dict{Tuple{PricingSubproblemId,V},Vector{X}}
+    pm_vars::Vector{PureMasterVariableData}
+    pm_coupling_accum::Dict{_VI,Vector{CouplingEntry}}
+    pm_data_accum::Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}
+    forward_map::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
+    inverse_map::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
     all_orig_vars_set::Set{X}
     coupling_cstrs::Vector{Tuple{C,ConstraintSense,Float64}}
 end
 
-function DecompositionBuilder{V,X,C,Y}(; minimize::Bool=true) where {V,X,C,Y}
-    return DecompositionBuilder{V,X,C,Y}(
+function DecompositionBuilder{X,C}(; minimize::Bool=true) where {X,C}
+    return DecompositionBuilder{X,C}(
         minimize,
-        Dict{PricingSubproblemId,Vector{V}}(),
-        Dict{PricingSubproblemId,Dict{V,Float64}}(),
-        Dict{PricingSubproblemId,Vector{Tuple{V,C,Float64}}}(),
+        Dict{PricingSubproblemId,Vector{_VI}}(),
+        Dict{PricingSubproblemId,Dict{_VI,Float64}}(),
+        Dict{PricingSubproblemId,Vector{Tuple{_VI,C,Float64}}}(),
         Dict{PricingSubproblemId,Float64}(),
         Dict{PricingSubproblemId,Tuple{Float64,Float64}}(),
-        PureMasterVariableData{Y}[],
-        Dict{Y,Vector{CouplingEntry}}(),
-        Dict{Y,Tuple{Float64,Float64,Float64,Bool}}(),
-        Dict{X,Vector{Tuple{PricingSubproblemId,V}}}(),
-        Dict{Tuple{PricingSubproblemId,V},Vector{X}}(),
+        PureMasterVariableData[],
+        Dict{_VI,Vector{CouplingEntry}}(),
+        Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}(),
+        Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}(),
+        Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}(),
         Set{X}(),
         Tuple{C,ConstraintSense,Float64}[]
     )
 end
 
 function add_subproblem!(
-    b::DecompositionBuilder{V,X,C,Y},
+    b::DecompositionBuilder{X,C},
     sp_id::PricingSubproblemId,
     fixed_cost::Float64,
     conv_lb::Float64,
     conv_ub::Float64
-) where {V,X,C,Y}
-    b.sp_variables[sp_id] = V[]
-    b.sp_original_costs[sp_id] = Dict{V,Float64}()
-    b.sp_coupling_entries[sp_id] = Tuple{V,C,Float64}[]
+) where {X,C}
+    b.sp_variables[sp_id] = _VI[]
+    b.sp_original_costs[sp_id] = Dict{_VI,Float64}()
+    b.sp_coupling_entries[sp_id] = Tuple{_VI,C,Float64}[]
     b.sp_fixed_costs[sp_id] = fixed_cost
     b.sp_conv_bounds[sp_id] = (conv_lb, conv_ub)
     return nothing
 end
 
 function add_sp_variable!(
-    b::DecompositionBuilder{V}, sp_id::PricingSubproblemId,
-    sp_var::V, orig_cost::Float64
-) where {V}
+    b::DecompositionBuilder, sp_id::PricingSubproblemId,
+    sp_var::_VI, orig_cost::Float64
+)
     push!(b.sp_variables[sp_id], sp_var)
     b.sp_original_costs[sp_id][sp_var] = orig_cost
     return nothing
 end
 
 function add_coupling_coefficient!(
-    b::DecompositionBuilder{V,X,C}, sp_id::PricingSubproblemId,
-    sp_var::V, cstr_id::C, coeff::Float64
-) where {V,X,C}
-    push!(get!(Vector{Tuple{V,C,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, cstr_id, coeff))
+    b::DecompositionBuilder{X,C}, sp_id::PricingSubproblemId,
+    sp_var::_VI, cstr_id::C, coeff::Float64
+) where {X,C}
+    push!(get!(Vector{Tuple{_VI,C,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, cstr_id, coeff))
     return nothing
 end
 
 function add_mapping!(
-    b::DecompositionBuilder{V,X}, orig_var::X,
-    sp_id::PricingSubproblemId, sp_var::V
-) where {V,X}
-    push!(get!(Vector{Tuple{PricingSubproblemId,V}}, b.forward_map, orig_var), (sp_id, sp_var))
+    b::DecompositionBuilder{X}, orig_var::X,
+    sp_id::PricingSubproblemId, sp_var::_VI
+) where {X}
+    push!(get!(Vector{Tuple{PricingSubproblemId,_VI}}, b.forward_map, orig_var), (sp_id, sp_var))
     push!(get!(Vector{X}, b.inverse_map, (sp_id, sp_var)), orig_var)
     push!(b.all_orig_vars_set, orig_var)
     return nothing
 end
 
 function add_pure_master_variable!(
-    b::DecompositionBuilder{V,X,C,Y},
-    y_id::Y,
+    b::DecompositionBuilder,
+    y_id::_VI,
     cost::Float64,
     lb::Float64,
     ub::Float64,
     is_integer::Bool
-) where {V,X,C,Y}
+)
     b.pm_data_accum[y_id] = (cost, lb, ub, is_integer)
     b.pm_coupling_accum[y_id] = CouplingEntry[]
     return nothing
 end
 
 function add_pure_master_coupling!(
-    b::DecompositionBuilder{V,X,C,Y}, y_id::Y, cstr_id::C,
+    b::DecompositionBuilder{X,C}, y_id::_VI, cstr_id::C,
     coeff::Float64
-) where {V,X,C,Y}
+) where {X,C}
     push!(b.pm_coupling_accum[y_id], CouplingEntry(TaggedCI(cstr_id), coeff))
     return nothing
 end
 
 function add_coupling_constraint!(
-    b::DecompositionBuilder{V,X,C}, cstr_id::C,
+    b::DecompositionBuilder{X,C}, cstr_id::C,
     sense::ConstraintSense, rhs::Float64
-) where {V,X,C}
+) where {X,C}
     push!(b.coupling_cstrs, (cstr_id, sense, rhs))
     return nothing
 end
@@ -497,19 +492,19 @@ end
 Compile the accumulated data into an immutable Decomposition.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
-function build(b::DecompositionBuilder{V,X,C,Y}) where {V,X,C,Y}
-    subproblems = Dict{PricingSubproblemId,SubproblemData{V}}()
+function build(b::DecompositionBuilder{X,C}) where {X,C}
+    subproblems = Dict{PricingSubproblemId,SubproblemData}()
 
     for sp_id in keys(b.sp_variables)
         variables = b.sp_variables[sp_id]
         original_costs = b.sp_original_costs[sp_id]
 
         entries = CouplingEntry[]
-        offsets = Dict{V,UnitRange{Int}}()
+        offsets = Dict{_VI,UnitRange{Int}}()
 
-        # Group raw entries by sp_var using a dict (avoids requiring isless on V)
-        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{V,C,Float64}[])
-        grouped = Dict{V,Vector{Tuple{C,Float64}}}()
+        # Group raw entries by sp_var using a dict
+        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{_VI,C,Float64}[])
+        grouped = Dict{_VI,Vector{Tuple{C,Float64}}}()
         for (sp_var, cstr_id, coeff) in raw_entries
             grp = get!(Vector{Tuple{C,Float64}}, grouped, sp_var)
             push!(grp, (cstr_id, coeff))
@@ -538,7 +533,7 @@ function build(b::DecompositionBuilder{V,X,C,Y}) where {V,X,C,Y}
         )
     end
 
-    pm_vars = PureMasterVariableData{Y}[]
+    pm_vars = PureMasterVariableData[]
     for (y_id, (cost, lb, ub, is_int)) in b.pm_data_accum
         coeffs = get(b.pm_coupling_accum, y_id, CouplingEntry[])
         push!(pm_vars, PureMasterVariableData(y_id, cost, lb, ub, is_int, coeffs))
@@ -550,7 +545,7 @@ function build(b::DecompositionBuilder{V,X,C,Y}) where {V,X,C,Y}
         collect(b.all_orig_vars_set)
     )
 
-    return Decomposition{V,X,C,Y}(
+    return Decomposition{X,C}(
         subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize
     )
 end

@@ -198,7 +198,7 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DecompositionBuilder{SpVar,Tuple{Int,Int},CstrId,Nothing}(minimize=true)
+    builder = DecompositionBuilder{Tuple{Int,Int},CstrId}(minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -221,7 +221,7 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     decomp = build(builder)
 
     # ── Column pool ───────────────────────────────────────────────────────────
-    pool = ColumnPool{MOI.VariableIndex,SpVar}()
+    pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
@@ -281,7 +281,7 @@ function build_gap_context_max(inst::GAPInstance)
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DecompositionBuilder{SpVar,Tuple{Int,Int},CstrId,Nothing}(minimize=false)
+    builder = DecompositionBuilder{Tuple{Int,Int},CstrId}(minimize=false)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -304,7 +304,7 @@ function build_gap_context_max(inst::GAPInstance)
     decomp = build(builder)
 
     # ── Column pool ───────────────────────────────────────────────────────────
-    pool = ColumnPool{MOI.VariableIndex,SpVar}()
+    pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)

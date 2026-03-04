@@ -29,7 +29,7 @@ maximization).
 """
 struct PricingPrimalSolution
     sp_id::PricingSubproblemId
-    solution::_SpSolution{MOI.VariableIndex}
+    solution::_SpSolution
     is_improving::Bool
 end
 
