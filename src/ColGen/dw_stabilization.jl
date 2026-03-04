@@ -96,37 +96,21 @@ function _convex_combination(
     alpha::Float64
 )
     one_minus_alpha = 1.0 - alpha
+    d_in = center.sol.constraint_duals
+    d_out = out.sol.constraint_duals
 
-    # Collect all constraint types from both solutions
-    all_types = union(
-        keys(center.sol.constraint_duals),
-        keys(out.sol.constraint_duals)
-    )
-
-    combined = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}()
-    for ctype in all_types
-        d_in = get(center.sol.constraint_duals, ctype, nothing)
-        d_out = get(out.sol.constraint_duals, ctype, nothing)
-
-        merged = Dict{Int64,Float64}()
-        # Indices from center
-        if !isnothing(d_in)
-            for (idx, val) in d_in
-                out_val = isnothing(d_out) ? 0.0 : get(d_out, idx, 0.0)
-                merged[idx] = alpha * val + one_minus_alpha * out_val
-            end
-        end
-        # Indices only in out (not in center)
-        if !isnothing(d_out)
-            for (idx, val) in d_out
-                haskey(merged, idx) && continue
-                merged[idx] = one_minus_alpha * val
-            end
-        end
-        combined[ctype] = merged
+    combined = Dict{TaggedCI,Float64}()
+    for (idx, val) in d_in
+        out_val = get(d_out, idx, 0.0)
+        combined[idx] = alpha * val + one_minus_alpha * out_val
+    end
+    for (idx, val) in d_out
+        haskey(combined, idx) && continue
+        combined[idx] = one_minus_alpha * val
     end
 
-    obj = alpha * center.sol.obj_value + one_minus_alpha * out.sol.obj_value
+    obj = alpha * center.sol.obj_value +
+        one_minus_alpha * out.sol.obj_value
     return MasterDualSolution(
         DualMoiSolution(obj, combined),
         out.coupling_constraint_ids

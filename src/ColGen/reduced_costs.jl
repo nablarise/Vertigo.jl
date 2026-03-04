@@ -59,16 +59,12 @@ end
 Extract dual value for a specific constraint index from a MasterDualSolution.
 Returns 0.0 if the constraint type or index is not present.
 """
-function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
-    d = get(dual_sol.sol.constraint_duals, typeof(cstr_idx), nothing)
-    isnothing(d) && return 0.0
-    return get(d, cstr_idx.value, 0.0)
+function _dual_value(dual_sol::MasterDualSolution, idx::TaggedCI)
+    return get(dual_sol.sol.constraint_duals, idx, 0.0)
 end
 
-function _dual_value(dual_sol::MasterDualSolution, idx::TaggedCI)
-    d = get(dual_sol.sol.constraint_duals, _ci_type(idx.kind), nothing)
-    isnothing(d) && return 0.0
-    return get(d, idx.value, 0.0)
+function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
+    return get(dual_sol.sol.constraint_duals, TaggedCI(cstr_idx), 0.0)
 end
 
 # Hot path: sorted duals built once, shared across subproblems.

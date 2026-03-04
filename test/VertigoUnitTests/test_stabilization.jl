@@ -17,27 +17,12 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
 # ────────────────────────────────────────────────────────────────────────────
 
 function _make_dual_sol(
-    obj::Float64, duals::Dict;
+    obj::Float64,
+    duals::Dict{TaggedCI,Float64}=Dict{TaggedCI,Float64}();
     cc_ids::Vector{TaggedCI}=TaggedCI[]
 )
-    constraint_duals = Dict{
-        Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}
-    }()
-    for (ctype, inner) in duals
-        constraint_duals[ctype] = inner
-    end
     return MasterDualSolution(
-        DualMoiSolution(obj, constraint_duals), cc_ids
-    )
-end
-
-function _make_dual_sol(obj::Float64)
-    return MasterDualSolution(
-        DualMoiSolution(
-            obj,
-            Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}()
-        ),
-        TaggedCI[]
+        DualMoiSolution(obj, duals), cc_ids
     )
 end
 
@@ -165,19 +150,18 @@ function test_convex_combination_arithmetic()
     EqCstr = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    d_center = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 10.0, 2 => 20.0)
+    d_center = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 10.0, TaggedCI(EqCstr(2)) => 20.0
     )
-    d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 0.0, 2 => 0.0)
+    d_out = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 0.0, TaggedCI(EqCstr(2)) => 0.0
     )
     center = MasterDualSolution(DualMoiSolution(100.0, d_center), TaggedCI[])
     out = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
     combined = _convex_combination(center, out, 0.5)
-    eq_duals = combined.sol.constraint_duals[EqCstr]
-    @test eq_duals[1] ≈ 5.0
-    @test eq_duals[2] ≈ 10.0
+    @test combined.sol.constraint_duals[TaggedCI(EqCstr(1))] ≈ 5.0
+    @test combined.sol.constraint_duals[TaggedCI(EqCstr(2))] ≈ 10.0
     @test combined.sol.obj_value ≈ 50.0
 end
 
@@ -188,20 +172,20 @@ function test_convex_combination_disjoint_types()
     LtCstr = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}
     }
-    d_center = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 4.0)
+    d_center = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 4.0
     )
-    d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        LtCstr => Dict(1 => 6.0)
+    d_out = Dict{TaggedCI,Float64}(
+        TaggedCI(LtCstr(1)) => 6.0
     )
     center = MasterDualSolution(DualMoiSolution(10.0, d_center), TaggedCI[])
     out = MasterDualSolution(DualMoiSolution(20.0, d_out), TaggedCI[])
 
     combined = _convex_combination(center, out, 0.3)
     # EqCstr: 0.3*4.0 + 0.7*0.0 = 1.2
-    @test combined.sol.constraint_duals[EqCstr][1] ≈ 1.2
+    @test combined.sol.constraint_duals[TaggedCI(EqCstr(1))] ≈ 1.2
     # LtCstr: 0.3*0.0 + 0.7*6.0 = 4.2
-    @test combined.sol.constraint_duals[LtCstr][1] ≈ 4.2
+    @test combined.sol.constraint_duals[TaggedCI(LtCstr(1))] ≈ 4.2
     # obj: 0.3*10 + 0.7*20 = 17
     @test combined.sol.obj_value ≈ 17.0
 end
@@ -332,28 +316,22 @@ function test_decrease_alpha()
     master = get_master(ctx)
     stab = setup_stabilization!(ctx, master)
 
-    # Set up center
     EqCstr = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    d_center = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 1.0)
+    d_center = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 1.0
     )
-    d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 3.0)
+    d_out = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 3.0
     )
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
     stab.stab_center = center_dual
 
-    # Need generated columns for direction product computation.
-    # Empty columns means g^sep_i = rhs_i (all 1.0 for our GAP).
-    # Direction product = Σ rhs_i * (π^out_i - π^in_i)
-    # For our GAP: 4 constraints, each rhs=1.0
-    # All with (π^out - π^in) = 3.0 - 1.0 = 2.0 for constraint 1
-    # and 0 - 0 = 0 for others
-    # So direction_product = 1.0 * 2.0 = 2.0 > 0 → decrease α
+    # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
+    # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
     stab.last_generated_columns = GeneratedColumns(Any[])
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
 
@@ -370,11 +348,11 @@ function test_increase_alpha()
     EqCstr = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    d_center = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 3.0)
+    d_center = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 3.0
     )
-    d_out = Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}(
-        EqCstr => Dict(1 => 1.0)
+    d_out = Dict{TaggedCI,Float64}(
+        TaggedCI(EqCstr(1)) => 1.0
     )
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])

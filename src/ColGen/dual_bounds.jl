@@ -2,6 +2,27 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
+_rhs(s::MOI.LessThan) = s.upper
+_rhs(s::MOI.GreaterThan) = s.lower
+_rhs(s::MOI.EqualTo) = s.value
+_rhs(s) = error("unsupported constraint set type: $(typeof(s))")
+
+function _recompute_cost(dual_sol::DualMoiSolution, model)::Float64
+    total_cost = 0.0
+    for (tagged, dual_value) in dual_sol.constraint_duals
+        with_typed_ci(tagged) do ci
+            cset = MOI.get(model, MOI.ConstraintSet(), ci)
+            total_cost += dual_value * _rhs(cset)
+        end
+    end
+    obj_fn = MOI.get(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+    )
+    total_cost += obj_fn.constant
+    return total_cost
+end
+
 function compute_dual_bound(
     ctx::ColGenContext,
     ::Union{Phase0,Phase1,Phase2},
@@ -12,7 +33,7 @@ function compute_dual_bound(
     dual_values(cstr) = _dual_value(mast_dual_sol, cstr)
 
     # Verify dual solution consistency
-    recomputed = recompute_cost(mast_dual_sol.sol, ctx.master_model)
+    recomputed = _recompute_cost(mast_dual_sol.sol, ctx.master_model)
     stored = mast_dual_sol.sol.obj_value
     @assert abs(recomputed - stored) < 1e-4 "Dual cost mismatch: recomputed=$recomputed stored=$stored"
 

@@ -17,7 +17,6 @@ include("coluna.jl")
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 include("helpers.jl")
-include("moi_solutions.jl")
 include("dw_colgen_iteration.jl")
 
 # ── Decomposition interface (abstract types + function stubs) ─────────────────
@@ -25,6 +24,9 @@ include("decomposition_interface.jl")
 
 # ── Concrete decomposition and column pool ────────────────────────────────────
 include("decomposition_impl.jl")
+
+# ── MOI solution types (needs TaggedCI from decomposition_impl.jl) ────────────
+include("moi_solutions.jl")
 
 # ── Context and phase/stage control ───────────────────────────────────────────
 include("context.jl")

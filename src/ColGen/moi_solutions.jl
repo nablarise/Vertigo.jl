@@ -51,28 +51,3 @@ function Base.show(io::IO, sol::DualMoiSolution)
     print(io, "└ cost = $(sol.obj_value)")
 end
 
-"""
-    recompute_cost(dual_sol::DualMoiSolution, model)::Float64
-
-Recompute the dual objective cost by multiplying dual values with RHS values.
-"""
-_rhs(s::MOI.LessThan) = s.upper
-_rhs(s::MOI.GreaterThan) = s.lower
-_rhs(s::MOI.EqualTo) = s.value
-_rhs(s) = error("unsupported constraint set type: $(typeof(s))")
-
-function recompute_cost(dual_sol::DualMoiSolution, model)::Float64
-    total_cost = 0.0
-    for (tagged, dual_value) in dual_sol.constraint_duals
-        with_typed_ci(tagged) do ci
-            cset = MOI.get(model, MOI.ConstraintSet(), ci)
-            total_cost += dual_value * _rhs(cset)
-        end
-    end
-    obj_fn = MOI.get(
-        model,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    )
-    total_cost += obj_fn.constant
-    return total_cost
-end
