@@ -23,12 +23,12 @@ Unified dual solution type for both master and pricing problems.
 
 Fields:
 - obj_value::Float64: Dual objective function value
-- constraint_duals::Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}: Constraint dual
-  values organized by constraint type
+- constraint_duals::Dict{TaggedCI,Float64}: Constraint dual values keyed
+  by `TaggedCI` (encodes MOI constraint type via `CIKind` and index value)
 """
 struct DualMoiSolution
     obj_value::Float64
-    constraint_duals::Dict{Type{<:MOI.ConstraintIndex},Dict{Int64,Float64}}
+    constraint_duals::Dict{TaggedCI,Float64}
 end
 
 function Base.show(io::IO, sol::PrimalMoiSolution)
@@ -43,16 +43,10 @@ end
 
 function Base.show(io::IO, sol::DualMoiSolution)
     println(io, "Dual solution:")
-    all_constraints = []
-    for (constraint_type, constraint_dict) in sol.constraint_duals
-        for (index_value, dual_value) in constraint_dict
-            push!(all_constraints, (constraint_type, index_value, dual_value))
-        end
-    end
-    sort!(all_constraints, by = x -> (string(x[1]), x[2]))
-    for (i, (constraint_type, index_value, dual_value)) in enumerate(all_constraints)
-        connector = i == length(all_constraints) ? "└" : "|"
-        println(io, "$connector constr[$(constraint_type)][$(index_value)]: $dual_value")
+    sorted = sort(collect(sol.constraint_duals); by = first)
+    for (i, (tagged, dual_value)) in enumerate(sorted)
+        connector = i == length(sorted) ? "└" : "|"
+        println(io, "$connector constr[$(tagged)]: $dual_value")
     end
     print(io, "└ cost = $(sol.obj_value)")
 end
@@ -62,32 +56,23 @@ end
 
 Recompute the dual objective cost by multiplying dual values with RHS values.
 """
+_rhs(s::MOI.LessThan) = s.upper
+_rhs(s::MOI.GreaterThan) = s.lower
+_rhs(s::MOI.EqualTo) = s.value
+_rhs(s) = error("unsupported constraint set type: $(typeof(s))")
+
 function recompute_cost(dual_sol::DualMoiSolution, model)::Float64
     total_cost = 0.0
-    for (constraint_type, constraint_dict) in dual_sol.constraint_duals
-        for (index_value, dual_value) in constraint_dict
-            constraint_index = constraint_type(index_value)
-            try
-                constraint_set = MOI.get(model, MOI.ConstraintSet(), constraint_index)
-                rhs_value = if constraint_set isa MOI.LessThan
-                    constraint_set.upper
-                elseif constraint_set isa MOI.GreaterThan
-                    constraint_set.lower
-                elseif constraint_set isa MOI.EqualTo
-                    constraint_set.value
-                else
-                    continue
-                end
-                total_cost += dual_value * rhs_value
-            catch
-                continue
-            end
+    for (tagged, dual_value) in dual_sol.constraint_duals
+        with_typed_ci(tagged) do ci
+            cset = MOI.get(model, MOI.ConstraintSet(), ci)
+            total_cost += dual_value * _rhs(cset)
         end
     end
-    try
-        objective_function = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
-        total_cost += objective_function.constant
-    catch
-    end
+    obj_fn = MOI.get(
+        model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+    )
+    total_cost += obj_fn.constant
     return total_cost
 end
