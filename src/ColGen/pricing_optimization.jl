@@ -17,12 +17,18 @@ pricing_strategy_iterate(s::DefaultPricingStrategy, state) = iterate(s.pricing_s
 
 # ── Pricing solution ──────────────────────────────────────────────────────────
 
-struct PricingSolution{PS}
+struct PricingPrimalSolution
+    sp_id::PricingSubproblemId
+    solution::_SpSolution{MOI.VariableIndex}
+    is_improving::Bool
+end
+
+struct PricingSolution
     is_infeasible::Bool
     is_unbounded::Bool
     primal_bound::Float64
     dual_bound::Float64
-    primal_sols::Vector{PS}
+    primal_sols::Vector{PricingPrimalSolution}
 end
 
 is_infeasible(sol::PricingSolution) = sol.is_infeasible
@@ -30,12 +36,6 @@ is_unbounded(sol::PricingSolution) = sol.is_unbounded
 get_primal_sols(sol::PricingSolution) = sol.primal_sols
 get_primal_bound(sol::PricingSolution) = sol.primal_bound
 get_dual_bound(sol::PricingSolution) = sol.dual_bound
-
-struct PricingPrimalSolution
-    sp_id::PricingSubproblemId
-    solution::_SpSolution{MOI.VariableIndex}
-    is_improving::Bool
-end
 
 # ── Set of columns ────────────────────────────────────────────────────────────
 
