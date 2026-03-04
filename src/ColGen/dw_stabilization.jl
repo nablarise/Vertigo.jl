@@ -242,8 +242,8 @@ function update_stabilization_after_iter!(
     end
 
     # Iterate coupling constraints to compute direction product
-    for (cstr_id, _sense, rhs) in coupling_constraints(decomp)
-        g_sep = rhs - get(col_contrib, TaggedCI(cstr_id), 0.0)
+    for (cstr_id, rhs) in coupling_constraints(decomp)
+        g_sep = rhs - get(col_contrib, cstr_id, 0.0)
         pi_out = _dual_value(out, cstr_id)
         pi_in = _dual_value(center, cstr_id)
         direction_product += g_sep * (pi_out - pi_in)

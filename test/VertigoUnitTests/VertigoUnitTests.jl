@@ -88,7 +88,7 @@ function build_gap_context(inst::GAPInstance)
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DecompositionBuilder{Tuple{Int,Int},CstrId}(minimize=true)
+    builder = DecompositionBuilder{Tuple{Int,Int}}(minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -105,7 +105,7 @@ function build_gap_context(inst::GAPInstance)
     end
 
     for t in T
-        add_coupling_constraint!(builder, index(assignment[t]), EQUAL_TO, 1.0)
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
     end
 
     decomp = build(builder)

@@ -94,7 +94,7 @@ function build_insert_columns_context()
     # X = Tuple{Int,Int} for original variable mappings
     OrigVar = Tuple{Int,Int}
 
-    builder = DecompositionBuilder{OrigVar,CstrEq}(minimize=true)
+    builder = DecompositionBuilder{OrigVar}(minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 1.0)
 
@@ -111,8 +111,8 @@ function build_insert_columns_context()
     add_coupling_coefficient!(builder, sp1, z2, c2, 4.0)
     add_mapping!(builder, (1, 2), sp1, z2)   # z2 → x₂
 
-    add_coupling_constraint!(builder, c1, EQUAL_TO, 1.0)
-    add_coupling_constraint!(builder, c2, EQUAL_TO, 1.0)
+    add_coupling_constraint!(builder, c1, 1.0)
+    add_coupling_constraint!(builder, c2, 1.0)
 
     decomp = build(builder)
 

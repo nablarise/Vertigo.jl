@@ -125,9 +125,7 @@ end
 is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
 
 function get_master(ctx::ColGenContext)
-    cc_ids = TaggedCI[
-        TaggedCI(cid) for (cid, _, _) in coupling_constraints(ctx.decomp)
-    ]
+    cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ctx.decomp)]
     return Master(
         ctx.master_model,
         ctx.convexity_ub,
@@ -200,34 +198,34 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     convexity_cost = sense * phase.convexity_artificial_var_cost
 
     # Artificial variables for coupling constraints
-    for (cstr_id, cstr_sense, _rhs) in coupling_constraints(ctx.decomp)
-        tagged = TaggedCI(cstr_id)
-        if cstr_sense == EQUAL_TO
+    for (cstr_id, _rhs) in coupling_constraints(ctx.decomp)
+        kind = cstr_id.kind
+        if kind == SAF_EQ || kind == VI_EQ
             s_pos = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(tagged => 1.0),
+                constraint_coeffs = Dict(cstr_id => 1.0),
                 objective_coeff = cost,
                 name = "s_pos[$(cstr_id.value)]"
             )
             s_neg = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(tagged => -1.0),
+                constraint_coeffs = Dict(cstr_id => -1.0),
                 objective_coeff = cost,
                 name = "s_neg[$(cstr_id.value)]"
             )
             ctx.eq_art_vars[cstr_id] = (s_pos, s_neg)
-        elseif cstr_sense == GREATER_THAN
+        elseif kind == SAF_GEQ || kind == VI_GEQ
             s_pos = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(tagged => 1.0),
+                constraint_coeffs = Dict(cstr_id => 1.0),
                 objective_coeff = cost,
                 name = "s_geq[$(cstr_id.value)]"
             )
             ctx.geq_art_vars[cstr_id] = s_pos
-        elseif cstr_sense == LESS_THAN
+        else  # LEQ
             s_neg = add_variable!(model;
                 lower_bound = 0.0,
-                constraint_coeffs = Dict(tagged => -1.0),
+                constraint_coeffs = Dict(cstr_id => -1.0),
                 objective_coeff = cost,
                 name = "s_leq[$(cstr_id.value)]"
             )

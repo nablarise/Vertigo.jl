@@ -149,26 +149,19 @@ end
 # PART 5: THE DECOMPOSITION STRUCT
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-@enum ConstraintSense begin
-    GREATER_THAN  # ax ≥ b
-    LESS_THAN     # ax ≤ b
-    EQUAL_TO      # ax = b
-end
-
 """
-    Decomposition{X,C}
+    Decomposition{X}
 
 Immutable concrete implementation of AbstractDecomposition.
 
 Type parameters:
   - X: original/linking variable identifier type
-  - C: constraint identifier type (e.g., MOI.ConstraintIndex)
 """
-struct Decomposition{X,C} <: AbstractDecomposition
+struct Decomposition{X} <: AbstractDecomposition
     subproblems::Dict{PricingSubproblemId,SubproblemData}
     pure_master_vars::Vector{PureMasterVariableData}
     mapping::ForwardMapping{X}
-    coupling_cstrs::Vector{Tuple{C,ConstraintSense,Float64}}
+    coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
     minimize::Bool
 end
 
@@ -377,15 +370,15 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    DecompositionBuilder{X,C}
+    DecompositionBuilder{X}
 
 Incrementally builds an immutable Decomposition from problem data.
 """
-mutable struct DecompositionBuilder{X,C}
+mutable struct DecompositionBuilder{X}
     minimize::Bool
     sp_variables::Dict{PricingSubproblemId,Vector{_VI}}
     sp_original_costs::Dict{PricingSubproblemId,Dict{_VI,Float64}}
-    sp_coupling_entries::Dict{PricingSubproblemId,Vector{Tuple{_VI,C,Float64}}}
+    sp_coupling_entries::Dict{PricingSubproblemId,Vector{Tuple{_VI,TaggedCI,Float64}}}
     sp_fixed_costs::Dict{PricingSubproblemId,Float64}
     sp_conv_bounds::Dict{PricingSubproblemId,Tuple{Float64,Float64}}
     pm_vars::Vector{PureMasterVariableData}
@@ -394,15 +387,15 @@ mutable struct DecompositionBuilder{X,C}
     forward_map::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
     inverse_map::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
     all_orig_vars_set::Set{X}
-    coupling_cstrs::Vector{Tuple{C,ConstraintSense,Float64}}
+    coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
 end
 
-function DecompositionBuilder{X,C}(; minimize::Bool=true) where {X,C}
-    return DecompositionBuilder{X,C}(
+function DecompositionBuilder{X}(; minimize::Bool=true) where {X}
+    return DecompositionBuilder{X}(
         minimize,
         Dict{PricingSubproblemId,Vector{_VI}}(),
         Dict{PricingSubproblemId,Dict{_VI,Float64}}(),
-        Dict{PricingSubproblemId,Vector{Tuple{_VI,C,Float64}}}(),
+        Dict{PricingSubproblemId,Vector{Tuple{_VI,TaggedCI,Float64}}}(),
         Dict{PricingSubproblemId,Float64}(),
         Dict{PricingSubproblemId,Tuple{Float64,Float64}}(),
         PureMasterVariableData[],
@@ -411,20 +404,20 @@ function DecompositionBuilder{X,C}(; minimize::Bool=true) where {X,C}
         Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}(),
         Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}(),
         Set{X}(),
-        Tuple{C,ConstraintSense,Float64}[]
+        Tuple{TaggedCI,Float64}[]
     )
 end
 
 function add_subproblem!(
-    b::DecompositionBuilder{X,C},
+    b::DecompositionBuilder{X},
     sp_id::PricingSubproblemId,
     fixed_cost::Float64,
     conv_lb::Float64,
     conv_ub::Float64
-) where {X,C}
+) where {X}
     b.sp_variables[sp_id] = _VI[]
     b.sp_original_costs[sp_id] = Dict{_VI,Float64}()
-    b.sp_coupling_entries[sp_id] = Tuple{_VI,C,Float64}[]
+    b.sp_coupling_entries[sp_id] = Tuple{_VI,TaggedCI,Float64}[]
     b.sp_fixed_costs[sp_id] = fixed_cost
     b.sp_conv_bounds[sp_id] = (conv_lb, conv_ub)
     return nothing
@@ -440,10 +433,11 @@ function add_sp_variable!(
 end
 
 function add_coupling_coefficient!(
-    b::DecompositionBuilder{X,C}, sp_id::PricingSubproblemId,
-    sp_var::_VI, cstr_id::C, coeff::Float64
-) where {X,C}
-    push!(get!(Vector{Tuple{_VI,C,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, cstr_id, coeff))
+    b::DecompositionBuilder, sp_id::PricingSubproblemId,
+    sp_var::_VI, cstr_id, coeff::Float64
+)
+    tagged = TaggedCI(cstr_id)
+    push!(get!(Vector{Tuple{_VI,TaggedCI,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, tagged, coeff))
     return nothing
 end
 
@@ -471,18 +465,17 @@ function add_pure_master_variable!(
 end
 
 function add_pure_master_coupling!(
-    b::DecompositionBuilder{X,C}, y_id::_VI, cstr_id::C,
+    b::DecompositionBuilder, y_id::_VI, cstr_id,
     coeff::Float64
-) where {X,C}
+)
     push!(b.pm_coupling_accum[y_id], CouplingEntry(TaggedCI(cstr_id), coeff))
     return nothing
 end
 
 function add_coupling_constraint!(
-    b::DecompositionBuilder{X,C}, cstr_id::C,
-    sense::ConstraintSense, rhs::Float64
-) where {X,C}
-    push!(b.coupling_cstrs, (cstr_id, sense, rhs))
+    b::DecompositionBuilder, cstr_id, rhs::Float64
+)
+    push!(b.coupling_cstrs, (TaggedCI(cstr_id), rhs))
     return nothing
 end
 
@@ -492,7 +485,7 @@ end
 Compile the accumulated data into an immutable Decomposition.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
-function build(b::DecompositionBuilder{X,C}) where {X,C}
+function build(b::DecompositionBuilder{X}) where {X}
     subproblems = Dict{PricingSubproblemId,SubproblemData}()
 
     for sp_id in keys(b.sp_variables)
@@ -503,10 +496,10 @@ function build(b::DecompositionBuilder{X,C}) where {X,C}
         offsets = Dict{_VI,UnitRange{Int}}()
 
         # Group raw entries by sp_var using a dict
-        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{_VI,C,Float64}[])
-        grouped = Dict{_VI,Vector{Tuple{C,Float64}}}()
+        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{_VI,TaggedCI,Float64}[])
+        grouped = Dict{_VI,Vector{Tuple{TaggedCI,Float64}}}()
         for (sp_var, cstr_id, coeff) in raw_entries
-            grp = get!(Vector{Tuple{C,Float64}}, grouped, sp_var)
+            grp = get!(Vector{Tuple{TaggedCI,Float64}}, grouped, sp_var)
             push!(grp, (cstr_id, coeff))
         end
 
@@ -517,7 +510,7 @@ function build(b::DecompositionBuilder{X,C}) where {X,C}
             haskey(grouped, sp_var) || continue
             range_start = length(entries) + 1
             for (cstr_id, coeff) in grouped[sp_var]
-                push!(entries, CouplingEntry(TaggedCI(cstr_id), coeff))
+                push!(entries, CouplingEntry(cstr_id, coeff))
             end
             # @view into Vector is mutable — sort! operates in-place
             sort!(@view(entries[range_start:end]); by = e -> e.constraint_id)
@@ -545,7 +538,7 @@ function build(b::DecompositionBuilder{X,C}) where {X,C}
         collect(b.all_orig_vars_set)
     )
 
-    return Decomposition{X,C}(
+    return Decomposition{X}(
         subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize
     )
 end

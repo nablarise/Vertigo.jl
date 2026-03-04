@@ -58,7 +58,7 @@ function _build_stab_ctx(; alpha=0.5)
     CstrId = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    builder = DecompositionBuilder{Tuple{Int,Int},CstrId}(
+    builder = DecompositionBuilder{Tuple{Int,Int}}(
         minimize=true
     )
     for k in K
@@ -73,7 +73,7 @@ function _build_stab_ctx(; alpha=0.5)
     end
     for t in T
         add_coupling_constraint!(
-            builder, JuMP.index(assignment[t]), EQUAL_TO, 1.0
+            builder, JuMP.index(assignment[t]), 1.0
         )
     end
     decomp = build(builder)

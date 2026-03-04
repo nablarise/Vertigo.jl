@@ -27,7 +27,7 @@ include("rk_adapter.jl")
 
 # Decomposition builder
 export PricingSubproblemId
-export Decomposition, DecompositionBuilder, ConstraintSense, EQUAL_TO, LESS_THAN, GREATER_THAN
+export Decomposition, DecompositionBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build

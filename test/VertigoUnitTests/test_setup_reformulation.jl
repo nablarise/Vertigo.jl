@@ -105,10 +105,10 @@ function build_phase_test_context()
     # Decomposition with pure master variables (no real subproblem).
     SpVar = MOI.VariableIndex
     CstrEq = typeof(c1)
-    builder = DecompositionBuilder{Nothing,CstrEq}(minimize=true)
+    builder = DecompositionBuilder{Nothing}(minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 2.0)
-    add_coupling_constraint!(builder, c1, EQUAL_TO, 1.0)
+    add_coupling_constraint!(builder, c1, 1.0)
 
     add_pure_master_variable!(
         builder, y_cont, 3.5, 0.0, 10.0, false
