@@ -46,7 +46,7 @@ export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id
 export has_column, record_column!, columns, columns_for_subproblem
 export column_sp_id, column_original_cost, pricing_objective_value
-export column_nonzero_entries, column_fingerprint
+export column_nonzero_entries
 
 # Branch-and-price
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price

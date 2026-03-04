@@ -223,7 +223,6 @@ column_sp_id(rec::ColumnRecord) = rec.sp_id
 column_original_cost(rec::ColumnRecord) = rec.original_cost
 pricing_objective_value(rec::ColumnRecord) = rec.solution.obj_value
 column_nonzero_entries(rec::ColumnRecord) = rec.solution.entries
-column_fingerprint(rec::ColumnRecord) = rec.solution.fingerprint
 
 """
     ColumnPool{C,S,V}
