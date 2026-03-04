@@ -188,11 +188,11 @@ function project_to_original(
     decomp::AbstractDecomposition, pool::AbstractColumnPool, master_primal_values
 )
     x_values = Dict{Any,Float64}()
-    for (master_var, sp_id, sol, _) in columns(pool)
-        λ_val = master_primal_values(master_var)
+    for (col_var, rec) in columns(pool)
+        λ_val = master_primal_values(col_var)
         iszero(λ_val) && continue
-        for (sp_var, z_val) in nonzero_entries(sol)
-            for orig_var in mapping_to_original(decomp, sp_id, sp_var)
+        for (sp_var, z_val) in column_nonzero_entries(rec)
+            for orig_var in mapping_to_original(decomp, column_sp_id(rec), sp_var)
                 x_values[orig_var] = get(x_values, orig_var, 0.0) + z_val * λ_val
             end
         end

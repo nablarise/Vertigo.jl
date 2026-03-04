@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Proprietary
 
 # ──────────────────────────────────────────────────────────────────
-# SpSolution fingerprint tests
+# Vertigo.ColGen._SpSolution fingerprint tests
 # ──────────────────────────────────────────────────────────────────
 
 function test_fingerprint_same_entries()
@@ -11,8 +11,8 @@ function test_fingerprint_same_entries()
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
 
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0), (z2, 2.0)])
-        sol_b = SpSolution(1, 99.0, [(z1, 1.0), (z2, 2.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0), (z2, 2.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 99.0, [(z1, 1.0), (z2, 2.0)])
 
         @test sol_a.fingerprint == sol_b.fingerprint
     end
@@ -22,8 +22,8 @@ function test_fingerprint_different_values()
     @testset "[fingerprint] different values produce different fingerprints" begin
         z1 = MOI.VariableIndex(1)
 
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0)])
-        sol_b = SpSolution(1, 3.0, [(z1, 2.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 2.0)])
 
         @test sol_a.fingerprint != sol_b.fingerprint
     end
@@ -34,8 +34,8 @@ function test_fingerprint_zero_entries_filtered()
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
 
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0)])
-        sol_b = SpSolution(1, 3.0, [(z1, 1.0), (z2, 0.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0), (z2, 0.0)])
 
         @test sol_a.fingerprint == sol_b.fingerprint
         @test length(sol_a.entries) == 1
@@ -48,8 +48,8 @@ function test_fingerprint_order_independent()
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
 
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0), (z2, 2.0)])
-        sol_b = SpSolution(1, 3.0, [(z2, 2.0), (z1, 1.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0), (z2, 2.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 3.0, [(z2, 2.0), (z1, 1.0)])
 
         @test sol_a.fingerprint == sol_b.fingerprint
     end
@@ -64,7 +64,7 @@ function test_column_pool_record_and_retrieve()
         pool = ColumnPool{MOI.VariableIndex,Int,MOI.VariableIndex}()
 
         z1 = MOI.VariableIndex(1)
-        sol = SpSolution(1, 3.0, [(z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
         col_var = MOI.VariableIndex(100)
 
         record_column!(pool, col_var, 1, sol, 5.0)
@@ -90,9 +90,9 @@ function test_column_pool_columns_for_subproblem()
 
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0)])
-        sol_b = SpSolution(1, 7.0, [(z2, 2.0)])
-        sol_c = SpSolution(2, 4.0, [(z1, 1.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 7.0, [(z2, 2.0)])
+        sol_c = Vertigo.ColGen._SpSolution(2, 4.0, [(z1, 1.0)])
 
         col_a = MOI.VariableIndex(100)
         col_b = MOI.VariableIndex(101)
@@ -104,13 +104,13 @@ function test_column_pool_columns_for_subproblem()
 
         sp1_cols = collect(columns_for_subproblem(pool, 1))
         @test length(sp1_cols) == 2
-        sp1_costs = sort([c[3] for c in sp1_cols])
+        sp1_costs = sort([column_original_cost(c[2]) for c in sp1_cols])
         @test sp1_costs[1] ≈ 3.0
         @test sp1_costs[2] ≈ 7.0
 
         sp2_cols = collect(columns_for_subproblem(pool, 2))
         @test length(sp2_cols) == 1
-        @test sp2_cols[1][3] ≈ 4.0
+        @test sp2_cols[1][2].original_cost ≈ 4.0
 
         # Non-existent subproblem returns empty.
         @test isempty(collect(columns_for_subproblem(pool, 99)))
@@ -123,8 +123,8 @@ function test_column_pool_columns_iterator()
 
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0)])
-        sol_b = SpSolution(2, 7.0, [(z2, 2.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(2, 7.0, [(z2, 2.0)])
 
         col_a = MOI.VariableIndex(100)
         col_b = MOI.VariableIndex(101)
@@ -135,7 +135,7 @@ function test_column_pool_columns_iterator()
         all_cols = collect(columns(pool))
         @test length(all_cols) == 2
 
-        costs = sort([c[4] for c in all_cols])
+        costs = sort([column_original_cost(c[2]) for c in all_cols])
         @test costs[1] ≈ 3.0
         @test costs[2] ≈ 7.0
     end
@@ -146,7 +146,7 @@ function test_column_pool_has_column_duplicate()
         pool = ColumnPool{MOI.VariableIndex,Int,MOI.VariableIndex}()
 
         z1 = MOI.VariableIndex(1)
-        sol = SpSolution(1, 3.0, [(z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
         col_var = MOI.VariableIndex(100)
 
         @test !has_column(pool, 1, sol)
@@ -156,7 +156,7 @@ function test_column_pool_has_column_duplicate()
         @test has_column(pool, 1, sol)
 
         # Same entries, rebuilt — same fingerprint.
-        sol_dup = SpSolution(1, 99.0, [(z1, 1.0)])
+        sol_dup = Vertigo.ColGen._SpSolution(1, 99.0, [(z1, 1.0)])
         @test has_column(pool, 1, sol_dup)
     end
 end
@@ -166,13 +166,13 @@ function test_column_pool_has_column_different_values()
         pool = ColumnPool{MOI.VariableIndex,Int,MOI.VariableIndex}()
 
         z1 = MOI.VariableIndex(1)
-        sol_a = SpSolution(1, 3.0, [(z1, 1.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
         col_var = MOI.VariableIndex(100)
 
         record_column!(pool, col_var, 1, sol_a, 5.0)
 
         # Same variable, different value.
-        sol_b = SpSolution(1, 3.0, [(z1, 2.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 2.0)])
         @test !has_column(pool, 1, sol_b)
     end
 end
@@ -182,13 +182,13 @@ function test_column_pool_has_column_different_subproblem()
         pool = ColumnPool{MOI.VariableIndex,Int,MOI.VariableIndex}()
 
         z1 = MOI.VariableIndex(1)
-        sol = SpSolution(1, 3.0, [(z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(z1, 1.0)])
         col_var = MOI.VariableIndex(100)
 
         record_column!(pool, col_var, 1, sol, 5.0)
 
         # Same fingerprint but different subproblem.
-        sol2 = SpSolution(2, 3.0, [(z1, 1.0)])
+        sol2 = Vertigo.ColGen._SpSolution(2, 3.0, [(z1, 1.0)])
         @test !has_column(pool, 2, sol2)
     end
 end
@@ -199,7 +199,7 @@ function test_column_pool_empty()
 
         @test isempty(collect(columns(pool)))
 
-        sol = SpSolution(1, 0.0, [(MOI.VariableIndex(1), 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 0.0, [(MOI.VariableIndex(1), 1.0)])
         @test !has_column(pool, 1, sol)
     end
 end

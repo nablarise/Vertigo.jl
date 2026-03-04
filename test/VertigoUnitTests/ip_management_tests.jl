@@ -14,7 +14,7 @@ end
 # Add a single column to a context's pool using a fresh MOI.VariableIndex as master var.
 function _add_test_column!(ctx, master_var_id::Int, sp_id::Int, cost::Float64)
     sp_var = MOI.VariableIndex(master_var_id + 1000)   # unique SP var
-    sol = SpSolution(sp_id, cost, [(sp_var, 1.0)])
+    sol = Vertigo.ColGen._SpSolution(sp_id, cost, [(sp_var, 1.0)])
     master_var = MOI.VariableIndex(master_var_id)
     record_column!(ctx.pool, master_var, sp_id, sol, cost)
     return master_var

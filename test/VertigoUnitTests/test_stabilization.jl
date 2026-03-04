@@ -8,7 +8,7 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     check_misprice, update_stabilization_after_misprice!,
     update_stabilization_after_iter!, _convex_combination,
     MasterDualSolution, DualMoiSolution, GeneratedColumns,
-    PricingPrimalSolution, SpSolution, get_master,
+    PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
     Phase0, Phase1, Phase2
 

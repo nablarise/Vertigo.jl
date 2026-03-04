@@ -33,7 +33,7 @@ get_dual_bound(sol::PricingSolution) = sol.dual_bound
 
 struct PricingPrimalSolution{S,V}
     sp_id::S
-    solution::SpSolution{S,V}
+    solution::_SpSolution{S,V}
     is_improving::Bool
 end
 
@@ -113,7 +113,7 @@ function optimize_pricing_problem!(
             push!(entries, (sp_var, val))
         end
     end
-    sol = SpSolution(sp_id, reduced_cost, entries)
+    sol = _SpSolution(sp_id, reduced_cost, entries)
 
     primal_sol = PricingPrimalSolution(sp_id, sol, is_improving)
 

@@ -287,8 +287,8 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase1)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
     sense = is_minimization(ctx.decomp) ? 1.0 : -1.0
 
-    for (master_var, _, _, _) in columns(ctx.pool)
-        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, 0.0))
+    for (col_var, _) in columns(ctx.pool)
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, 0.0))
     end
     for pmv in pure_master_variables(ctx.decomp)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(pmv.id, 0.0))
@@ -324,8 +324,8 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase2)
     empty!(ctx.leq_art_vars)
     empty!(ctx.geq_art_vars)
 
-    for (master_var, _, _, cost) in columns(ctx.pool)
-        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(master_var, cost))
+    for (col_var, rec) in columns(ctx.pool)
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec)))
     end
     for pmv in pure_master_variables(ctx.decomp)
         MOI.modify(model, obj_type,

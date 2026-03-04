@@ -14,7 +14,7 @@ const MOI = MathOptInterface
 using Vertigo
 using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
     check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2,
-    get_column_sp_id, get_column_cost
+    get_column_sp_id, get_column_cost, get_column_solution
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
 

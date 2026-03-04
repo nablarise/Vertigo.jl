@@ -127,8 +127,8 @@ function build_phase_test_context()
     # Column pool with two columns.
     pool = ColumnPool{MOI.VariableIndex,Int,SpVar}()
     sp_var_dummy = MOI.VariableIndex(9999)
-    sol1 = SpSolution(1, 5.0, [(sp_var_dummy, 1.0)])
-    sol2 = SpSolution(1, 8.0, [(sp_var_dummy, 1.0)])
+    sol1 = Vertigo.ColGen._SpSolution(1, 5.0, [(sp_var_dummy, 1.0)])
+    sol2 = Vertigo.ColGen._SpSolution(1, 8.0, [(sp_var_dummy, 1.0)])
     record_column!(pool, λ1, 1, sol1, 5.0)
     record_column!(pool, λ2, 1, sol2, 8.0)
 

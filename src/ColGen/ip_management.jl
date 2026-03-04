@@ -26,14 +26,14 @@ end
 function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     obj = 0.0
-    for (master_var, _, _, cost) in columns(ctx.pool)
-        val = get(mast_primal_sol.sol.variable_values, master_var, 0.0)
+    for (col_var, rec) in columns(ctx.pool)
+        val = get(mast_primal_sol.sol.variable_values, col_var, 0.0)
         rounded = round(val)
         abs(val - rounded) > tol && return nothing, false
         ival = round(Int, rounded)
         if ival > 0
-            push!(non_zero_integral, (master_var, ival))
-            obj += cost * ival
+            push!(non_zero_integral, (col_var, ival))
+            obj += column_original_cost(rec) * ival
         end
     end
     return MasterIpPrimalSol(obj, non_zero_integral), false

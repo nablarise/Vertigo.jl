@@ -151,7 +151,7 @@ function test_insert_columns_single_column()
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
-        sol = SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
@@ -178,8 +178,8 @@ function test_insert_columns_two_columns()
         ctx, refs = build_insert_columns_context()
         model = ctx.master_model
 
-        sol_a = SpSolution(1, 3.0, [(refs.z1, 1.0)])
-        sol_b = SpSolution(1, 5.0, [(refs.z2, 1.0)])
+        sol_a = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol_b = Vertigo.ColGen._SpSolution(1, 5.0, [(refs.z2, 1.0)])
 
         pricing_a = Vertigo.ColGen.PricingPrimalSolution(
             1, sol_a, true
@@ -224,7 +224,7 @@ function test_insert_columns_duplicate_skipped()
     @testset "[insert_columns] duplicate column skipped" begin
         ctx, refs = build_insert_columns_context()
 
-        sol = SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
@@ -253,7 +253,7 @@ function test_insert_columns_mixed_sp_variables()
         # cost = 3*1 + 5*2 = 13
         # c1 = 2*1 + 0*2 = 2, c2 = 1*1 + 4*2 = 9
         # br(x₁) = 1 (only z1 maps to x₁)
-        sol = SpSolution(
+        sol = Vertigo.ColGen._SpSolution(
             1, 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -279,7 +279,7 @@ function test_insert_columns_pool_records_original_cost()
     @testset "[insert_columns] pool records original cost" begin
         ctx, refs = build_insert_columns_context()
 
-        sol = SpSolution(1, 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.ColGen._SpSolution(1, 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
@@ -290,8 +290,8 @@ function test_insert_columns_pool_records_original_cost()
         col_var = first(keys(ctx.pool.by_column_var))
         entry = ctx.pool.by_column_var[col_var]
 
-        @test entry.original_cost ≈ 3.0
-        @test entry.sp_id == 1
+        @test column_original_cost(entry) ≈ 3.0
+        @test column_sp_id(entry) == 1
     end
 end
 

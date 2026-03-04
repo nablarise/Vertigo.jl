@@ -169,32 +169,32 @@ is_minimization(d::Decomposition) = d.minimize
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    SpSolution{S,V}
+    _SpSolution{S,V}
 
 Concrete subproblem solution with sorted entries for deterministic order and
 cheap deduplication via fingerprint hash.
 
 `obj_value` is the pricing subproblem objective (reduced-cost objective).
 """
-struct SpSolution{S,V} <: AbstractSubproblemSolution
+struct _SpSolution{S,V} <: AbstractSubproblemSolution
     sp_id::S
     obj_value::Float64
     entries::Vector{Tuple{V,Float64}}  # sorted by sp_var
     fingerprint::UInt64
 end
 
-function SpSolution(sp_id::S, obj_value::Float64, entries::Vector{Tuple{MOI.VariableIndex,Float64}}) where {S}
+function _SpSolution(sp_id::S, obj_value::Float64, entries::Vector{Tuple{MOI.VariableIndex,Float64}}) where {S}
     sorted = sort(entries; by = e -> e[1].value)
     filter!(e -> !iszero(e[2]), sorted)
     fp = hash(map(e -> (e[1].value, round(e[2]; digits=10)), sorted))
-    return SpSolution{S,MOI.VariableIndex}(sp_id, obj_value, sorted, fp)
+    return _SpSolution{S,MOI.VariableIndex}(sp_id, obj_value, sorted, fp)
 end
 
-subproblem_id(sol::SpSolution) = sol.sp_id
-objective_value(sol::SpSolution) = sol.obj_value
-@inline nonzero_entries(sol::SpSolution) = sol.entries
+subproblem_id(sol::_SpSolution) = sol.sp_id
+objective_value(sol::_SpSolution) = sol.obj_value
+@inline nonzero_entries(sol::_SpSolution) = sol.entries
 
-function solution_value(sol::SpSolution{S,V}, sp_var::V) where {S,V}
+function solution_value(sol::_SpSolution{S,V}, sp_var::V) where {S,V}
     idx = searchsortedfirst(sol.entries, (sp_var, -Inf); by=first)
     if idx <= length(sol.entries) && first(sol.entries[idx]) == sp_var
         return sol.entries[idx][2]
@@ -215,9 +215,15 @@ master's original objective.
 """
 struct ColumnRecord{S,V}
     sp_id::S
-    solution::SpSolution{S,V}
+    solution::_SpSolution{S,V}
     original_cost::Float64
 end
+
+column_sp_id(rec::ColumnRecord) = rec.sp_id
+column_original_cost(rec::ColumnRecord) = rec.original_cost
+pricing_objective_value(rec::ColumnRecord) = rec.solution.obj_value
+column_nonzero_entries(rec::ColumnRecord) = rec.solution.entries
+column_fingerprint(rec::ColumnRecord) = rec.solution.fingerprint
 
 """
     ColumnPool{C,S,V}
@@ -243,10 +249,18 @@ function ColumnPool{C,S,V}() where {C,S,V}
     )
 end
 
+"""
+    record_column!(pool, col_var, sp_id, sol, original_cost)
+
+Register a column in the pool, indexing it by column variable, subproblem,
+and fingerprint.
+"""
 function record_column!(
-    pool::ColumnPool{C,S,V}, col_var::C, sp_id::S, sol::SpSolution{S,V}, cost::Float64
+    pool::ColumnPool{C,S,V}, col_var::C, sp_id::S, sol::_SpSolution{S,V},
+    original_cost::Float64
 ) where {C,S,V}
-    pool.by_column_var[col_var] = ColumnRecord(sp_id, sol, cost)
+    pool.by_column_var[col_var] = ColumnRecord(sp_id, sol, original_cost)
+    # get!: fetch existing pool.by_subproblem[sp_id] or insert sp_id => Vector{C}().
     sp_cols = get!(Vector{C}, pool.by_subproblem, sp_id)
     push!(sp_cols, col_var)
     fp_set = get!(Set{UInt64}, pool.fingerprints, sp_id)
@@ -254,30 +268,50 @@ function record_column!(
     return nothing
 end
 
+"""
+    get_column_solution(pool, col_var) -> _SpSolution or nothing
+
+Return the subproblem solution associated with `col_var`, or `nothing`.
+"""
 function get_column_solution(pool::ColumnPool, col_var)
     record = get(pool.by_column_var, col_var, nothing)
     return isnothing(record) ? nothing : record.solution
 end
 
-get_column_sp_id(pool::ColumnPool, col_var) = pool.by_column_var[col_var].sp_id
-get_column_cost(pool::ColumnPool, col_var) = pool.by_column_var[col_var].original_cost
+"Return the subproblem id of the column associated with `col_var`."
+get_column_sp_id(pool::ColumnPool, col_var) = column_sp_id(pool.by_column_var[col_var])
 
+"Return the original cost of the column associated with `col_var`."
+get_column_cost(pool::ColumnPool, col_var) = column_original_cost(pool.by_column_var[col_var])
+
+"""
+    columns(pool) -> iterator of (col_var, ColumnRecord)
+
+Iterate over all columns in the pool.
+"""
 function columns(pool::ColumnPool)
-    return (
-        (cv, rec.sp_id, rec.solution, rec.original_cost)
-        for (cv, rec) in pool.by_column_var
-    )
+    return pool.by_column_var
 end
 
+"""
+    columns_for_subproblem(pool, sp_id) -> iterator of (col_var, ColumnRecord)
+
+Iterate over columns belonging to subproblem `sp_id`.
+"""
 function columns_for_subproblem(pool::ColumnPool{C,S,V}, sp_id::S) where {C,S,V}
     col_vars = get(pool.by_subproblem, sp_id, C[])
     return (
-        (cv, pool.by_column_var[cv].solution, pool.by_column_var[cv].original_cost)
+        (cv, pool.by_column_var[cv])
         for cv in col_vars
     )
 end
 
-function has_column(pool::ColumnPool, sp_id, sol::SpSolution)
+"""
+    has_column(pool, sp_id, sol) -> Bool
+
+Check if a column with the same fingerprint already exists for `sp_id`.
+"""
+function has_column(pool::ColumnPool, sp_id, sol::_SpSolution)
     fp_set = get(pool.fingerprints, sp_id, nothing)
     isnothing(fp_set) && return false
     return sol.fingerprint in fp_set

@@ -48,7 +48,7 @@ export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
 # Data structures
-export ColumnPool, SpSolution, NonRobustCutManager
+export ColumnPool, NonRobustCutManager
 
 # Context and solver entry point
 export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput
@@ -60,6 +60,8 @@ export subproblem_ids, subproblem_variables, subproblem_fixed_cost, convexity_bo
 export coupling_constraints, is_minimization, original_cost, coupling_coefficients
 export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id
-export has_column, record_column!, get_column_solution, columns, columns_for_subproblem
+export has_column, record_column!, columns, columns_for_subproblem
+export column_sp_id, column_original_cost, pricing_objective_value
+export column_nonzero_entries, column_fingerprint
 
 end # module ColGen

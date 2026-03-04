@@ -59,12 +59,12 @@ function create_branching_children(
 
     # Build constraint terms for all existing columns
     terms = MOI.ScalarAffineTerm{Float64}[]
-    for (master_var, sp_id, sol, _) in ColGen.columns(pool)
+    for (col_var, rec) in ColGen.columns(pool)
         coeff = ColGen.compute_branching_column_coefficient(
-            decomp, orig_var, sp_id, sol
+            decomp, orig_var, ColGen.column_sp_id(rec), rec.solution
         )
         if !iszero(coeff)
-            push!(terms, MOI.ScalarAffineTerm(coeff, master_var))
+            push!(terms, MOI.ScalarAffineTerm(coeff, col_var))
         end
     end
 
