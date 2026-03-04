@@ -242,7 +242,7 @@ function test_bound_improvement_updates_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(Any[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
 
     # For minimization, improving means pseudo_db > best_lagrangian_bound
     update_stabilization_after_pricing_optim!(
@@ -261,7 +261,7 @@ function test_no_improvement_keeps_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(Any[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
 
     # First call sets bound to 10.0
     update_stabilization_after_pricing_optim!(
@@ -284,7 +284,7 @@ function test_misprice_inactive()
     stab = setup_stabilization!(ctx, master)
     stab.cur_smooth_dual_sol_coeff = 0.0
 
-    gen_cols = GeneratedColumns(Any[])
+    gen_cols = GeneratedColumns(PricingPrimalSolution{Int}[])
     dual = _make_dual_sol(0.0)
     @test check_misprice(stab, gen_cols, dual) == false
 end
@@ -332,7 +332,7 @@ function test_decrease_alpha()
 
     # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
     # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
-    stab.last_generated_columns = GeneratedColumns(Any[])
+    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution{Int}[])
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
 
     old_alpha = stab.smooth_dual_sol_coeff
@@ -360,7 +360,7 @@ function test_increase_alpha()
     stab.stab_center = center_dual
 
     # Direction product = 1.0 * (1.0 - 3.0) = -2.0 ≤ 0 → increase α
-    stab.last_generated_columns = GeneratedColumns(Any[])
+    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution{Int}[])
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
 
     old_alpha = stab.smooth_dual_sol_coeff

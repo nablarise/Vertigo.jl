@@ -166,6 +166,8 @@ struct Decomposition{S,V,X,C,Y} <: AbstractDecomposition
     minimize::Bool
 end
 
+_sp_id_type(::Decomposition{S}) where {S} = S
+
 # M⁻¹ hot path
 @inline function original_cost(d::Decomposition, sp_id, sp_var)
     return d.subproblems[sp_id].original_costs[sp_var]

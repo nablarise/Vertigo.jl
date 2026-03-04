@@ -155,7 +155,7 @@ function test_insert_columns_single_column()
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
-        columns = Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
+        columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
@@ -188,7 +188,7 @@ function test_insert_columns_two_columns()
             1, sol_b, true
         )
         columns = Vertigo.ColGen.GeneratedColumns(
-            Any[pricing_a, pricing_b]
+            [pricing_a, pricing_b]
         )
 
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
@@ -231,13 +231,13 @@ function test_insert_columns_duplicate_skipped()
 
         n1 = Vertigo.ColGen.insert_columns!(
             ctx, Phase0(),
-            Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
+            Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n1 == 1
 
         n2 = Vertigo.ColGen.insert_columns!(
             ctx, Phase0(),
-            Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
+            Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n2 == 0
         @test length(ctx.pool.by_column_var) == 1
@@ -259,7 +259,7 @@ function test_insert_columns_mixed_sp_variables()
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
-        columns = Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
+        columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
         @test n == 1
@@ -283,7 +283,7 @@ function test_insert_columns_pool_records_original_cost()
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             1, sol, true
         )
-        columns = Vertigo.ColGen.GeneratedColumns(Any[pricing_sol])
+        columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
         Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
@@ -299,7 +299,7 @@ function test_insert_columns_empty_set()
     @testset "[insert_columns] empty column set" begin
         ctx, _ = build_insert_columns_context()
 
-        columns = Vertigo.ColGen.GeneratedColumns(Any[])
+        columns = Vertigo.ColGen.GeneratedColumns(Vertigo.ColGen.PricingPrimalSolution{Int}[])
         n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
 
         @test n == 0
