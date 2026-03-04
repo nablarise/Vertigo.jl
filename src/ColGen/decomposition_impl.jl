@@ -138,6 +138,20 @@ end
 # PART 4: FORWARD MAPPING M (x → z)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+"""
+    ForwardMapping{X}
+
+Bidirectional mapping between original variables and subproblem
+variables.
+
+`X` is the original variable identifier type (e.g. `Tuple{Int,Int}`
+for a (machine, task) pair in GAP).
+
+# Fields
+- `forward`: original var → subproblem copies it maps to.
+- `inverse_set`: (subproblem, sp_var) → original vars it represents.
+- `all_orig_vars`: every original variable registered in the mapping.
+"""
 struct ForwardMapping{X}
     forward::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
     inverse_set::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
