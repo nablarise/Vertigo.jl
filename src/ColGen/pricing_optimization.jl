@@ -17,12 +17,59 @@ pricing_strategy_iterate(s::DefaultPricingStrategy, state) = iterate(s.pricing_s
 
 # ── Pricing solution ──────────────────────────────────────────────────────────
 
+"""
+    PricingPrimalSolution
+
+Primal solution returned by a single pricing subproblem.
+
+Wraps the sparse variable–value pairs (`solution`) together with the
+subproblem identity (`sp_id`) and a flag indicating whether the
+reduced cost is improving (negative for minimization, positive for
+maximization).
+"""
 struct PricingPrimalSolution
     sp_id::PricingSubproblemId
     solution::_SpSolution{MOI.VariableIndex}
     is_improving::Bool
 end
 
+"""
+    PricingSolution
+
+Raw optimizer output for a single pricing subproblem call.
+
+Captures termination information (`is_infeasible`, `is_unbounded`),
+objective bounds, and every primal solution found by the optimizer.
+A `PricingSolution` is transient: it is produced by
+[`optimize_pricing_problem!`](@ref), inspected once, and discarded.
+
+## Bound semantics
+
+The two bounds correspond to the standard primal/dual pair of the
+**subproblem optimization** (not the master):
+
+- `primal_bound`: objective value of the best *feasible* solution found.
+- `dual_bound`: best known bound on the subproblem *optimum* (e.g., from
+  an internal LP relaxation or branch-and-bound).
+
+When the subproblem is solved to optimality (exact pricing),
+both values are equal.  The distinction matters for **heuristic pricing**,
+where the solver returns a feasible solution without proving optimality.
+
+These bounds are used differently at the master level:
+
+- `dual_bound` → feeds the *valid* master dual bound via
+  [`compute_dual_bound`](@ref). This bound is tight and drives the
+  convergence test (LP gap closed?).
+- `primal_bound` → feeds the *pseudo* dual bound, which is weaker
+  (uses feasible SP values instead of proven optima). The pseudo bound
+  is used only by stabilization: a looser bound avoids deactivating
+  smoothing prematurely after a heuristic pricing round.
+
+See also [`GeneratedColumns`](@ref), which accumulates only the
+*improving* solutions across all subproblems within one column
+generation iteration.
+"""
 struct PricingSolution
     is_infeasible::Bool
     is_unbounded::Bool
@@ -39,6 +86,21 @@ get_dual_bound(sol::PricingSolution) = sol.dual_bound
 
 # ── Set of columns ────────────────────────────────────────────────────────────
 
+"""
+    GeneratedColumns
+
+Accumulator for improving columns across all subproblems within one
+column generation iteration.
+
+Unlike [`PricingSolution`](@ref), which is the raw output of a single
+subproblem call (including infeasibility flags and bounds),
+`GeneratedColumns` retains only the solutions whose reduced cost is
+improving. These are the columns that will be inserted into the
+restricted master problem.
+
+Columns are added via [`push_in_set!`](@ref), which silently discards
+non-improving solutions.
+"""
 struct GeneratedColumns
     collection::Vector{PricingPrimalSolution}
 end
@@ -57,6 +119,14 @@ end
 
 # ── Pricing subproblem optimizer ──────────────────────────────────────────────
 
+"""
+    SubproblemMoiOptimizer
+
+Exact pricing optimizer that solves the subproblem via `MOI.optimize!`.
+
+Selected by [`get_pricing_subprob_optimizer`](@ref) for the
+[`ExactStage`](@ref) pricing stage.
+"""
 struct SubproblemMoiOptimizer end
 
 get_pricing_subprob_optimizer(::ExactStage, ::PricingSubproblem) = SubproblemMoiOptimizer()
