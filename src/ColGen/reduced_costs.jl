@@ -18,6 +18,12 @@ function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
     return get(d, cstr_idx.value, 0.0)
 end
 
+function _dual_value(dual_sol::MasterDualSolution, idx::TaggedCI)
+    return with_typed_ci(idx) do ci
+        _dual_value(dual_sol, ci)
+    end
+end
+
 function _compute_sp_reduced_costs(
     ctx::ColGenContext, mast_dual_sol::MasterDualSolution, sp_id; zero_cost=false
 )

@@ -62,7 +62,11 @@ function insert_columns!(
         cut_coeffs = compute_column_cut_coefficients(ctx.cuts, sol)
 
         all_coeffs = Dict{Any,Float64}()
-        for (k, v) in coupling_coeffs; all_coeffs[k] = v; end
+        for (tagged_ci, v) in coupling_coeffs
+            with_typed_ci(tagged_ci) do ci
+                all_coeffs[ci] = v
+            end
+        end
         for (k, v) in cut_coeffs; all_coeffs[k] = v; end
 
         for bc in ctx.branching_constraints

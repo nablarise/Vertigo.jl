@@ -6,30 +6,71 @@
 # PART 1: COUPLING COEFFICIENT STORAGE (CSR-style, allocation-free iteration)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-"""
-    CouplingEntry{C}
+const _SAF = MOI.ScalarAffineFunction{Float64}
 
-Single (constraint_id, coefficient) pair stored in a flat array.
-isbits when C is isbits (true for MOI.ConstraintIndex).
+@enum CIKind::UInt8 EQ_KIND LEQ_KIND GEQ_KIND
+
 """
-struct CouplingEntry{C}
-    constraint_id::C
-    coefficient::Float64
+    TaggedCI
+
+Concrete isbits representation of a `MOI.ConstraintIndex{SAF,S}`.
+Stores the index value and a kind tag to recover the concrete type
+at MOI call boundaries via `with_typed_ci`.
+"""
+struct TaggedCI
+    value::Int64
+    kind::CIKind
+end
+@assert isbitstype(TaggedCI)
+
+TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) =
+    TaggedCI(ci.value, EQ_KIND)
+TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) =
+    TaggedCI(ci.value, LEQ_KIND)
+TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}) =
+    TaggedCI(ci.value, GEQ_KIND)
+
+@inline function with_typed_ci(f, idx::TaggedCI)
+    if idx.kind == EQ_KIND
+        return f(MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}(
+            idx.value
+        ))
+    elseif idx.kind == LEQ_KIND
+        return f(MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}(
+            idx.value
+        ))
+    else
+        return f(MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}(
+            idx.value
+        ))
+    end
 end
 
 """
-    CouplingCoefficients{V,C}
+    CouplingEntry
+
+Single (constraint_id, coefficient) pair stored in a flat array.
+isbits — enables contiguous storage in `Vector{CouplingEntry}`.
+"""
+struct CouplingEntry
+    constraint_id::TaggedCI
+    coefficient::Float64
+end
+@assert isbitstype(CouplingEntry)
+
+"""
+    CouplingCoefficients{V}
 
 CSR-style storage for coupling coefficients of SP variables.
 Iterating over a sp_var's coefficients is a @view into a flat array — allocation-free.
 """
-struct CouplingCoefficients{V,C}
-    entries::Vector{CouplingEntry{C}}
+struct CouplingCoefficients{V}
+    entries::Vector{CouplingEntry}
     offsets::Dict{V,UnitRange{Int}}
 end
 
-function CouplingCoefficients{V,C}() where {V,C}
-    return CouplingCoefficients(CouplingEntry{C}[], Dict{V,UnitRange{Int}}())
+function CouplingCoefficients{V}() where {V}
+    return CouplingCoefficients(CouplingEntry[], Dict{V,UnitRange{Int}}())
 end
 
 @inline function get_coefficients(cc::CouplingCoefficients{V}, sp_var::V) where {V}
@@ -42,10 +83,10 @@ end
 # PART 2: SUBPROBLEM DATA
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-struct SubproblemData{V,C}
+struct SubproblemData{V}
     variables::Vector{V}
     original_costs::Dict{V,Float64}
-    coupling_coeffs::CouplingCoefficients{V,C}
+    coupling_coeffs::CouplingCoefficients{V}
     fixed_cost::Float64
     convexity_lb::Float64
     convexity_ub::Float64
@@ -56,13 +97,13 @@ end
 # PART 3: PURE MASTER VARIABLE DATA
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-struct PureMasterVariableData{Y,C}
+struct PureMasterVariableData{Y}
     id::Y
     cost::Float64
     lb::Float64
     ub::Float64
     is_integer::Bool
-    coupling_coeffs::Vector{CouplingEntry{C}}
+    coupling_coeffs::Vector{CouplingEntry}
 end
 
 
@@ -105,8 +146,8 @@ Type parameters:
   - Y: pure master variable identifier type
 """
 struct Decomposition{S,V,X,C,Y} <: AbstractDecomposition
-    subproblems::Dict{S,SubproblemData{V,C}}
-    pure_master_vars::Vector{PureMasterVariableData{Y,C}}
+    subproblems::Dict{S,SubproblemData{V}}
+    pure_master_vars::Vector{PureMasterVariableData{Y}}
     mapping::ForwardMapping{X,S,V}
     coupling_cstrs::Vector{Tuple{C,ConstraintSense,Float64}}
     minimize::Bool
@@ -333,8 +374,8 @@ mutable struct DecompositionBuilder{S,V,X,C,Y}
     sp_coupling_entries::Dict{S,Vector{Tuple{V,C,Float64}}}
     sp_fixed_costs::Dict{S,Float64}
     sp_conv_bounds::Dict{S,Tuple{Float64,Float64}}
-    pm_vars::Vector{PureMasterVariableData{Y,C}}
-    pm_coupling_accum::Dict{Y,Vector{CouplingEntry{C}}}
+    pm_vars::Vector{PureMasterVariableData{Y}}
+    pm_coupling_accum::Dict{Y,Vector{CouplingEntry}}
     pm_data_accum::Dict{Y,Tuple{Float64,Float64,Float64,Bool}}
     forward_map::Dict{X,Vector{Tuple{S,V}}}
     inverse_map::Dict{Tuple{S,V},Vector{X}}
@@ -350,8 +391,8 @@ function DecompositionBuilder{S,V,X,C,Y}(; minimize::Bool=true) where {S,V,X,C,Y
         Dict{S,Vector{Tuple{V,C,Float64}}}(),
         Dict{S,Float64}(),
         Dict{S,Tuple{Float64,Float64}}(),
-        PureMasterVariableData{Y,C}[],
-        Dict{Y,Vector{CouplingEntry{C}}}(),
+        PureMasterVariableData{Y}[],
+        Dict{Y,Vector{CouplingEntry}}(),
         Dict{Y,Tuple{Float64,Float64,Float64,Bool}}(),
         Dict{X,Vector{Tuple{S,V}}}(),
         Dict{Tuple{S,V},Vector{X}}(),
@@ -408,14 +449,14 @@ function add_pure_master_variable!(
     is_integer::Bool
 ) where {S,V,X,C,Y}
     b.pm_data_accum[y_id] = (cost, lb, ub, is_integer)
-    b.pm_coupling_accum[y_id] = CouplingEntry{C}[]
+    b.pm_coupling_accum[y_id] = CouplingEntry[]
     return nothing
 end
 
 function add_pure_master_coupling!(
     b::DecompositionBuilder{S,V,X,C,Y}, y_id::Y, cstr_id::C, coeff::Float64
 ) where {S,V,X,C,Y}
-    push!(b.pm_coupling_accum[y_id], CouplingEntry(cstr_id, coeff))
+    push!(b.pm_coupling_accum[y_id], CouplingEntry(TaggedCI(cstr_id), coeff))
     return nothing
 end
 
@@ -433,13 +474,13 @@ Compile the accumulated data into an immutable Decomposition.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
 function build(b::DecompositionBuilder{S,V,X,C,Y}) where {S,V,X,C,Y}
-    subproblems = Dict{S,SubproblemData{V,C}}()
+    subproblems = Dict{S,SubproblemData{V}}()
 
     for sp_id in keys(b.sp_variables)
         variables = b.sp_variables[sp_id]
         original_costs = b.sp_original_costs[sp_id]
 
-        entries = CouplingEntry{C}[]
+        entries = CouplingEntry[]
         offsets = Dict{V,UnitRange{Int}}()
 
         # Group raw entries by sp_var using a dict (avoids requiring isless on V)
@@ -455,7 +496,7 @@ function build(b::DecompositionBuilder{S,V,X,C,Y}) where {S,V,X,C,Y}
             haskey(grouped, sp_var) || continue
             range_start = length(entries) + 1
             for (cstr_id, coeff) in grouped[sp_var]
-                push!(entries, CouplingEntry(cstr_id, coeff))
+                push!(entries, CouplingEntry(TaggedCI(cstr_id), coeff))
             end
             offsets[sp_var] = range_start:length(entries)
         end
@@ -469,9 +510,9 @@ function build(b::DecompositionBuilder{S,V,X,C,Y}) where {S,V,X,C,Y}
         )
     end
 
-    pm_vars = PureMasterVariableData{Y,C}[]
+    pm_vars = PureMasterVariableData{Y}[]
     for (y_id, (cost, lb, ub, is_int)) in b.pm_data_accum
-        coeffs = get(b.pm_coupling_accum, y_id, CouplingEntry{C}[])
+        coeffs = get(b.pm_coupling_accum, y_id, CouplingEntry[])
         push!(pm_vars, PureMasterVariableData(y_id, cost, lb, ub, is_int, coeffs))
     end
 
