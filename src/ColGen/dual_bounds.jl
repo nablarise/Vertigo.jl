@@ -51,13 +51,15 @@ function compute_dual_bound(
         end
     end
 
-    # 2. Subproblem contribution: Σₖ SP_db × multiplicity
+    # 2. Subproblem contribution: Σₖ (SP_db + fₖ) × multiplicity
     sense = is_minimization(decomp) ? 1 : -1
     sp_contrib = 0.0
     for (sp_id, sp_db) in sps_db
+        fk = subproblem_fixed_cost(decomp, sp_id)
+        sp_total = sp_db + fk
         conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        multiplicity = (sense * sp_db < 0) ? conv_ub : conv_lb
-        sp_contrib += sp_db * multiplicity
+        multiplicity = (sense * sp_total < 0) ? conv_ub : conv_lb
+        sp_contrib += sp_total * multiplicity
     end
 
     # 3. Pure master variable contribution (0 for GAP)
