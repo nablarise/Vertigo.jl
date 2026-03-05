@@ -63,6 +63,16 @@ function gap_three_identical_machines()
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
+function gap_small_feasible()
+    # 2 machines, 7 tasks — small feasible instance.
+    cost = [5.0 8.0 14.0 20.0 5.0 4.0 13.0;
+            18.0 14.0 15.0 16.0 3.0 8.0 19.0]
+    weight = [1.0 1.0 1.0 5.0 2.0 1.0 4.0;
+              5.0 3.0 4.0 1.0 4.0 1.0 1.0]
+    capacity = [11.0, 14.0]
+    return GAPInstance(2, 7, cost, weight, capacity)
+end
+
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Benchmark instance table (Pigatti et al. 2005, Table 1)
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -84,7 +94,7 @@ const BENCHMARK_INSTANCES = [
 
 function test_gap_column_generation_converges()
     @testset "[gap] column generation converges (2 machines, 7 tasks)" begin
-        inst = random_gap_instance(2, 7)
+        inst = gap_small_feasible()
         ctx = build_gap_context(inst)
 
         output = run_column_generation(ctx)
@@ -161,7 +171,7 @@ end
 
 function test_gap_wentges_smoothing()
     @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
-        inst = random_gap_instance(2, 7)
+        inst = gap_small_feasible()
         ctx = build_gap_context(inst; smoothing_alpha=0.5)
         output = run_column_generation(ctx)
         @test output.status == optimal
