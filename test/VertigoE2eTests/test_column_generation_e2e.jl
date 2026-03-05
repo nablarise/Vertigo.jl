@@ -243,6 +243,19 @@ function test_gap_shifted_bounds()
     end
 end
 
+function test_gap_with_penalty2()
+    @testset "[gap] penalty unassignment (2 machines, 7 tasks, penalty=10)" begin
+        gap = gap_small_feasible2()
+        penalty = fill(10.0, gap.n_tasks)
+        inst = GAPWithPenaltyInstance(gap, penalty)
+        ctx = build_gap_with_penalty_context(inst)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - 51.0) <= 1e-4
+    end
+end
+
 function test_gap_fixed_master_cost()
     @testset "[gap] fixed master cost shifts bounds (2 machines, 7 tasks)" begin
         inst = gap_small_feasible()
@@ -279,6 +292,7 @@ function test_column_generation_e2e()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
     test_gap_with_penalty()
+    test_gap_with_penalty2()
     test_gap_shifted_bounds()
     test_gap_fixed_master_cost()
     test_gap_wentges_smoothing()
