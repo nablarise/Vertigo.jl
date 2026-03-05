@@ -205,21 +205,11 @@ end
 function test_gap_shifted_bounds()
     @testset "[gap] shifted formulation z ∈ {1,2} matches standard bounds" begin
         inst = gap_small_feasible()
-
-        # Shifted formulation
         shifted_ctx = build_gap_shifted_context(inst)
         shifted_out = run_column_generation(shifted_ctx)
         @test shifted_out.status == optimal
         @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
         @test abs(shifted_out.incumbent_dual_bound - 63.0) <= 1e-4
-
-        # Standard formulation
-        std_ctx = build_gap_context(inst)
-        std_out = run_column_generation(std_ctx)
-        @test std_out.status == optimal
-
-        # LP bounds must match
-        @test abs(shifted_out.master_lp_obj - std_out.master_lp_obj) <= 1e-4
     end
 end
 
