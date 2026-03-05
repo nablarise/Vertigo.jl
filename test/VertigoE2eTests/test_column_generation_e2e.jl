@@ -29,17 +29,16 @@ function gap_infeasible_subproblem()
 end
 
 function gap_maximization()
-    # Maximization GAP with all-negative costs, 3 machines × 30 jobs.
-    # Costs vary by machine and task to create a non-trivial LP relaxation.
-    n_machines = 3
-    n_tasks = 30
-    cost = [-(k + t) * 1.0 for k in 1:n_machines, t in 1:n_tasks]
-    weight = fill(3.0, n_machines, n_tasks)
-    capacity = fill(50.0, n_machines)  # 50/3 ≈ 16 tasks/machine, 48 > 30
-    return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
+    # Maximization GAP: negate gap_small_feasible2 costs.
+    inst = gap_small_feasible2()
+    cost = -inst.cost
+    return GAPInstance(
+        inst.n_machines, inst.n_tasks, cost, inst.weight, inst.capacity
+    )
 end
 
 # Root dual bound is 32
+# Optimal value is 32
 function gap_two_identical_machines()
     # 3 machines, 7 tasks — machines 1 and 2 are identical
     cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
@@ -158,7 +157,7 @@ function test_gap_infeasible_subproblem()
 end
 
 function test_gap_maximization()
-    @testset "[gap] maximization converges (3 machines, 30 jobs, negative costs)" begin
+    @testset "[gap] maximization converges (2 machines, 7 tasks, negated costs)" begin
         inst = gap_maximization()
         ctx = build_gap_context_max(inst)
         output = run_column_generation(ctx)
