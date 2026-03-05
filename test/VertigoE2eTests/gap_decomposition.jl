@@ -18,17 +18,6 @@ function random_gap_instance(n_machines, n_tasks; seed=42)
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
-function play2()
-    return GAPInstance(
-      2, 7,
-      [8 5 11 21 6 5 19;
-       1 12 11 12 14 8 5],
-      [2 3 3 1 2 1 1;
-       5 1 1 3 1 5 4],
-      [5, 8]
-  )
-end
-
 """
     parse_gap_file(filepath::String) -> GAPInstance
 

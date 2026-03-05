@@ -63,6 +63,8 @@ function gap_three_identical_machines()
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
+# Root dual bound is 63
+# Optimal value is 63
 function gap_small_feasible()
     # 2 machines, 7 tasks — small feasible instance.
     cost = [5.0 8.0 14.0 20.0 5.0 4.0 13.0;
@@ -71,6 +73,19 @@ function gap_small_feasible()
               5.0 3.0 4.0 1.0 4.0 1.0 1.0]
     capacity = [11.0, 14.0]
     return GAPInstance(2, 7, cost, weight, capacity)
+end
+
+# Root dual bound is 70.33333
+# Optimal solution is 75
+function gap_small_feasible2()
+    return GAPInstance(
+      2, 7,
+      [8 5 11 21 6 5 19;
+       1 12 11 12 14 8 5],
+      [2 3 3 1 2 1 1;
+       5 1 1 3 1 5 4],
+      [5, 8]
+  )
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -101,6 +116,20 @@ function test_gap_column_generation_converges()
 
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - 63.0) <= 1e-4
+    end
+end
+
+function test_gap_column_generation_converges2()
+    @testset "[gap] column generation converges (2 machines, 7 tasks, instance 2)" begin
+        inst = gap_small_feasible2()
+        ctx = build_gap_context(inst)
+
+        output = run_column_generation(ctx)
+
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - 70.33333) <= 1e-4
     end
 end
 
@@ -202,6 +231,7 @@ function test_gap_shifted_bounds()
         shifted_out = run_column_generation(shifted_ctx)
         @test shifted_out.status == optimal
         @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
+        @test abs(shifted_out.incumbent_dual_bound - 63.0) <= 1e-4
 
         # Standard formulation
         std_ctx = build_gap_context(inst)
@@ -229,6 +259,7 @@ end
 
 function test_column_generation_e2e()
     test_gap_column_generation_converges()
+    test_gap_column_generation_converges2()
     #test_gap_benchmark_instances()
     test_gap_infeasible_master()
     test_gap_infeasible_subproblem()
