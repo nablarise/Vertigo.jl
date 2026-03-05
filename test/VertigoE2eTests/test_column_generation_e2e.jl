@@ -51,6 +51,21 @@ function gap_two_identical_machines()
     return GAPInstance(3, 7, cost, weight, capacity)
 end
 
+# Root dual bound is 32
+# Optimal value is 32
+# Same as gap_two_identical_machines but with 2 machine types:
+#   type 1 = identical pair (multiplicity 2), type 2 = machine 3
+function gap_identical_machines()
+    cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
+            8.0  6.0  10.0  4.0  11.0  7.0  3.0]
+    weight = [2.0  3.0  1.0  4.0  2.0  1.0  3.0;
+              3.0  1.0  2.0  2.0  4.0  3.0  1.0]
+    capacity = [10.0, 12.0]
+    return GAPInstanceWithIdenticalMachines(
+        2, 7, cost, weight, capacity, [2, 1]
+    )
+end
+
 # Root dual bound is 63
 # Optimal value is 63
 function gap_small_feasible()
@@ -176,6 +191,18 @@ function test_gap_two_identical_machines()
     end
 end
 
+function test_gap_identical_machines()
+    @testset "[gap] identical machines with multiplicity (2 types, 7 tasks)" begin
+        expected_root_dual_bound = 32.0
+        inst = gap_identical_machines()
+        ctx = build_gap_identical_context(inst)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+    end
+end
+
 function test_gap_wentges_smoothing()
     @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
         expected_root_dual_bound = 70.33333
@@ -254,6 +281,7 @@ function test_column_generation_e2e()
     test_gap_infeasible_subproblem()
     test_gap_maximization()
     test_gap_two_identical_machines()
+    test_gap_identical_machines()
     test_gap_with_penalty()
     test_gap_with_penalty2()
     test_gap_shifted_bounds()
