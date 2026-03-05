@@ -97,27 +97,25 @@ const BENCHMARK_INSTANCES = [
 
 function test_gap_column_generation_converges()
     @testset "[gap] column generation converges (2 machines, 7 tasks)" begin
+        expected_root_dual_bound = 63.0
         inst = gap_small_feasible()
         ctx = build_gap_context(inst)
-
         output = run_column_generation(ctx)
-
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 63.0) <= 1e-4
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
 function test_gap_column_generation_converges2()
     @testset "[gap] column generation converges (2 machines, 7 tasks, instance 2)" begin
+        expected_root_dual_bound = 70.33333
         inst = gap_small_feasible2()
         ctx = build_gap_context(inst)
-
         output = run_column_generation(ctx)
-
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 70.33333) <= 1e-4
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
@@ -168,23 +166,25 @@ end
 
 function test_gap_two_identical_machines()
     @testset "[gap] two identical machines (symmetric degeneracy)" begin
+        expected_root_dual_bound = 32.0
         inst = gap_two_identical_machines()
         ctx = build_gap_context(inst)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 32.0) <= 1e-4
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
 function test_gap_wentges_smoothing()
     @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
+        expected_root_dual_bound = 70.33333
         inst = gap_small_feasible2()
         ctx = build_gap_context(inst; smoothing_alpha=0.5)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 70.33333) <= 1e-4
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
@@ -204,12 +204,13 @@ end
 
 function test_gap_shifted_bounds()
     @testset "[gap] shifted formulation z ∈ {1,2} matches standard bounds" begin
+        expected_root_dual_bound = 63.0
         inst = gap_small_feasible()
         shifted_ctx = build_gap_shifted_context(inst)
         shifted_out = run_column_generation(shifted_ctx)
         @test shifted_out.status == optimal
         @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
-        @test abs(shifted_out.incumbent_dual_bound - 63.0) <= 1e-4
+        @test abs(shifted_out.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
@@ -222,7 +223,8 @@ function test_gap_with_penalty2()
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 51.0) <= 1e-4
+        expected_root_dual_bound = 51.0
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
@@ -234,7 +236,8 @@ function test_gap_fixed_master_cost()
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - (63.0 + fixed_cost)) <= 1e-4
+        expected_root_dual_bound = 63.0 + fixed_cost
+        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
     end
 end
 
