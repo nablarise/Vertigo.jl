@@ -678,8 +678,8 @@ function build_gap_with_penalty_card_context(
     end
 
     for k in K
+        sp_id = PricingSubproblemId(k)
         for t in T
-            sp_id = PricingSubproblemId(k)
             sp_var = sp_var_indices[sp_id][t]
             add_sp_variable!(
                 builder, sp_id, sp_var, gap.cost[k, t]
