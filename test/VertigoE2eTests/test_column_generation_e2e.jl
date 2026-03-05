@@ -39,18 +39,17 @@ function gap_maximization()
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
+# Root dual bound is 60
 function gap_two_identical_machines()
-    # Machines 1 and 2 are identical
-    n_machines = 3
-    n_tasks = 30
-    cost = Matrix{Float64}(undef, n_machines, n_tasks)
-    weight = Matrix{Float64}(undef, n_machines, n_tasks)
-    for t in 1:n_tasks
-        cost[1, t] = 2.0; cost[2, t] = 2.0; cost[3, t] = 3.0
-        weight[1, t] = 3.0; weight[2, t] = 3.0; weight[3, t] = 4.0
-    end
-    capacity = fill(50.0, n_machines)
-    return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
+    # 3 machines, 7 tasks — machines 1 and 2 are identical
+    cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
+            5.0  8.0  3.0  12.0  7.0  4.0  9.0;
+            8.0  6.0  10.0  4.0  11.0  7.0  3.0]
+    weight = [2.0  3.0  1.0  4.0  2.0  1.0  3.0;
+              2.0  3.0  1.0  4.0  2.0  1.0  3.0;
+              3.0  1.0  2.0  2.0  4.0  3.0  1.0]
+    capacity = [10.0, 10.0, 12.0]
+    return GAPInstance(3, 7, cost, weight, capacity)
 end
 
 # Root dual bound is 63
@@ -175,6 +174,7 @@ function test_gap_two_identical_machines()
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - 60.0) <= 1e-4
     end
 end
 
