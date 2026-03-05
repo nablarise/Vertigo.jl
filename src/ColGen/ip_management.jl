@@ -25,6 +25,7 @@ end
 # Returns (MasterIpPrimalSol, false) if all values are integral, (nothing, false) if not.
 function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
+    non_zero_continuous = Tuple{MOI.VariableIndex,Float64}[]
     obj = 0.0
     for (col_var, rec) in columns(ctx.pool)
         val = get(mast_primal_sol.sol.variable_values, col_var, 0.0)
@@ -36,7 +37,27 @@ function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
             obj += column_original_cost(rec) * ival
         end
     end
-    return MasterIpPrimalSol(obj, non_zero_integral), false
+    decomp = ctx.decomp
+    for pmv in pure_master_variables(decomp)
+        val = get(mast_primal_sol.sol.variable_values, pmv.id, 0.0)
+        cost = pure_master_cost(decomp, pmv)
+        if pure_master_is_integer(decomp, pmv)
+            rounded = round(val)
+            abs(val - rounded) > tol && return nothing, false
+            ival = round(Int, rounded)
+            if ival != 0
+                push!(non_zero_integral, (pmv.id, ival))
+                obj += cost * ival
+            end
+        else
+            if abs(val) > tol
+                push!(non_zero_continuous, (pmv.id, val))
+                obj += cost * val
+            end
+        end
+    end
+    return MasterIpPrimalSol(obj, non_zero_integral, non_zero_continuous),
+           false
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────

@@ -129,6 +129,108 @@ function test_ip_project_multiplicity_greater_than_one()
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# _project_if_integral with pure master variables
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+function _add_test_pure_master_var!(ctx, var_id::Int, cost::Float64, is_integer::Bool)
+    pmv = Vertigo.ColGen.PureMasterVariableData(
+        MOI.VariableIndex(var_id), cost, 0.0, 1.0, is_integer,
+        Vertigo.ColGen.CouplingEntry[]
+    )
+    push!(ctx.decomp.pure_master_vars, pmv)
+    return MOI.VariableIndex(var_id)
+end
+
+function test_ip_project_integral_with_integer_pure_master()
+    @testset "[ip_management] _project_if_integral integer pure master integral" begin
+        inst = random_gap_instance(1, 1; seed=30)
+        ctx = build_gap_context(inst)
+
+        mv = _add_test_column!(ctx, 700, 1, 5.0)
+        pmv_id = _add_test_pure_master_var!(ctx, 701, 3.0, true)
+
+        var_values = Dict{MOI.VariableIndex,Float64}(
+            mv => 1.0, pmv_id => 2.0
+        )
+        sol = _make_primal_sol(var_values)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
+
+        @test !isnothing(result)
+        @test cut == false
+        @test result.obj_value ≈ 5.0 + 3.0 * 2
+        @test length(result.non_zero_integral) == 2
+    end
+end
+
+function test_ip_project_fractional_integer_pure_master()
+    @testset "[ip_management] _project_if_integral fractional integer pure master → nothing" begin
+        inst = random_gap_instance(1, 1; seed=31)
+        ctx = build_gap_context(inst)
+
+        mv = _add_test_column!(ctx, 710, 1, 5.0)
+        pmv_id = _add_test_pure_master_var!(ctx, 711, 3.0, true)
+
+        var_values = Dict{MOI.VariableIndex,Float64}(
+            mv => 1.0, pmv_id => 0.5
+        )
+        sol = _make_primal_sol(var_values)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
+
+        @test isnothing(result)
+        @test cut == false
+    end
+end
+
+function test_ip_project_with_continuous_pure_master()
+    @testset "[ip_management] _project_if_integral continuous pure master always passes" begin
+        inst = random_gap_instance(1, 1; seed=32)
+        ctx = build_gap_context(inst)
+
+        mv = _add_test_column!(ctx, 720, 1, 5.0)
+        pmv_id = _add_test_pure_master_var!(ctx, 721, 4.0, false)
+
+        var_values = Dict{MOI.VariableIndex,Float64}(
+            mv => 1.0, pmv_id => 0.75
+        )
+        sol = _make_primal_sol(var_values)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
+
+        @test !isnothing(result)
+        @test cut == false
+        @test result.obj_value ≈ 5.0 + 4.0 * 0.75
+        @test length(result.non_zero_continuous) == 1
+        @test result.non_zero_continuous[1][1] == pmv_id
+        @test result.non_zero_continuous[1][2] ≈ 0.75
+    end
+end
+
+function test_ip_project_mixed_columns_and_pure_master()
+    @testset "[ip_management] _project_if_integral mixed columns + pure master" begin
+        inst = random_gap_instance(1, 1; seed=33)
+        ctx = build_gap_context(inst)
+
+        mv1 = _add_test_column!(ctx, 730, 1, 2.0)
+        mv2 = _add_test_column!(ctx, 731, 1, 3.0)
+        pmv_int = _add_test_pure_master_var!(ctx, 732, 7.0, true)
+        pmv_cont = _add_test_pure_master_var!(ctx, 733, 1.5, false)
+
+        var_values = Dict{MOI.VariableIndex,Float64}(
+            mv1 => 1.0, mv2 => 2.0,
+            pmv_int => 1.0, pmv_cont => 0.4
+        )
+        sol = _make_primal_sol(var_values)
+        result, cut = Vertigo.ColGen._project_if_integral(sol, ctx)
+
+        @test !isnothing(result)
+        @test cut == false
+        expected_obj = 2.0 * 1 + 3.0 * 2 + 7.0 * 1 + 1.5 * 0.4
+        @test result.obj_value ≈ expected_obj
+        @test length(result.non_zero_integral) == 3
+        @test length(result.non_zero_continuous) == 1
+    end
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # _has_artificial_vars_in_solution
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -329,6 +431,10 @@ function test_ip_management()
     test_ip_project_missing_var_defaults_zero()
     test_ip_project_near_integer_within_tol()
     test_ip_project_multiplicity_greater_than_one()
+    test_ip_project_integral_with_integer_pure_master()
+    test_ip_project_fractional_integer_pure_master()
+    test_ip_project_with_continuous_pure_master()
+    test_ip_project_mixed_columns_and_pure_master()
     test_ip_has_art_eq_active()
     test_ip_has_art_leq_active()
     test_ip_has_art_geq_active()
