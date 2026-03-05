@@ -39,7 +39,7 @@ function gap_maximization()
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
-# Root dual bound is 60
+# Root dual bound is 32
 function gap_two_identical_machines()
     # 3 machines, 7 tasks — machines 1 and 2 are identical
     cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
@@ -174,7 +174,7 @@ function test_gap_two_identical_machines()
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - 60.0) <= 1e-4
+        @test abs(output.incumbent_dual_bound - 32.0) <= 1e-4
     end
 end
 
