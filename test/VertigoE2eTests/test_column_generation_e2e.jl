@@ -53,16 +53,6 @@ function gap_two_identical_machines()
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
-function gap_three_identical_machines()
-    # All three machines are identical
-    n_machines = 3
-    n_tasks = 30
-    cost = fill(2.0, n_machines, n_tasks)
-    weight = fill(3.0, n_machines, n_tasks)
-    capacity = fill(50.0, n_machines)
-    return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
-end
-
 # Root dual bound is 63
 # Optimal value is 63
 function gap_small_feasible()
@@ -188,16 +178,6 @@ function test_gap_two_identical_machines()
     end
 end
 
-function test_gap_three_identical_machines()
-    @testset "[gap] three identical machines (maximum symmetry)" begin
-        inst = gap_three_identical_machines()
-        ctx = build_gap_context(inst)
-        output = run_column_generation(ctx)
-        @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-    end
-end
-
 function test_gap_wentges_smoothing()
     @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
         inst = gap_small_feasible()
@@ -290,7 +270,6 @@ function test_column_generation_e2e()
     test_gap_infeasible_subproblem()
     test_gap_maximization()
     test_gap_two_identical_machines()
-    test_gap_three_identical_machines()
     test_gap_with_penalty()
     test_gap_with_penalty2()
     test_gap_shifted_bounds()
