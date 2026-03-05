@@ -179,6 +179,20 @@ function test_gap_wentges_smoothing()
     end
 end
 
+function test_gap_with_penalty()
+    @testset "[gap] penalty unassignment (3 machines, 30 jobs, penalty=1000)" begin
+        gap = gap_infeasible_master()
+        penalty = fill(1000.0, gap.n_tasks)
+        inst = GAPWithPenaltyInstance(gap, penalty)
+        ctx = build_gap_with_penalty_context(inst)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        # At least 3 tasks must be unassigned → penalty ≥ 3000
+        @test output.master_lp_obj >= 3000.0 - 1e-4
+    end
+end
+
 function test_gap_wentges_smoothing_larger()
     @testset "[gap] Wentges smoothing converges (3 machines, 30 tasks, α=0.5)" begin
         inst = gap_two_identical_machines()
@@ -201,6 +215,7 @@ function test_column_generation_e2e()
     test_gap_maximization()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
+    test_gap_with_penalty()
     test_gap_wentges_smoothing()
     test_gap_wentges_smoothing_larger()
 end
