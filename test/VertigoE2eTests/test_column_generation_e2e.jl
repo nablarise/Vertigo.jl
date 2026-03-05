@@ -243,6 +243,18 @@ function test_gap_shifted_bounds()
     end
 end
 
+function test_gap_fixed_master_cost()
+    @testset "[gap] fixed master cost shifts bounds (2 machines, 7 tasks)" begin
+        inst = gap_small_feasible()
+        fixed_cost = 100.0
+        ctx = build_gap_context_with_fixed_cost(inst, fixed_cost)
+        output = run_column_generation(ctx)
+        @test output.status == optimal
+        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test abs(output.incumbent_dual_bound - (63.0 + fixed_cost)) <= 1e-4
+    end
+end
+
 function test_gap_wentges_smoothing_larger()
     @testset "[gap] Wentges smoothing converges (3 machines, 30 tasks, α=0.5)" begin
         inst = gap_two_identical_machines()
@@ -268,6 +280,7 @@ function test_column_generation_e2e()
     test_gap_three_identical_machines()
     test_gap_with_penalty()
     test_gap_shifted_bounds()
+    test_gap_fixed_master_cost()
     test_gap_wentges_smoothing()
     test_gap_wentges_smoothing_larger()
 end
