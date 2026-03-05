@@ -1,0 +1,50 @@
+# Copyright (c) 2025 Nablarise. All rights reserved.
+# Author: Guillaume Marques <guillaume@nablarise.com>
+# SPDX-License-Identifier: Proprietary
+
+function test_gap_decomposition_builder()
+    @testset "[gap] decomposition builder" begin
+        inst = random_gap_instance(2, 4)
+        ctx = build_gap_context(inst)
+
+        @test length(collect(subproblem_ids(ctx.decomp))) == 2
+        for k in 1:2
+            sp_id = PricingSubproblemId(k)
+            vars = subproblem_variables(ctx.decomp, sp_id)
+            @test length(vars) == 4
+            lb, ub = convexity_bounds(ctx.decomp, sp_id)
+            @test lb ≈ 0.0
+            @test ub ≈ 1.0
+            @test subproblem_fixed_cost(ctx.decomp, sp_id) ≈ 0.0
+        end
+        @test length(coupling_constraints(ctx.decomp)) == 4
+        @test is_minimization(ctx.decomp)
+    end
+end
+
+function test_gap_column_pool_populated()
+    @testset "[gap] column pool is populated after CG" begin
+        inst = random_gap_instance(2, 5)
+        ctx = build_gap_context(inst)
+
+        run_column_generation(ctx)
+
+        # Pool must have columns — at least one per machine
+        @test length(ctx.pool.by_column_var) >= 2
+    end
+end
+
+function test_gap_lp_dual_bound_matches_primal()
+    @testset "[gap] LP dual bound approximately equals primal at convergence" begin
+        inst = random_gap_instance(2, 7)
+        ctx = build_gap_context(inst)
+
+        output = run_column_generation(ctx)
+
+        @test !isnothing(output.incumbent_dual_bound)
+        @test !isnothing(output.master_lp_obj)
+
+        gap = abs(output.master_lp_obj - output.incumbent_dual_bound)
+        @test gap <= 1.0  # within 1 unit (tight for LP relaxation)
+    end
+end

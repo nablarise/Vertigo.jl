@@ -134,7 +134,13 @@ function build_gap_context(inst::GAPInstance)
     return ctx
 end
 
-include("ip_management_tests.jl")
+include("colgen/test_gap.jl")
+include("colgen/ip_management_tests.jl")
+include("colgen/test_branch_and_price.jl")
+include("colgen/test_stabilization.jl")
+include("colgen/test_setup_reformulation.jl")
+include("colgen/test_insert_columns.jl")
+include("colgen/test_column_pool.jl")
 include("treesearch/test_node.jl")
 include("treesearch/test_search_loop.jl")
 include("treesearch/test_strategies.jl")
@@ -143,62 +149,6 @@ include("test_local_cut_tracker.jl")
 include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
 include("test_cut_pool_tracker.jl")
-include("test_branch_and_price.jl")
-include("test_stabilization.jl")
-include("test_setup_reformulation.jl")
-include("test_insert_columns.jl")
-include("test_column_pool.jl")
-
-# ────────────────────────────────────────────────────────────────────────────────────────
-# Tests
-# ────────────────────────────────────────────────────────────────────────────────────────
-
-function test_gap_decomposition_builder()
-    @testset "[gap] decomposition builder" begin
-        inst = random_gap_instance(2, 4)
-        ctx = build_gap_context(inst)
-
-        @test length(collect(subproblem_ids(ctx.decomp))) == 2
-        for k in 1:2
-            sp_id = PricingSubproblemId(k)
-            vars = subproblem_variables(ctx.decomp, sp_id)
-            @test length(vars) == 4
-            lb, ub = convexity_bounds(ctx.decomp, sp_id)
-            @test lb ≈ 0.0
-            @test ub ≈ 1.0
-            @test subproblem_fixed_cost(ctx.decomp, sp_id) ≈ 0.0
-        end
-        @test length(coupling_constraints(ctx.decomp)) == 4
-        @test is_minimization(ctx.decomp)
-    end
-end
-
-function test_gap_column_pool_populated()
-    @testset "[gap] column pool is populated after CG" begin
-        inst = random_gap_instance(2, 5)
-        ctx = build_gap_context(inst)
-
-        run_column_generation(ctx)
-
-        # Pool must have columns — at least one per machine
-        @test length(ctx.pool.by_column_var) >= 2
-    end
-end
-
-function test_gap_lp_dual_bound_matches_primal()
-    @testset "[gap] LP dual bound approximately equals primal at convergence" begin
-        inst = random_gap_instance(2, 7)
-        ctx = build_gap_context(inst)
-
-        output = run_column_generation(ctx)
-
-        @test !isnothing(output.incumbent_dual_bound)
-        @test !isnothing(output.master_lp_obj)
-
-        gap = abs(output.master_lp_obj - output.incumbent_dual_bound)
-        @test gap <= 1.0  # within 1 unit (tight for LP relaxation)
-    end
-end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
