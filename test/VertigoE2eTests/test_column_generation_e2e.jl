@@ -193,6 +193,26 @@ function test_gap_with_penalty()
     end
 end
 
+function test_gap_shifted_bounds()
+    @testset "[gap] shifted formulation z ∈ {1,2} matches standard bounds" begin
+        inst = gap_small_feasible()
+
+        # Shifted formulation
+        shifted_ctx = build_gap_shifted_context(inst)
+        shifted_out = run_column_generation(shifted_ctx)
+        @test shifted_out.status == optimal
+        @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
+
+        # Standard formulation
+        std_ctx = build_gap_context(inst)
+        std_out = run_column_generation(std_ctx)
+        @test std_out.status == optimal
+
+        # LP bounds must match
+        @test abs(shifted_out.master_lp_obj - std_out.master_lp_obj) <= 1e-4
+    end
+end
+
 function test_gap_wentges_smoothing_larger()
     @testset "[gap] Wentges smoothing converges (3 machines, 30 tasks, α=0.5)" begin
         inst = gap_two_identical_machines()
@@ -216,6 +236,7 @@ function test_column_generation_e2e()
     test_gap_two_identical_machines()
     test_gap_three_identical_machines()
     test_gap_with_penalty()
+    test_gap_shifted_bounds()
     test_gap_wentges_smoothing()
     test_gap_wentges_smoothing_larger()
 end

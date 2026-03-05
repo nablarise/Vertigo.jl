@@ -18,6 +18,17 @@ function random_gap_instance(n_machines, n_tasks; seed=42)
     return GAPInstance(n_machines, n_tasks, cost, weight, capacity)
 end
 
+function play2()
+    return GAPInstance(
+      2, 7,
+      [8 5 11 21 6 5 19;
+       1 12 11 12 14 8 5],
+      [2 3 3 1 2 1 1;
+       5 1 1 3 1 5 4],
+      [5, 8]
+  )
+end
+
 """
     parse_gap_file(filepath::String) -> GAPInstance
 
@@ -167,6 +178,105 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
         Dict{Any,Any}(),
         Dict{Any,Any}();
         smoothing_alpha=smoothing_alpha
+    )
+    ctx = ColGenLoggerContext(inner_ctx)
+
+    return ctx
+end
+
+# ──────────────────────────────────────────────────────────────────────
+# Build ColGenContext for a shifted GAP (z ∈ {1,2} instead of x ∈ {0,1})
+# ──────────────────────────────────────────────────────────────────────
+
+function build_gap_shifted_context(inst::GAPInstance)
+    K = 1:inst.n_machines
+    T = 1:inst.n_tasks
+
+    # ── Master model ──────────────────────────────────────────────────
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+
+    @constraint(master_jump, assignment[t in T], 0 >= 1)   # coupling: ≥ 1
+    @constraint(master_jump, conv_lb[k in K], 0 >= 0)      # Σλ ≥ 0
+    @constraint(master_jump, conv_ub[k in K], 0 <= 1)      # Σλ ≤ 1
+    @objective(master_jump, Min, 0)
+
+    master_model = backend(master_jump)
+
+    # ── Subproblem models ─────────────────────────────────────────────
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
+    sp_one_indices = Dict{PricingSubproblemId,MOI.VariableIndex}()
+
+    for k in K
+        sp_jump = Model(HiGHS.Optimizer)
+        set_silent(sp_jump)
+
+        @variable(sp_jump, 1 <= z[t in T] <= 2, Int)
+        @variable(sp_jump, one == 1)
+        shifted_cap = sum(inst.weight[k, :]) + inst.capacity[k]
+        @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= shifted_cap)
+        @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
+
+        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
+        sp_one_indices[PricingSubproblemId(k)] = index(one)
+    end
+
+    # ── Build Decomposition ───────────────────────────────────────────
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}
+
+    builder = DecompositionBuilder{Tuple{Int,Int}}(minimize=true)
+
+    for k in K
+        fixed_cost = -sum(inst.cost[k, :])
+        add_subproblem!(builder, PricingSubproblemId(k), fixed_cost, 0.0, 1.0)
+    end
+
+    for k in K
+        sp_id = PricingSubproblemId(k)
+        for t in T
+            sp_var = sp_var_indices[sp_id][t]
+            add_sp_variable!(builder, sp_id, sp_var, inst.cost[k, t])
+            cstr_idx = index(assignment[t])
+            add_coupling_coefficient!(builder, sp_id, sp_var, cstr_idx, 1.0)
+            add_mapping!(builder, (k, t), sp_id, sp_var)
+        end
+
+        # Fixed variable `one == 1` with coupling coefficient -1.0
+        one_var = sp_one_indices[sp_id]
+        add_sp_variable!(builder, sp_id, one_var, 0.0)
+        for t in T
+            cstr_idx = index(assignment[t])
+            add_coupling_coefficient!(builder, sp_id, one_var, cstr_idx, -1.0)
+        end
+    end
+
+    for t in T
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
+    end
+
+    decomp = build(builder)
+
+    # ── Column pool ───────────────────────────────────────────────────
+    pool = ColumnPool()
+
+    # ── Convexity constraint indices ──────────────────────────────────
+    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+
+    # ── Build context ─────────────────────────────────────────────────
+    inner_ctx = ColGenContext(
+        decomp,
+        master_model,
+        conv_ub_map,
+        conv_lb_map,
+        sp_models,
+        pool,
+        NonRobustCutManager{CstrId}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}()
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
