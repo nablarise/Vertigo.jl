@@ -515,6 +515,12 @@ struct GAPWithPenaltyInstance
     penalty::Vector{Float64}   # penalty[t] for leaving task t unassigned
 end
 
+struct GAPWithPenaltyCardInstance
+    gap::GAPInstance
+    penalty::Vector{Float64}   # penalty[t] for leaving task t unassigned
+    max_unassigned::Int         # max number of tasks left unassigned
+end
+
 function build_gap_with_penalty_context(inst::GAPWithPenaltyInstance)
     gap = inst.gap
     K = 1:gap.n_machines
@@ -585,6 +591,136 @@ function build_gap_with_penalty_context(inst::GAPWithPenaltyInstance)
     # ── Convexity constraint indices ──────────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+
+    # ── Build context ─────────────────────────────────────────────────
+    inner_ctx = ColGenContext(
+        decomp,
+        master_model,
+        conv_ub_map,
+        conv_lb_map,
+        sp_models,
+        pool,
+        NonRobustCutManager{CstrId}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}()
+    )
+    ctx = ColGenLoggerContext(inner_ctx)
+
+    return ctx
+end
+
+function build_gap_with_penalty_card_context(
+    inst::GAPWithPenaltyCardInstance
+)
+    gap = inst.gap
+    K = 1:gap.n_machines
+    T = 1:gap.n_tasks
+
+    # ── Master model ──────────────────────────────────────────────────
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+
+    @variable(master_jump, u[t in T], Bin)
+    @constraint(master_jump, assignment[t in T], 0 == 1)
+    @constraint(
+        master_jump, max_unassign, 0 <= inst.max_unassigned
+    )
+    @constraint(master_jump, conv_lb[k in K], 0 >= 0)
+    @constraint(master_jump, conv_ub[k in K], 0 <= 1)
+    @objective(master_jump, Min, sum(inst.penalty[t] * u[t] for t in T))
+
+    for t in T
+        set_normalized_coefficient(assignment[t], u[t], 1.0)
+        set_normalized_coefficient(max_unassign, u[t], 1.0)
+    end
+
+    master_model = backend(master_jump)
+
+    # ── Subproblem models ─────────────────────────────────────────────
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{
+        PricingSubproblemId,Vector{MOI.VariableIndex}
+    }()
+
+    for k in K
+        sp_jump = Model(HiGHS.Optimizer)
+        set_silent(sp_jump)
+
+        @variable(sp_jump, z[t in T], Bin)
+        @constraint(
+            sp_jump,
+            sum(gap.weight[k, t] * z[t] for t in T) <= gap.capacity[k]
+        )
+        @objective(
+            sp_jump,
+            Min,
+            sum(gap.cost[k, t] * z[t] for t in T)
+        )
+
+        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [
+            index(z[t]) for t in T
+        ]
+    end
+
+    # ── Build Decomposition ───────────────────────────────────────────
+    CstrId = MOI.ConstraintIndex{
+        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
+    }
+
+    builder = DecompositionBuilder{Tuple{Int,Int}}(minimize=true)
+
+    for k in K
+        add_subproblem!(
+            builder, PricingSubproblemId(k), 0.0, 0.0, 1.0
+        )
+    end
+
+    for k in K
+        for t in T
+            sp_id = PricingSubproblemId(k)
+            sp_var = sp_var_indices[sp_id][t]
+            add_sp_variable!(
+                builder, sp_id, sp_var, gap.cost[k, t]
+            )
+            add_coupling_coefficient!(
+                builder, sp_id, sp_var, index(assignment[t]), 1.0
+            )
+            add_mapping!(builder, (k, t), sp_id, sp_var)
+        end
+    end
+
+    for t in T
+        add_coupling_constraint!(
+            builder, index(assignment[t]), 1.0
+        )
+        add_pure_master_variable!(
+            builder, index(u[t]), inst.penalty[t], 0.0, 1.0, true
+        )
+        add_pure_master_coupling!(
+            builder, index(u[t]), index(assignment[t]), 1.0
+        )
+        add_pure_master_coupling!(
+            builder, index(u[t]), index(max_unassign), 1.0
+        )
+    end
+    add_coupling_constraint!(
+        builder, index(max_unassign), Float64(inst.max_unassigned)
+    )
+
+    decomp = build(builder)
+
+    # ── Column pool ───────────────────────────────────────────────────
+    pool = ColumnPool()
+
+    # ── Convexity constraint indices ──────────────────────────────────
+    conv_ub_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    )
 
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
