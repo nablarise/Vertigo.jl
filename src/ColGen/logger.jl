@@ -2,36 +2,40 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-# ────────────────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────
 # VERTIGO LOGGER CONTEXT
-# A thin wrapper around ColGenContext that overrides the two logging hooks to emit
-# styled, aligned terminal output without touching ColGenContext itself.
-# ────────────────────────────────────────────────────────────────────────────────────────
+# A thin wrapper around ColGenContext that overrides the two logging
+# hooks to emit compact, tag-based terminal output.
+# ──────────────────────────────────────────────────────────────────────
 
 mutable struct ColGenLoggerContext
     inner::ColGenContext
     cg_start_time::Float64
-    header_printed::Bool
-    ColGenLoggerContext(ctx::ColGenContext) = new(ctx, 0.0, false)
+    log_level::Int
+    log_frequency::Int
+    master_time::Float64
+    pricing_time::Float64
+    function ColGenLoggerContext(
+        ctx::ColGenContext;
+        log_level::Int=1,
+        log_frequency::Int=1
+    )
+        return new(ctx, 0.0, log_level, log_frequency, 0.0, 0.0)
+    end
 end
 
-# ── Table formatting ──────────────────────────────────────────────────────────
+# ── Formatting helpers ───────────────────────────────────────────────
 
-const _VRT_HDR = "    ITER        OBJ (LP)       BEST DUAL        DUAL BND       IP PRIMAL   COLS   TIME (s)"
-const _VRT_SEP = "  ------   -------------   -------------   -------------   -------------   ----   --------"
-const _VRT_HDR_ALPHA = "    ALPHA"
-const _VRT_SEP_ALPHA = "   ------"
+_alpha_val(::NoStabilization) = 0.0
+_alpha_val(s::WentgesSmoothing) = s.smooth_dual_sol_coeff
 
-_fmt_alpha(::NoStabilization) = ""
-_fmt_alpha(s::WentgesSmoothing) = @sprintf("   %6.4f", s.smooth_dual_sol_coeff)
-
-_fmt_val(::Nothing) = "          N/A"
-function _fmt_val(x::Float64)
-    isinf(x) && return x < 0 ? "         -inf" : "          inf"
-    return @sprintf("%13.6e", x)
+function _fmt_bound(x)
+    isnothing(x) && return "N/A"
+    isinf(x) && return x < 0 ? "-Inf" : "Inf"
+    return @sprintf("%.4f", x)
 end
 
-# ── Protocol delegation (context as arg 1) ───────────────────────────────────
+# ── Protocol delegation (context as arg 1) ───────────────────────────
 
 new_phase_iterator(lctx::ColGenLoggerContext)                        = new_phase_iterator(lctx.inner)
 new_stage_iterator(lctx::ColGenLoggerContext)                        = new_stage_iterator(lctx.inner)
@@ -56,14 +60,10 @@ get_pricing_strategy(lctx::ColGenLoggerContext, args...)             = get_prici
 get_pricing_subprobs(lctx::ColGenLoggerContext)                      = get_pricing_subprobs(lctx.inner)
 insert_columns!(lctx::ColGenLoggerContext, args...)                  = insert_columns!(lctx.inner, args...)
 compute_dual_bound(lctx::ColGenLoggerContext, args...)               = compute_dual_bound(lctx.inner, args...)
-optimize_pricing_problem!(lctx::ColGenLoggerContext, args...)        = optimize_pricing_problem!(lctx.inner, args...)
 compute_sp_init_db(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_db(lctx.inner, sp)
 compute_sp_init_pb(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_pb(lctx.inner, sp)
 
-# ── Protocol delegation (context as arg 2) ───────────────────────────────────
-
-optimize_master_lp_problem!(master, lctx::ColGenLoggerContext) =
-    optimize_master_lp_problem!(master, lctx.inner)
+# ── Protocol delegation (context as arg 2) ───────────────────────────
 
 update_stabilization_after_pricing_optim!(stab, lctx::ColGenLoggerContext, args...) =
     update_stabilization_after_pricing_optim!(stab, lctx.inner, args...)
@@ -71,42 +71,85 @@ update_stabilization_after_pricing_optim!(stab, lctx::ColGenLoggerContext, args.
 check_primal_ip_feasibility!(sol, lctx::ColGenLoggerContext, phase) =
     check_primal_ip_feasibility!(sol, lctx.inner, phase)
 
-# ── Logging overrides ─────────────────────────────────────────────────────────
+# ── Timing wrappers ──────────────────────────────────────────────────
 
-# Print a blank line between phases; the header stays up (printed once at first iteration).
+function optimize_master_lp_problem!(master, lctx::ColGenLoggerContext)
+    t0 = time()
+    result = optimize_master_lp_problem!(master, lctx.inner)
+    lctx.master_time += time() - t0
+    return result
+end
+
+function optimize_pricing_problem!(lctx::ColGenLoggerContext, args...)
+    t0 = time()
+    result = optimize_pricing_problem!(lctx.inner, args...)
+    lctx.pricing_time += time() - t0
+    return result
+end
+
+# ── Logging overrides ────────────────────────────────────────────────
+
 function setup_reformulation!(lctx::ColGenLoggerContext, phase)
-    lctx.header_printed && println()
+    lctx.master_time = 0.0
+    lctx.pricing_time = 0.0
     setup_reformulation!(lctx.inner, phase)
 end
 
 function after_colgen_iteration(
     lctx::ColGenLoggerContext, phase, _stage,
-    colgen_iterations, stab, out, incumbent_dual_bound, _ip_primal_sol
+    colgen_iterations, stab, out,
+    incumbent_dual_bound, _ip_primal_sol
 )
-    if !lctx.header_printed
-        has_alpha = lctx.inner.smoothing_alpha > 0.0
-        println(_VRT_HDR * (has_alpha ? _VRT_HDR_ALPHA : ""))
-        println(_VRT_SEP * (has_alpha ? _VRT_SEP_ALPHA : ""))
-        lctx.header_printed = true
+    lctx.log_level == 0 && return
+
+    mst = lctx.master_time
+    spt = lctx.pricing_time
+    lctx.master_time = 0.0
+    lctx.pricing_time = 0.0
+
+    is_terminal = out.nb_columns_added == 0
+    if !is_terminal &&
+        colgen_iterations % lctx.log_frequency != 0
+        return
     end
-    iter_tag = phase isa Phase0 ? "" : phase isa Phase1 ? "#" : "##"
-    iter_str = @sprintf("%6s", iter_tag * string(colgen_iterations))
-    lp     = out.master_lp_obj
-    db     = incumbent_dual_bound
-    db2    = out.dual_bound
+
+    prefix = phase isa Phase0 ? "  " :
+             phase isa Phase1 ? "# " : "##"
+
+    et = time() - lctx.cg_start_time
+    al = _alpha_val(stab)
+    db_star = _fmt_bound(incumbent_dual_bound)
+    mlp = _fmt_bound(out.master_lp_obj)
     ip_val = isnothing(lctx.inner.ip_incumbent) ? nothing :
              lctx.inner.ip_incumbent.obj_value
-    t      = time() - lctx.cg_start_time
-    @printf "  %s   %s   %s   %s   %s   %4d   %8.2f" iter_str _fmt_val(lp) _fmt_val(db) _fmt_val(db2) _fmt_val(ip_val) out.nb_columns_added t
-    println(_fmt_alpha(stab))
+    pb = _fmt_bound(ip_val)
+
+    line = string(
+        prefix,
+        @sprintf("<it=%3d> <et=%5.2f> <cols=%2d> <al=%5.2f>",
+                 colgen_iterations, et, out.nb_columns_added, al),
+        " <DB*=", db_star,
+        "> <mlp=", mlp,
+        "> <PB=", pb, ">"
+    )
+
+    if lctx.log_level >= 2
+        db = _fmt_bound(out.dual_bound)
+        line *= string(
+            @sprintf(" <mst=%5.2f> <spt=%5.2f>", mst, spt),
+            " <DB=", db, ">"
+        )
+    end
+
+    println(line)
 end
 
-# ── Entry point ───────────────────────────────────────────────────────────────
+# ── Entry point ──────────────────────────────────────────────────────
 
 """
     run_column_generation(lctx::ColGenLoggerContext) -> ColGenOutput
 
-Run column generation with VERTIGO-styled terminal logging.
+Run column generation with compact, tag-based terminal logging.
 
 # Examples
 ```jldoctest
@@ -115,28 +158,29 @@ julia> # (see test for a full example)
 """
 function run_column_generation(lctx::ColGenLoggerContext)
     lctx.cg_start_time = time()
-    println("[VERTIGO] :: Initializing Master Problem...")
     output = ColGen.run!(lctx, nothing)
     _print_cg_footer(lctx, output)
     return output
 end
 
-function _print_cg_footer(lctx::ColGenLoggerContext, output::ColGenOutput)
+function _print_cg_footer(
+    lctx::ColGenLoggerContext, output::ColGenOutput
+)
+    lctx.log_level == 0 && return
     println()
     if output.status == optimal
-        println("[STATUS] :: Convergence reached. LP gap < 1e-6.")
-        println("[SIGNAL] :: Optimal LP relaxation found.")
+        println("[STATUS] Convergence reached.")
     elseif output.status == master_infeasible
-        println("[STATUS] :: Infeasible master problem.")
-        println("[SIGNAL] :: No feasible solution exists.")
+        println("[STATUS] Infeasible master problem.")
     elseif output.status == subproblem_infeasible
-        println("[STATUS] :: Subproblem infeasible.")
-        println("[SIGNAL] :: Pricing failed — check decomposition.")
+        println("[STATUS] Subproblem infeasible.")
     else
-        println("[STATUS] :: Iteration limit reached.")
-        println("[SIGNAL] :: Terminating with current best solution.")
+        println("[STATUS] Iteration limit reached.")
     end
     if !isnothing(lctx.inner.ip_incumbent)
-        @printf "[SIGNAL] :: IP incumbent: %.6e\n" lctx.inner.ip_incumbent.obj_value
+        @printf(
+            "[STATUS] IP incumbent: %.6e\n",
+            lctx.inner.ip_incumbent.obj_value
+        )
     end
 end
