@@ -282,7 +282,7 @@ function test_gap_dual_bound_with_pure_master()
         # At convergence, dual bound must equal master LP objective
         # (strong duality). The y_contrib double-counting bug makes
         # dual_bound < master_lp_obj for minimization (invalid).
-        @test_broken output.incumbent_dual_bound ≈ output.master_lp_obj atol=1e-4
+        @test output.incumbent_dual_bound ≈ output.master_lp_obj atol=1e-4
     end
 end
 

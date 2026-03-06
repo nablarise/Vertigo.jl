@@ -62,8 +62,25 @@ function compute_dual_bound(
         sp_contrib += sp_total * multiplicity
     end
 
-    # 3. Pure master variable contribution (0 for GAP)
+    # 3. Subtract pure master variable bound duals
+    #    (avoid double-counting with y_contrib below)
+    y_bound_contrib = 0.0
+    for y_var in pure_master_variables(decomp)
+        lb, ub = pure_master_bounds(decomp, y_var)
+        lb_ci = TaggedCI(y_var.id.value, VI_GEQ)
+        ub_ci = TaggedCI(y_var.id.value, VI_LEQ)
+        lb_dual = get(
+            mast_dual_sol.sol.constraint_duals, lb_ci, 0.0
+        )
+        ub_dual = get(
+            mast_dual_sol.sol.constraint_duals, ub_ci, 0.0
+        )
+        y_bound_contrib += lb_dual * lb + ub_dual * ub
+    end
+
+    # 4. Pure master variable contribution
     y_contrib = compute_dual_bound_y_contribution(decomp, dual_values)
 
-    return mast_dual_sol.sol.obj_value - convexity_contrib + sp_contrib + y_contrib
+    return mast_dual_sol.sol.obj_value - convexity_contrib -
+        y_bound_contrib + sp_contrib + y_contrib
 end
