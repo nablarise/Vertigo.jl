@@ -147,6 +147,7 @@ include("test_local_cut_tracker.jl")
 include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
 include("test_cut_pool_tracker.jl")
+include("dml/test_dml.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
@@ -170,6 +171,7 @@ function run()
     test_setup_reformulation()
     test_insert_columns()
     test_column_pool()
+    test_dml()
 end
 
 end # module VertigoUnitTests

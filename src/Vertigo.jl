@@ -24,10 +24,15 @@ using .TreeSearch
 include("BranchCutPrice/BranchCutPrice.jl")
 using .BranchCutPrice
 
-# ── Adapter stub ──────────────────────────────────────────────────────────────
-include("rk_adapter.jl")
+# ── Decomposition Modeling Language ───────────────────────────────────────────
+include("DML/DML.jl")
+using .DML
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
+# DML (Decomposition Modeling Language)
+export @dantzig_wolfe, dantzig_wolfe_decomposition
+export dantzig_wolfe_subproblem, dantzig_wolfe_master
 
 # Decomposition builder
 export PricingSubproblemId
