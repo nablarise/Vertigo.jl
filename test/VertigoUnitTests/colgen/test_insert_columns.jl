@@ -121,10 +121,10 @@ function build_insert_columns_context()
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_ub))
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_lb))
 
+    set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub_map, conv_lb_map)
+
     ctx = ColGenContext(
-        decomp, model,
-        conv_ub_map, conv_lb_map,
-        Dict{PricingSubproblemId,Any}(),
+        decomp,
         pool,
         NonRobustCutManager{CstrEq}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -148,7 +148,7 @@ end
 function test_insert_columns_single_column()
     @testset "[insert_columns] single column" begin
         ctx, refs = build_insert_columns_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
@@ -177,7 +177,7 @@ end
 function test_insert_columns_two_columns()
     @testset "[insert_columns] two columns" begin
         ctx, refs = build_insert_columns_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)])
@@ -248,7 +248,7 @@ end
 function test_insert_columns_mixed_sp_variables()
     @testset "[insert_columns] column with two SP variables" begin
         ctx, refs = build_insert_columns_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         # Column: z1=1, z2=2
         # cost = 3*1 + 5*2 = 13

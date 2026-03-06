@@ -5,8 +5,8 @@
 # Accessors that dispatch on both ColGenContext and ColGenLoggerContext,
 # so BranchCutPrice works with either type.
 
-bp_master_model(ctx::ColGen.ColGenContext) = ctx.master_model
-bp_master_model(ctx::ColGen.ColGenLoggerContext) = ctx.inner.master_model
+bp_master_model(ctx::ColGen.ColGenContext) = master_model(ctx.decomp)
+bp_master_model(ctx::ColGen.ColGenLoggerContext) = master_model(ctx.inner.decomp)
 
 bp_ip_incumbent(ctx::ColGen.ColGenContext) = ctx.ip_incumbent
 bp_ip_incumbent(ctx::ColGen.ColGenLoggerContext) = ctx.inner.ip_incumbent

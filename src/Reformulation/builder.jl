@@ -172,6 +172,10 @@ function build(b::DWReformulationBuilder{X}) where {X}
     )
 
     return DWReformulation{X}(
-        subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize
+        subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize,
+        nothing,
+        Dict{PricingSubproblemId,Any}(),
+        Dict{PricingSubproblemId,TaggedCI}(),
+        Dict{PricingSubproblemId,TaggedCI}()
     )
 end

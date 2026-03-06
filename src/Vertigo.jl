@@ -56,6 +56,12 @@ export has_column, record_column!, columns, columns_for_subproblem
 export column_sp_id, column_original_cost, pricing_objective_value
 export column_nonzero_entries
 
+# MOI model accessors on DWReformulation
+export master_model, sp_model, sp_models, set_models!
+export convexity_ub_ci, convexity_lb_ci
+export has_convexity_ub, has_convexity_lb
+export convexity_ub_pairs, convexity_lb_pairs
+
 # Branch-and-price
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 export TreeSearchLoggerContext

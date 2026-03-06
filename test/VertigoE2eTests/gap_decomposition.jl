@@ -154,13 +154,11 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -252,13 +250,11 @@ function build_gap_context_with_fixed_cost(
         PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -354,13 +350,11 @@ function build_gap_shifted_context(
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -498,13 +492,11 @@ function build_gap_identical_context(
         PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -601,13 +593,11 @@ function build_gap_with_penalty_context(
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -733,13 +723,11 @@ function build_gap_with_penalty_card_context(
         PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -859,13 +847,11 @@ function build_gap_with_pure_master_context(
         PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -944,13 +930,11 @@ function build_gap_context_max(
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),

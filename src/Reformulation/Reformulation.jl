@@ -31,6 +31,11 @@ export SubproblemData, PureMasterVariableData, ForwardMapping
 
 # DWReformulation
 export DWReformulation
+export master_model, sp_model, sp_models
+export convexity_ub_ci, convexity_lb_ci
+export has_convexity_ub, has_convexity_lb
+export convexity_ub_pairs, convexity_lb_pairs
+export set_models!
 
 # Subproblem solution
 export _SpSolution

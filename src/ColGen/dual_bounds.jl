@@ -33,7 +33,7 @@ function compute_dual_bound(
     dual_values(cstr) = _dual_value(mast_dual_sol, cstr)
 
     # Verify dual solution consistency
-    recomputed = _recompute_cost(mast_dual_sol.sol, ctx.master_model)
+    recomputed = _recompute_cost(mast_dual_sol.sol, master_model(decomp))
     stored = mast_dual_sol.sol.obj_value
     @assert abs(recomputed - stored) < 1e-4 "Dual cost mismatch: recomputed=$recomputed stored=$stored"
 
@@ -41,12 +41,12 @@ function compute_dual_bound(
     convexity_contrib = 0.0
     for sp_id in subproblem_ids(decomp)
         conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        if haskey(ctx.convexity_ub, sp_id)
-            ν_ub = dual_values(ctx.convexity_ub[sp_id])
+        if has_convexity_ub(decomp, sp_id)
+            ν_ub = dual_values(convexity_ub_ci(decomp, sp_id))
             convexity_contrib += ν_ub * conv_ub
         end
-        if haskey(ctx.convexity_lb, sp_id)
-            ν_lb = dual_values(ctx.convexity_lb[sp_id])
+        if has_convexity_lb(decomp, sp_id)
+            ν_lb = dual_values(convexity_lb_ci(decomp, sp_id))
             convexity_contrib += ν_lb * conv_lb
         end
     end

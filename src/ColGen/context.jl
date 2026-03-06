@@ -82,24 +82,20 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ColGenContext{D,M,CutM}
+    ColGenContext{D,CutM}
 
-Column generation context. Bundles all static data (decomposition), mutable MOI models,
+Column generation context. Bundles all static data (decomposition),
 and runtime structures (column pool, cut manager, artificial variable tracking).
+
+MOI models and convexity constraint indices are owned by `decomp`
+(`DWReformulation`), not by this struct.
 
 Type parameters:
   - D: AbstractDecomposition implementation
-  - M: master MOI backend type
   - CutM: NonRobustCutManager type
 """
-mutable struct ColGenContext{D<:AbstractDecomposition,M,CutM<:NonRobustCutManager}
+mutable struct ColGenContext{D<:AbstractDecomposition,CutM<:NonRobustCutManager}
     decomp::D
-    master_model::M
-    convexity_ub::Dict{PricingSubproblemId,TaggedCI}
-    convexity_lb::Dict{PricingSubproblemId,TaggedCI}
-    # JuMP backend types are opaque (CachingOptimizer{...}); MOI methods
-    # dispatch on runtime type, so concrete parameterization is impractical.
-    sp_models::Dict{PricingSubproblemId,Any}
     pool::ColumnPool
     cuts::CutM
     eq_art_vars::Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}
@@ -111,13 +107,13 @@ mutable struct ColGenContext{D<:AbstractDecomposition,M,CutM<:NonRobustCutManage
     smoothing_alpha::Float64
 
     function ColGenContext(
-        decomp, master_model, convexity_ub, convexity_lb, sp_models,
-        pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars;
+        decomp, pool, cuts,
+        eq_art_vars, leq_art_vars, geq_art_vars;
         smoothing_alpha::Float64 = 0.0
     )
-        new{typeof(decomp),typeof(master_model),typeof(cuts)}(
-            decomp, master_model, convexity_ub, convexity_lb, sp_models,
-            pool, cuts, eq_art_vars, leq_art_vars, geq_art_vars, nothing,
+        new{typeof(decomp),typeof(cuts)}(
+            decomp, pool, cuts,
+            eq_art_vars, leq_art_vars, geq_art_vars, nothing,
             nothing, ActiveBranchingConstraint[], smoothing_alpha
         )
     end
@@ -129,9 +125,9 @@ is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
 function get_master(ctx::ColGenContext)
     cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ctx.decomp)]
     return Master(
-        ctx.master_model,
-        ctx.convexity_ub,
-        ctx.convexity_lb,
+        master_model(ctx.decomp),
+        convexity_ub_pairs(ctx.decomp),
+        convexity_lb_pairs(ctx.decomp),
         ctx.eq_art_vars,
         ctx.leq_art_vars,
         ctx.geq_art_vars,
@@ -141,7 +137,7 @@ end
 
 function get_pricing_subprobs(ctx::ColGenContext)
     return Dict{PricingSubproblemId,Any}(
-        sp_id => PricingSubproblem(ctx.sp_models[sp_id])
+        sp_id => PricingSubproblem(sp_model(ctx.decomp, sp_id))
         for sp_id in subproblem_ids(ctx.decomp)
     )
 end
@@ -194,7 +190,7 @@ stop_colgen(::ColGenContext, _) = false
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
-    model = ctx.master_model
+    model = master_model(ctx.decomp)
     sense = is_minimization(ctx.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
     convexity_cost = sense * phase.convexity_artificial_var_cost
@@ -236,7 +232,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     end
 
     # Artificial variables for convexity constraints (LessThan UB)
-    for (sp_id, cstr_idx) in ctx.convexity_ub
+    for (sp_id, cstr_idx) in convexity_ub_pairs(ctx.decomp)
         s_neg = add_variable!(model;
             lower_bound = 0.0,
             constraint_coeffs = Dict(cstr_idx => -1.0),
@@ -247,7 +243,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     end
 
     # Artificial variables for convexity constraints (GreaterThan LB)
-    for (sp_id, cstr_idx) in ctx.convexity_lb
+    for (sp_id, cstr_idx) in convexity_lb_pairs(ctx.decomp)
         s_pos = add_variable!(model;
             lower_bound = 0.0,
             constraint_coeffs = Dict(cstr_idx => 1.0),
@@ -288,7 +284,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
 end
 
 function setup_reformulation!(ctx::ColGenContext, ::Phase1)
-    model = ctx.master_model
+    model = master_model(ctx.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
     sense = is_minimization(ctx.decomp) ? 1.0 : -1.0
 
@@ -312,7 +308,7 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase1)
 end
 
 function setup_reformulation!(ctx::ColGenContext, ::Phase2)
-    model = ctx.master_model
+    model = master_model(ctx.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
 
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
@@ -438,7 +434,7 @@ end
 colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
 
 function has_artificial_vars_in_solution(ctx::ColGenContext, tol=1e-6)::Bool
-    model = ctx.master_model
+    model = master_model(ctx.decomp)
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
         MOI.get(model, MOI.VariablePrimal(), s_neg) > tol && return true

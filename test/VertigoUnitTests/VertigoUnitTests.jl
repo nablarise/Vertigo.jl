@@ -117,13 +117,11 @@ function build_gap_context(inst::GAPInstance)
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     # ── Build context ─────────────────────────────────────────────────────────
     ctx = ColGenContext(
         decomp,
-        master_model,
-        conv_ub_map,
-        conv_lb_map,
-        sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),

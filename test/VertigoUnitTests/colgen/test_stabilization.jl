@@ -86,8 +86,10 @@ function _build_stab_ctx(; alpha=0.5)
         PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_lb[k])) for k in K
     )
 
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
     ctx = ColGenContext(
-        decomp, master_model, conv_ub_map, conv_lb_map, sp_models,
+        decomp,
         pool, NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),

@@ -17,8 +17,8 @@ function insert_columns!(
     ctx::ColGenContext, phase::Union{Phase0,Phase1,Phase2},
     columns::GeneratedColumns
 )
-    model = ctx.master_model
     decomp = ctx.decomp
+    model = master_model(decomp)
     cols_inserted = 0
 
     for pricing_sol in columns.collection
@@ -51,11 +51,11 @@ function insert_columns!(
             end
         end
 
-        if haskey(ctx.convexity_ub, sp_id)
-            all_coeffs[ctx.convexity_ub[sp_id]] = 1.0
+        if has_convexity_ub(decomp, sp_id)
+            all_coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
         end
-        if haskey(ctx.convexity_lb, sp_id)
-            all_coeffs[ctx.convexity_lb[sp_id]] = 1.0
+        if has_convexity_lb(decomp, sp_id)
+            all_coeffs[convexity_lb_ci(decomp, sp_id)] = 1.0
         end
 
         obj_coeff = _objective_cost(phase, col_cost)

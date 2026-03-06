@@ -5,17 +5,21 @@
 """
     DWReformulation{X}
 
-Immutable concrete implementation of AbstractDecomposition.
+Mutable concrete implementation of AbstractDecomposition.
 
 Type parameters:
   - X: original/linking variable identifier type
 """
-struct DWReformulation{X} <: AbstractDecomposition
+mutable struct DWReformulation{X} <: AbstractDecomposition
     subproblems::Dict{PricingSubproblemId,SubproblemData}
     pure_master_vars::Vector{PureMasterVariableData}
     mapping::ForwardMapping{X}
     coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
     minimize::Bool
+    master_model::Any
+    sp_models::Dict{PricingSubproblemId,Any}
+    convexity_ub::Dict{PricingSubproblemId,TaggedCI}
+    convexity_lb::Dict{PricingSubproblemId,TaggedCI}
 end
 
 # M⁻¹ hot path
@@ -68,3 +72,24 @@ end
 # Master
 coupling_constraints(d::DWReformulation) = d.coupling_cstrs
 is_minimization(d::DWReformulation) = d.minimize
+
+# MOI model accessors
+master_model(d::DWReformulation) = d.master_model
+sp_model(d::DWReformulation, sp_id) = d.sp_models[sp_id]
+sp_models(d::DWReformulation) = d.sp_models
+convexity_ub_ci(d::DWReformulation, sp_id) = d.convexity_ub[sp_id]
+convexity_lb_ci(d::DWReformulation, sp_id) = d.convexity_lb[sp_id]
+has_convexity_ub(d::DWReformulation, sp_id) = haskey(d.convexity_ub, sp_id)
+has_convexity_lb(d::DWReformulation, sp_id) = haskey(d.convexity_lb, sp_id)
+convexity_ub_pairs(d::DWReformulation) = d.convexity_ub
+convexity_lb_pairs(d::DWReformulation) = d.convexity_lb
+
+function set_models!(
+    d::DWReformulation, master, sps, conv_ub, conv_lb
+)
+    d.master_model = master
+    d.sp_models = sps
+    d.convexity_ub = conv_ub
+    d.convexity_lb = conv_lb
+    return nothing
+end

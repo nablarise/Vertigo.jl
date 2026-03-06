@@ -134,10 +134,10 @@ function build_phase_test_context()
     conv_ub = Dict{PricingSubproblemId,TaggedCI}(sp1 => TaggedCI(c2))
     conv_lb = Dict{PricingSubproblemId,TaggedCI}(sp1 => TaggedCI(c3))
 
+    set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub, conv_lb)
+
     ctx = ColGenContext(
-        decomp, model,
-        conv_ub, conv_lb,
-        Dict{PricingSubproblemId,Any}(),
+        decomp,
         pool,
         NonRobustCutManager{CstrEq}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
@@ -153,7 +153,7 @@ end
 function test_setup_reformulation_phase0_relaxes_integrality()
     @testset "[setup_reformulation] phase 0 relaxes integrality" begin
         ctx, _ = build_phase_test_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         int_cis = MOI.get(model,
             MOI.ListOfConstraintIndices{
@@ -180,7 +180,7 @@ end
 function test_setup_reformulation_phase1_zeroes_costs()
     @testset "[setup_reformulation] phase 1 zeroes all variable costs" begin
         ctx, vars = build_phase_test_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
 
@@ -203,7 +203,7 @@ end
 function test_setup_reformulation_phase2_restores_costs()
     @testset "[setup_reformulation] phase 2 restores original costs" begin
         ctx, vars = build_phase_test_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
         Vertigo.ColGen.setup_reformulation!(ctx, Phase1())
@@ -245,7 +245,7 @@ end
 function test_setup_reformulation_full_sequence()
     @testset "[setup_reformulation] full phase 0 → 1 → 2 roundtrip" begin
         ctx, vars = build_phase_test_context()
-        model = ctx.master_model
+        model = master_model(ctx.decomp)
 
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
         @test _obj_coeff(model, vars.λ2) ≈ 8.0

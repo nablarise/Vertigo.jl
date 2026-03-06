@@ -164,8 +164,8 @@ function optimize_pricing_problem!(
     sp_obj_raw = MOI.get(sp_model, MOI.ObjectiveValue())
     sp_obj = is_minimization(ctx) ? sp_obj_raw : -sp_obj_raw
 
-    ν_lb = _get_convexity_dual(mast_dual_sol, ctx.convexity_lb, sp_id)
-    ν_ub = _get_convexity_dual(mast_dual_sol, ctx.convexity_ub, sp_id)
+    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ctx.decomp), sp_id)
+    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ctx.decomp), sp_id)
     fk = subproblem_fixed_cost(ctx.decomp, sp_id)
     reduced_cost = sp_obj + fk - ν_lb - ν_ub
 
