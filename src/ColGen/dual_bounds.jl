@@ -35,7 +35,9 @@ function compute_dual_bound(
     # Verify dual solution consistency
     recomputed = _recompute_cost(mast_dual_sol.sol, master_model(decomp))
     stored = mast_dual_sol.sol.obj_value
-    @assert abs(recomputed - stored) < 1e-4 "Dual cost mismatch: recomputed=$recomputed stored=$stored"
+    abs(recomputed - stored) < 1e-4 || error(
+        "Dual cost mismatch: recomputed=$recomputed stored=$stored"
+    )
 
     # 1. Convexity contribution: Σₖ (ν⁺·W̄ₖ + ν⁻·Wₖ)
     convexity_contrib = 0.0

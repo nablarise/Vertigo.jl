@@ -25,7 +25,9 @@ Asserts that the variable is not already fixed. Removes any existing lower and u
 bound constraints, then adds a new equality constraint fixing the variable.
 """
 function apply_change!(backend, change::FixVarChange, helper::DomainChangeTrackerHelper)
-    @assert !haskey(helper.map_eq, change.var_id)
+    haskey(helper.map_eq, change.var_id) && error(
+        "variable $(change.var_id) is already fixed"
+    )
     if haskey(helper.map_lb, change.var_id)
         MOI.delete(backend, helper.map_lb[change.var_id])
         delete!(helper.map_lb, change.var_id)

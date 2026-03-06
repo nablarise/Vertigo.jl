@@ -98,7 +98,9 @@ Creates a new constraint if one doesn't exist, otherwise updates the existing on
 Asserts that the variable is not fixed (no equality constraint).
 """
 function apply_change!(backend, change::LowerBoundVarChange, helper::DomainChangeTrackerHelper)
-    @assert !haskey(helper.map_eq, change.var_id)
+    haskey(helper.map_eq, change.var_id) && error(
+        "cannot change lower bound of fixed variable $(change.var_id)"
+    )
     ci = get(helper.map_lb, change.var_id, nothing)
     if isnothing(ci)
         # Variable may already have a bound from column insertion;
@@ -142,7 +144,9 @@ Creates a new constraint if one doesn't exist, otherwise updates the existing on
 Asserts that the variable is not fixed (no equality constraint).
 """
 function apply_change!(backend, change::UpperBoundVarChange, helper::DomainChangeTrackerHelper)
-    @assert !haskey(helper.map_eq, change.var_id)
+    haskey(helper.map_eq, change.var_id) && error(
+        "cannot change upper bound of fixed variable $(change.var_id)"
+    )
     ci = get(helper.map_ub, change.var_id, nothing)
 
     if isnothing(ci)
