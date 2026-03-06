@@ -740,6 +740,129 @@ function build_gap_with_penalty_card_context(
     return ctx
 end
 
+"""
+    build_gap_with_pure_master_context(inst) -> ColGenLoggerContext
+
+Like `build_gap_context` but adds one continuous pure master variable `y`
+with cost 2.0, bounds [0, 1], and coupling coefficient 1.0 in the first
+assignment constraint. This creates a scenario where `y` has nonzero
+reduced cost at optimality, exposing the y_contrib double-counting bug
+in `compute_dual_bound`.
+"""
+function build_gap_with_pure_master_context(inst::GAPInstance)
+    K = 1:inst.n_machines
+    T = 1:inst.n_tasks
+
+    # ── Master model ──────────────────────────────────────────────────
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+
+    @constraint(master_jump, assignment[t in T], 0 == 1)   # coupling: = 1
+    @constraint(master_jump, conv_lb[k in K], 0 >= 0)      # Σλ ≥ 0
+    @constraint(master_jump, conv_ub[k in K], 0 <= 1)      # Σλ ≤ 1
+    @objective(master_jump, Min, 0)
+
+    master_model = backend(master_jump)
+
+    # ── Pure master variable y ────────────────────────────────────────
+    y = MOI.add_variable(master_model)
+    MOI.add_constraint(master_model, y, MOI.GreaterThan(0.0))
+    MOI.add_constraint(master_model, y, MOI.LessThan(1.0))
+
+    MOI.modify(
+        master_model,
+        index(assignment[1]),
+        MOI.ScalarCoefficientChange(y, 1.0)
+    )
+
+    MOI.modify(
+        master_model,
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+        MOI.ScalarCoefficientChange(y, 2.0)
+    )
+
+    # ── Subproblem models ─────────────────────────────────────────────
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
+
+    for k in K
+        sp_jump = Model(HiGHS.Optimizer)
+        set_silent(sp_jump)
+
+        @variable(sp_jump, z[t in T], Bin)
+        @constraint(
+            sp_jump,
+            sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k]
+        )
+        @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
+
+        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
+    end
+
+    # ── Build Decomposition ───────────────────────────────────────────
+    CstrId = MOI.ConstraintIndex{
+        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
+    }
+
+    builder = DecompositionBuilder{Tuple{Int,Int}}(minimize=true)
+
+    for k in K
+        add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
+    end
+
+    for k in K
+        for t in T
+            sp_var = sp_var_indices[PricingSubproblemId(k)][t]
+            add_sp_variable!(
+                builder, PricingSubproblemId(k), sp_var, inst.cost[k, t]
+            )
+            cstr_idx = index(assignment[t])
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
+            add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
+        end
+    end
+
+    for t in T
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
+    end
+
+    add_pure_master_variable!(builder, y, 2.0, 0.0, 1.0, false)
+    add_pure_master_coupling!(builder, y, index(assignment[1]), 1.0)
+
+    decomp = build(builder)
+
+    # ── Column pool ───────────────────────────────────────────────────
+    pool = ColumnPool()
+
+    # ── Convexity constraint indices ──────────────────────────────────
+    conv_ub_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,Any}(
+        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    )
+
+    # ── Build context ─────────────────────────────────────────────────
+    inner_ctx = ColGenContext(
+        decomp,
+        master_model,
+        conv_ub_map,
+        conv_lb_map,
+        sp_models,
+        pool,
+        NonRobustCutManager{CstrId}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}(),
+        Dict{Any,Any}()
+    )
+    ctx = ColGenLoggerContext(inner_ctx)
+
+    return ctx
+end
+
 function build_gap_context_max(inst::GAPInstance)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks

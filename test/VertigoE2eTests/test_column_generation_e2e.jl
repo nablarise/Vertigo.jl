@@ -268,6 +268,23 @@ function test_gap_fixed_master_cost()
     end
 end
 
+function test_gap_dual_bound_with_pure_master()
+    @testset "[gap] dual bound with pure master variable (y_contrib bug)" begin
+        inst = random_gap_instance(1, 2; seed=123)
+        ctx = build_gap_with_pure_master_context(inst)
+
+        output = run_column_generation(ctx)
+
+        @test output.status == optimal
+        @test !isnothing(output.incumbent_dual_bound)
+        @test !isnothing(output.master_lp_obj)
+
+        # At convergence, dual bound must equal master LP objective
+        # (strong duality). The y_contrib double-counting bug makes
+        # dual_bound < master_lp_obj for minimization (invalid).
+        @test_broken output.incumbent_dual_bound ≈ output.master_lp_obj atol=1e-4
+    end
+end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
@@ -287,4 +304,5 @@ function test_column_generation_e2e()
     test_gap_shifted_bounds()
     test_gap_fixed_master_cost()
     test_gap_wentges_smoothing()
+    test_gap_dual_bound_with_pure_master()
 end
