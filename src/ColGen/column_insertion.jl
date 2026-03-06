@@ -14,7 +14,7 @@ _objective_cost(::Union{Phase0,Phase2}, col_cost::Float64) = col_cost
 _objective_cost(::Phase1, ::Float64) = 0.0
 
 function insert_columns!(
-    ctx::ColGenContext, phase::Union{Phase0,Phase1,Phase2},
+    ctx::ColGenContext, phase::CGPhase,
     columns::GeneratedColumns
 )
     decomp = ctx.decomp

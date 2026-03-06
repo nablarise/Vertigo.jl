@@ -171,6 +171,8 @@ end
 struct Phase1 end   # Minimise sum of artificial variables (feasibility)
 struct Phase2 end   # Optimise original objective, no artificial variables
 
+const CGPhase = Union{Phase0,Phase1,Phase2}
+
 struct ExactStage end
 struct NoStabilization end
 
@@ -540,7 +542,7 @@ end
 
 function after_colgen_iteration(
     ::ColGenContext,
-    ::Union{Phase0,Phase1,Phase2},
+    ::CGPhase,
     ::ExactStage,
     colgen_iterations::Int64,
     ::NoStabilization,

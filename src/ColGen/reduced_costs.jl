@@ -129,7 +129,7 @@ function compute_reduced_costs!(
     ))
 end
 
-function update_reduced_costs!(ctx::ColGenContext, ::Union{Phase0,Phase1,Phase2}, red_costs::ReducedCosts)
+function update_reduced_costs!(ctx::ColGenContext, ::CGPhase, red_costs::ReducedCosts)
     # For maximization, negate RC so the SP (which always minimizes) finds the
     # column with the most positive reduced cost (= most negative negated RC).
     sign = is_minimization(ctx) ? 1.0 : -1.0

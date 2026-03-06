@@ -48,6 +48,7 @@ include("logger.jl")
 # Context and solver entry point
 export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput
 export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit
+export CGPhase, Phase0, Phase1, Phase2
 export WentgesSmoothing, NoStabilization
 
 end # module ColGen

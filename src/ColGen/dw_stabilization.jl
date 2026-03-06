@@ -267,7 +267,7 @@ end
 
 function after_colgen_iteration(
     ::ColGenContext,
-    ::Union{Phase0,Phase1,Phase2},
+    ::CGPhase,
     ::ExactStage,
     ::Int64,
     ::WentgesSmoothing,

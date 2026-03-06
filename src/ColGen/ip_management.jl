@@ -67,7 +67,7 @@ end
 function check_primal_ip_feasibility!(
     mast_primal_sol::MasterPrimalSolution,
     ctx::ColGenContext,
-    ::Union{Phase0,Phase1,Phase2}
+    ::CGPhase
 )
     _has_artificial_vars_in_solution(ctx, mast_primal_sol) && return nothing, false
     return _project_if_integral(mast_primal_sol, ctx)
