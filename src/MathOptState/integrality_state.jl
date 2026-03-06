@@ -10,7 +10,7 @@ function _apply_integrality_relaxation!(backend, var_id, helper)
         MOI.delete(backend, ci)
         delete!(helper.map_integer, var_id)
     else
-        @warn "Cannot relax a variable that is not integral."
+        error("cannot relax variable $var_id: not integral")
     end
     return
 end
@@ -21,7 +21,7 @@ function _apply_integrality_restriction!(backend, var_id, helper)
         ci = MOI.add_constraint(backend, var_id, MOI.Integer())
         helper.map_integer[var_id] = ci
     else
-        @warn "Variable is already integral."
+        error("variable $var_id is already integral")
     end
     return
 end
@@ -47,7 +47,7 @@ function _apply_zero_one_relaxation!(backend, var_id, helper)
             helper.map_ub[var_id] = new_ci_ub
         end
     else
-        @warn "Cannot relax a variable that is not binary."
+        error("cannot relax variable $var_id: not binary")
     end
     return
 end
@@ -58,7 +58,7 @@ function _apply_zero_one_restriction!(backend, var_id, helper)
         ci = MOI.add_constraint(backend, var_id, MOI.ZeroOne())
         helper.map_binary[var_id] = ci
     else
-        @warn "Variable is already binary."
+        error("variable $var_id is already binary")
     end
     return
 end
