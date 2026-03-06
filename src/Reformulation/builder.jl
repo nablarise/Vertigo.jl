@@ -118,39 +118,47 @@ end
 Compile the accumulated data into an immutable DWReformulation.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
+function _build_coupling_coefficients(
+    variables::Vector{_VI},
+    raw_entries::Vector{Tuple{_VI,TaggedCI,Float64}}
+)
+    entries = CouplingEntry[]
+    offsets = Dict{_VI,UnitRange{Int}}()
+
+    grouped = Dict{_VI,Vector{Tuple{TaggedCI,Float64}}}()
+    for (sp_var, cstr_id, coeff) in raw_entries
+        grp = get!(Vector{Tuple{TaggedCI,Float64}}, grouped, sp_var)
+        push!(grp, (cstr_id, coeff))
+    end
+
+    # Build CSR in variable-list order (deterministic).
+    # Each slice sorted by TaggedCI for merge-based RC computation.
+    for sp_var in variables
+        haskey(grouped, sp_var) || continue
+        range_start = length(entries) + 1
+        for (cstr_id, coeff) in grouped[sp_var]
+            push!(entries, CouplingEntry(cstr_id, coeff))
+        end
+        sort!(@view(entries[range_start:end]); by = e -> e.constraint_id)
+        offsets[sp_var] = range_start:length(entries)
+    end
+
+    return CouplingCoefficients(entries, offsets)
+end
+
 function build(b::DWReformulationBuilder{X}) where {X}
     subproblems = Dict{PricingSubproblemId,SubproblemData}()
 
     for sp_id in keys(b.sp_variables)
         variables = b.sp_variables[sp_id]
         original_costs = b.sp_original_costs[sp_id]
-
-        entries = CouplingEntry[]
-        offsets = Dict{_VI,UnitRange{Int}}()
-
-        # Group raw entries by sp_var using a dict
-        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{_VI,TaggedCI,Float64}[])
-        grouped = Dict{_VI,Vector{Tuple{TaggedCI,Float64}}}()
-        for (sp_var, cstr_id, coeff) in raw_entries
-            grp = get!(Vector{Tuple{TaggedCI,Float64}}, grouped, sp_var)
-            push!(grp, (cstr_id, coeff))
-        end
-
-        # Build CSR in the same order as the variables list (deterministic).
-        # Each variable's slice is sorted by TaggedCI to enable merge-based
-        # reduced cost computation (two-pointer merge with sorted duals).
-        for sp_var in variables
-            haskey(grouped, sp_var) || continue
-            range_start = length(entries) + 1
-            for (cstr_id, coeff) in grouped[sp_var]
-                push!(entries, CouplingEntry(cstr_id, coeff))
-            end
-            # @view into Vector is mutable — sort! operates in-place
-            sort!(@view(entries[range_start:end]); by = e -> e.constraint_id)
-            offsets[sp_var] = range_start:length(entries)
-        end
-
-        coupling_coeffs = CouplingCoefficients(entries, offsets)
+        raw_entries = get(
+            b.sp_coupling_entries, sp_id,
+            Tuple{_VI,TaggedCI,Float64}[]
+        )
+        coupling_coeffs = _build_coupling_coefficients(
+            variables, raw_entries
+        )
         conv_lb, conv_ub = b.sp_conv_bounds[sp_id]
 
         subproblems[sp_id] = SubproblemData(
