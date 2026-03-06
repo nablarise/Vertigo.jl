@@ -143,12 +143,9 @@ end
 function TreeSearch.branch!(space::BPSpace, node)
     primal_values = Dict{MOI.VariableIndex,Float64}()
     for v in MOI.get(space.backend, MOI.ListOfVariableIndices())
-        val = try
-            MOI.get(space.backend, MOI.VariablePrimal(), v)
-        catch
-            0.0
-        end
-        primal_values[v] = val
+        primal_values[v] = MOI.get(
+            space.backend, MOI.VariablePrimal(), v
+        )
     end
 
     orig_var, x_val = most_fractional_original_variable(
