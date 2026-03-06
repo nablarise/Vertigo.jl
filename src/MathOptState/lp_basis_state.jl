@@ -77,9 +77,8 @@ function apply_change!(backend, diff::LPBasisDiff, ::Nothing)
         MOI.is_valid(backend, vi) || continue
         try
             MOI.set(backend, MOI.VariableBasisStatus(), vi, status)
-        catch
-            # Solver does not expose basis warm-starting via standard MOI —
-            # abort silently; the next solve will cold-start instead.
+        catch e
+            @debug "Basis warm-start unsupported: $e"
             return
         end
     end
@@ -87,7 +86,8 @@ function apply_change!(backend, diff::LPBasisDiff, ::Nothing)
         MOI.is_valid(backend, ci) || continue
         try
             MOI.set(backend, MOI.ConstraintBasisStatus(), ci, status)
-        catch
+        catch e
+            @debug "Basis warm-start unsupported: $e"
             return
         end
     end
