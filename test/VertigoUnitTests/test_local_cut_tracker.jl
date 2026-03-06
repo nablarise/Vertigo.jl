@@ -13,10 +13,12 @@ end
 
 """Retrieve the constraint function and set for a given cut id."""
 function get_cut_constraint(backend, helper::LocalCutTrackerHelper, cut_id::Int)
-    ci = helper.active_cuts[cut_id]
-    f  = MOI.get(backend, MOI.ConstraintFunction(), ci)
-    s  = MOI.get(backend, MOI.ConstraintSet(), ci)
-    return (f, s)
+    tagged = helper.active_cuts[cut_id]
+    return with_typed_ci(tagged) do ci
+        f = MOI.get(backend, MOI.ConstraintFunction(), ci)
+        s = MOI.get(backend, MOI.ConstraintSet(), ci)
+        (f, s)
+    end
 end
 
 """Return all permutations of 1:n as a vector of vectors."""

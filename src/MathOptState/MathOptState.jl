@@ -7,6 +7,7 @@ module MathOptState
 using MathOptInterface
 
 const MOI = MathOptInterface
+using ..Reformulation: TaggedCI, with_typed_ci
 const ColId = Int
 const RowId = Int
 
@@ -227,7 +228,7 @@ export IntegralityChangeType, relax_integrality, restrict_integrality
 export relax_zero_one, restrict_zero_one, relax_integrality!
 export LocalCut, AddLocalCutChange, RemoveLocalCutChange
 export LocalCutChangeDiff, LocalCutTracker, LocalCutTrackerHelper, next_id!
-export LinearConstraintSet, LinearConstraintIndex
+export LinearConstraintSet
 export LPBasisState, LPBasisDiff, LPBasisTracker
 export capture_basis, update_basis
 export ColumnData, AddColumnChange, RemoveColumnChange

@@ -14,17 +14,6 @@ const LinearConstraintSet = Union{
 }
 
 """
-    LinearConstraintIndex
-
-Union of `MOI.ConstraintIndex` types for scalar affine constraints with `LinearConstraintSet` sets.
-"""
-const LinearConstraintIndex = Union{
-    MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}},
-    MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}},
-    MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}},
-}
-
-"""
     LPBasisState
 
 A snapshot of the LP basis: the status of all variables and linear constraints.
@@ -35,7 +24,7 @@ A snapshot of the LP basis: the status of all variables and linear constraints.
 """
 struct LPBasisState
     var_status::Dict{MOI.VariableIndex, MOI.BasisStatusCode}
-    constr_status::Dict{LinearConstraintIndex, MOI.BasisStatusCode}
+    constr_status::Dict{TaggedCI, MOI.BasisStatusCode}
 end
 
 """
@@ -61,20 +50,17 @@ LPBasisDiff() = LPBasisDiff(nothing)
     apply_change!(backend, diff::LPBasisDiff, ::Nothing)
 
 Restore the LP basis stored in `diff` by setting variable and constraint basis
-statuses on `backend`. Silently skips any indices that are no longer valid
-(e.g. constraints deleted after the snapshot was taken).
+statuses on `backend`. Errors if any index in the snapshot is no longer valid.
 
-Basis setting is a best-effort warm-start: if the solver does not support
-`MOI.VariableBasisStatus` or `MOI.ConstraintBasisStatus` as settable attributes,
-the attempt is silently abandoned and the solver falls back to cold-starting.
-Correctness is never affected — only the number of simplex iterations.
-
-Does nothing if `diff.basis` is `nothing`.
+If the solver does not support setting basis statuses, the attempt is silently
+abandoned (warm-start is best-effort). Does nothing if `diff.basis` is `nothing`.
 """
 function apply_change!(backend, diff::LPBasisDiff, ::Nothing)
     isnothing(diff.basis) && return
     for (vi, status) in diff.basis.var_status
-        MOI.is_valid(backend, vi) || continue
+        MOI.is_valid(backend, vi) || error(
+            "invalid variable index $vi in basis snapshot"
+        )
         try
             MOI.set(backend, MOI.VariableBasisStatus(), vi, status)
         catch e
@@ -82,13 +68,14 @@ function apply_change!(backend, diff::LPBasisDiff, ::Nothing)
             return
         end
     end
-    for (ci, status) in diff.basis.constr_status
-        MOI.is_valid(backend, ci) || continue
-        try
-            MOI.set(backend, MOI.ConstraintBasisStatus(), ci, status)
-        catch e
-            @debug "Basis warm-start unsupported: $e"
-            return
+    for (tagged, status) in diff.basis.constr_status
+        with_typed_ci(tagged) do ci
+            MOI.is_valid(backend, ci) || error(
+                "invalid constraint $ci in basis snapshot"
+            )
+            MOI.set(
+                backend, MOI.ConstraintBasisStatus(), ci, status
+            )
         end
     end
     return
@@ -124,11 +111,13 @@ function capture_basis(backend)
     for vi in MOI.get(backend, MOI.ListOfVariableIndices())
         var_status[vi] = MOI.get(backend, MOI.VariableBasisStatus(), vi)
     end
-    constr_status = Dict{LinearConstraintIndex, MOI.BasisStatusCode}()
+    constr_status = Dict{TaggedCI, MOI.BasisStatusCode}()
     F = MOI.ScalarAffineFunction{Float64}
     for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64})
         for ci in MOI.get(backend, MOI.ListOfConstraintIndices{F, S}())
-            constr_status[ci] = MOI.get(backend, MOI.ConstraintBasisStatus(), ci)
+            constr_status[TaggedCI(ci)] = MOI.get(
+                backend, MOI.ConstraintBasisStatus(), ci
+            )
         end
     end
     return LPBasisState(var_status, constr_status)

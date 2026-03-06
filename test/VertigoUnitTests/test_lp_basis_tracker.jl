@@ -134,11 +134,11 @@ function test_lp_basis_tracker_merge_forward_keeps_local()
     @testset "[lp_basis_tracker] merge_forward ignores parent, keeps local" begin
         parent_basis = LPBasisState(
             Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{LinearConstraintIndex, MOI.BasisStatusCode}(),
+            Dict{TaggedCI, MOI.BasisStatusCode}(),
         )
         child_basis = LPBasisState(
             Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{LinearConstraintIndex, MOI.BasisStatusCode}(),
+            Dict{TaggedCI, MOI.BasisStatusCode}(),
         )
         parent_diff = LPBasisDiff(parent_basis)
         local_diff  = LPBasisDiff(child_basis)
@@ -153,7 +153,7 @@ function test_lp_basis_tracker_merge_backward_always_noop()
     @testset "[lp_basis_tracker] merge_backward always returns nothing diff" begin
         some_basis = LPBasisState(
             Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{LinearConstraintIndex, MOI.BasisStatusCode}(),
+            Dict{TaggedCI, MOI.BasisStatusCode}(),
         )
         d1 = LPBasisDiff(some_basis)
         d2 = LPBasisDiff(some_basis)
@@ -165,23 +165,29 @@ function test_lp_basis_tracker_merge_backward_always_noop()
 end
 
 function test_lp_basis_tracker_robustness_stale_index()
-    @testset "[lp_basis_tracker] robustness: invalid constraint index silently skipped" begin
+    @testset "[lp_basis_tracker] robustness: invalid constraint index errors" begin
         m, _x, _y, _ci_x_ub, c1 = _build_lp_backend()
         MOI.optimize!(m)
         @test MOI.get(m, MOI.TerminationStatus()) == MOI.OPTIMAL
 
         # Capture basis (c1 is valid at this point)
         basis = capture_basis(m)
-        @test haskey(basis.constr_status, c1)
+        @test haskey(basis.constr_status, TaggedCI(c1))
 
         # Delete the SAF constraint — c1 is now stale
         MOI.delete(m, c1)
 
-        # apply_change! must not throw — stale ci is silently skipped
-        @test begin
-            apply_change!(m, LPBasisDiff(basis), nothing)
-            true
-        end
+        # Build a basis with only the stale constraint (no var statuses)
+        # to avoid early return from unsupported VariableBasisStatus.
+        stale_basis = LPBasisState(
+            Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
+            basis.constr_status,
+        )
+
+        # apply_change! must error on invalid constraint index
+        @test_throws ErrorException apply_change!(
+            m, LPBasisDiff(stale_basis), nothing
+        )
     end
 end
 
@@ -202,9 +208,9 @@ function test_lp_basis_tracker_three_set_types()
         @test length(lt_indices) == 1
         @test length(eq_indices) == 1
 
-        @test haskey(basis.constr_status, gt_indices[1])
-        @test haskey(basis.constr_status, lt_indices[1])
-        @test haskey(basis.constr_status, eq_indices[1])
+        @test haskey(basis.constr_status, TaggedCI(gt_indices[1]))
+        @test haskey(basis.constr_status, TaggedCI(lt_indices[1]))
+        @test haskey(basis.constr_status, TaggedCI(eq_indices[1]))
     end
 end
 

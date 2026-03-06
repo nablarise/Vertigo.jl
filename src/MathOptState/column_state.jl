@@ -12,14 +12,14 @@ Data required to add or restore a pricing column in the master LP.
 - `obj_coeff::Float64`: Objective coefficient.
 - `lower_bound::Float64`: Variable lower bound (`Inf` = unbounded).
 - `upper_bound::Float64`: Variable upper bound (`Inf` = unbounded).
-- `entries::Vector{Tuple{LinearConstraintIndex, Float64}}`: Constraint coefficients.
+- `entries::Vector{Tuple{TaggedCI, Float64}}`: Constraint coefficients.
 """
 struct ColumnData
     id::Int
     obj_coeff::Float64
     lower_bound::Float64
     upper_bound::Float64
-    entries::Vector{Tuple{LinearConstraintIndex, Float64}}
+    entries::Vector{Tuple{TaggedCI, Float64}}
 end
 
 """
@@ -130,8 +130,12 @@ function apply_change!(backend, change::AddColumnChange, helper::ColumnTrackerHe
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         MOI.ScalarCoefficientChange(vi, col.obj_coeff),
     )
-    for (ci, coeff) in col.entries
-        MOI.modify(backend, ci, MOI.ScalarCoefficientChange(vi, coeff))
+    for (tagged, coeff) in col.entries
+        with_typed_ci(tagged) do ci
+            MOI.modify(
+                backend, ci, MOI.ScalarCoefficientChange(vi, coeff)
+            )
+        end
     end
     return
 end

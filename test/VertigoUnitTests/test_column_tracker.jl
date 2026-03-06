@@ -44,7 +44,7 @@ function test_column_tracker_add_remove_basic()
         z_data = ColumnData(
             next_id!(t),
             3.0, 0.0, 10.0,
-            [(c1, 2.0), (c2, 1.0)],
+            [(TaggedCI(c1), 2.0), (TaggedCI(c2), 1.0)],
         )
 
         local_fwd = ColumnChangeDiff([AddColumnChange(z_data)], RemoveColumnChange[])
@@ -140,12 +140,12 @@ function test_column_tracker_mixed_constraints()
         z1_data = ColumnData(
             next_id!(t),
             1.0, 0.0, 5.0,
-            [(mdl.c_ge, 1.5), (mdl.c_le, 0.5)],
+            [(TaggedCI(mdl.c_ge), 1.5), (TaggedCI(mdl.c_le), 0.5)],
         )
         z2_data = ColumnData(
             next_id!(t),
             2.0, 0.0, 3.0,
-            [(mdl.c_eq, 1.0), (mdl.c_ge, 0.25)],
+            [(TaggedCI(mdl.c_eq), 1.0), (TaggedCI(mdl.c_ge), 0.25)],
         )
 
         # Node 1 — root
@@ -212,9 +212,9 @@ function test_column_tracker_deep_tree()
         t = ColumnTracker()
         helper = transform_model!(t, m)
 
-        z1_data = ColumnData(next_id!(t), 1.0, 0.0, Inf, [(c1, 1.0)])
-        z2_data = ColumnData(next_id!(t), 2.0, 0.0, Inf, [(c1, 1.0)])
-        z3_data = ColumnData(next_id!(t), 3.0, 0.0, Inf, [(c1, 1.0)])
+        z1_data = ColumnData(next_id!(t), 1.0, 0.0, Inf, [(TaggedCI(c1), 1.0)])
+        z2_data = ColumnData(next_id!(t), 2.0, 0.0, Inf, [(TaggedCI(c1), 1.0)])
+        z3_data = ColumnData(next_id!(t), 3.0, 0.0, Inf, [(TaggedCI(c1), 1.0)])
 
         # Node 1 — root
         state1 = root_state(t, m)

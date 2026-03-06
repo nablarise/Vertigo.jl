@@ -37,7 +37,7 @@ export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
 # MOI type wrappers
-export TaggedCI
+export TaggedCI, with_typed_ci
 
 # Data structures
 export ColumnPool, NonRobustCutManager

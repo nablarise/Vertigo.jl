@@ -66,16 +66,11 @@ LocalCutChangeDiff() = LocalCutChangeDiff(
 
 Maintains a mapping from cut IDs to their active constraint indices.
 
-The constraint index type varies per cut set type, so it is stored as `Any`
-to avoid premature specialization.
-
 # Fields
-- `active_cuts::Dict{Int,Any}`: Maps cut ID to the corresponding `MOI.ConstraintIndex`.
+- `active_cuts::Dict{Int,TaggedCI}`: Maps cut ID to its constraint index.
 """
 mutable struct LocalCutTrackerHelper
-    # Values are MOI.ConstraintIndex{ScalarAffineFunction{Float64}, S}
-    # where S varies per cut — stored as Any to avoid premature specialization.
-    active_cuts::Dict{Int,Any}
+    active_cuts::Dict{Int,TaggedCI}
 end
 
 """
@@ -83,7 +78,7 @@ end
 
 Create a helper with no active cuts.
 """
-LocalCutTrackerHelper() = LocalCutTrackerHelper(Dict{Int,Any}())
+LocalCutTrackerHelper() = LocalCutTrackerHelper(Dict{Int,TaggedCI}())
 
 """
     LocalCutTracker <: AbstractMathOptStateTracker
@@ -124,7 +119,7 @@ function apply_change!(
     cut = change.cut
     f = MOI.ScalarAffineFunction(cut.terms, 0.0)
     ci = MOI.add_constraint(backend, f, cut.set)
-    helper.active_cuts[cut.id] = ci
+    helper.active_cuts[cut.id] = TaggedCI(ci)
     return
 end
 
@@ -137,8 +132,10 @@ function apply_change!(
     backend, change::RemoveLocalCutChange, helper::LocalCutTrackerHelper
 )
     cut = change.cut
-    ci = helper.active_cuts[cut.id]
-    MOI.delete(backend, ci)
+    tagged = helper.active_cuts[cut.id]
+    with_typed_ci(tagged) do ci
+        MOI.delete(backend, ci)
+    end
     delete!(helper.active_cuts, cut.id)
     return
 end

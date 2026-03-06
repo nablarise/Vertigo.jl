@@ -58,15 +58,17 @@ function _verify_gcp_node_state(backend, helper, expected_ids, cuts_by_id)
     @test Set(keys(helper.active_cuts)) == Set(expected_ids)
     for id in expected_ids
         cut = cuts_by_id[id]
-        ci = helper.active_cuts[id]
-        f = MOI.get(backend, MOI.ConstraintFunction(), ci)
-        s = MOI.get(backend, MOI.ConstraintSet(), ci)
-        @test typeof(s) == typeof(cut.set)
-        @test s == cut.set
-        actual = Dict(t.variable => t.coefficient for t in f.terms)
-        for term in cut.terms
-            @test haskey(actual, term.variable)
-            @test actual[term.variable] ≈ term.coefficient
+        tagged = helper.active_cuts[id]
+        with_typed_ci(tagged) do ci
+            f = MOI.get(backend, MOI.ConstraintFunction(), ci)
+            s = MOI.get(backend, MOI.ConstraintSet(), ci)
+            @test typeof(s) == typeof(cut.set)
+            @test s == cut.set
+            actual = Dict(t.variable => t.coefficient for t in f.terms)
+            for term in cut.terms
+                @test haskey(actual, term.variable)
+                @test actual[term.variable] ≈ term.coefficient
+            end
         end
     end
 end

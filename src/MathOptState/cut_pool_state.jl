@@ -46,10 +46,10 @@ Only cuts currently present in the LP are tracked here; deactivated cuts
 are absent from the dict.
 
 # Fields
-- `active_cuts::Dict{Int, LinearConstraintIndex}`: Maps cut ID to its constraint index.
+- `active_cuts::Dict{Int, TaggedCI}`: Maps cut ID to its constraint index.
 """
 mutable struct GlobalCutPoolHelper
-    active_cuts::Dict{Int, LinearConstraintIndex}
+    active_cuts::Dict{Int, TaggedCI}
 end
 
 """
@@ -57,7 +57,7 @@ end
 
 Create a helper with no active cuts.
 """
-GlobalCutPoolHelper() = GlobalCutPoolHelper(Dict{Int, LinearConstraintIndex}())
+GlobalCutPoolHelper() = GlobalCutPoolHelper(Dict{Int, TaggedCI}())
 
 """
     GlobalCutPoolDiff <: AbstractMathOptStateDiff
@@ -103,7 +103,7 @@ function apply_change!(
         MOI.ScalarAffineFunction(cut.terms, 0.0),
         cut.set,
     )
-    helper.active_cuts[cut.id] = ci
+    helper.active_cuts[cut.id] = TaggedCI(ci)
     return
 end
 
@@ -116,9 +116,11 @@ function apply_change!(
     backend, change::DeactivateGlobalCutChange, helper::GlobalCutPoolHelper
 )
     cut = change.cut
-    ci = get(helper.active_cuts, cut.id, nothing)
-    isnothing(ci) && return
-    MOI.delete(backend, ci)
+    tagged = get(helper.active_cuts, cut.id, nothing)
+    isnothing(tagged) && return
+    with_typed_ci(tagged) do ci
+        MOI.delete(backend, ci)
+    end
     delete!(helper.active_cuts, cut.id)
     return
 end
