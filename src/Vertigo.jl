@@ -36,6 +36,9 @@ export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
+# MOI type wrappers
+export TaggedCI
+
 # Data structures
 export ColumnPool, NonRobustCutManager
 

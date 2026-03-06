@@ -118,8 +118,8 @@ function build_insert_columns_context()
 
     pool = ColumnPool()
 
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_ub)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(1) => conv_lb)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_ub))
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_lb))
 
     ctx = ColGenContext(
         decomp, model,
@@ -127,12 +127,14 @@ function build_insert_columns_context()
         Dict{PricingSubproblemId,Any}(),
         pool,
         NonRobustCutManager{CstrEq}(),
-        Dict{Any,Any}(), Dict{Any,Any}(), Dict{Any,Any}()
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}()
     )
 
     # Active branching constraint on x₁ = (1, 1)
     push!(ctx.branching_constraints,
-        Vertigo.ColGen.ActiveBranchingConstraint(br, (1, 1))
+        Vertigo.ColGen.ActiveBranchingConstraint(TaggedCI(br), (1, 1))
     )
 
     return ctx, (

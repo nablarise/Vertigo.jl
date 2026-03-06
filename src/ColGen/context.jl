@@ -42,11 +42,11 @@ end
 
 struct Master{MoiModel}
     moi_master::MoiModel
-    convexity_constraints_ub::Dict{PricingSubproblemId,Any}
-    convexity_constraints_lb::Dict{PricingSubproblemId,Any}
-    eq_art_vars::Dict{Any,Any}
-    leq_art_vars::Dict{Any,Any}
-    geq_art_vars::Dict{Any,Any}
+    convexity_constraints_ub::Dict{PricingSubproblemId,TaggedCI}
+    convexity_constraints_lb::Dict{PricingSubproblemId,TaggedCI}
+    eq_art_vars::Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}
+    leq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
+    geq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
     coupling_constraint_ids::Vector{TaggedCI}
 end
 
@@ -72,9 +72,9 @@ moi_pricing_sp(sp::PricingSubproblem) = sp.moi_model
 A branching constraint currently active in the master LP. Maps a MOI constraint
 (added via `LocalCutTracker`) to the original variable it branches on.
 """
-struct ActiveBranchingConstraint
-    constraint_index::Any
-    orig_var::Any
+struct ActiveBranchingConstraint{X}
+    constraint_index::TaggedCI
+    orig_var::X
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -95,14 +95,16 @@ Type parameters:
 mutable struct ColGenContext{D<:AbstractDecomposition,M,CutM<:NonRobustCutManager}
     decomp::D
     master_model::M
-    convexity_ub::Dict{PricingSubproblemId,Any}
-    convexity_lb::Dict{PricingSubproblemId,Any}
+    convexity_ub::Dict{PricingSubproblemId,TaggedCI}
+    convexity_lb::Dict{PricingSubproblemId,TaggedCI}
+    # JuMP backend types are opaque (CachingOptimizer{...}); MOI methods
+    # dispatch on runtime type, so concrete parameterization is impractical.
     sp_models::Dict{PricingSubproblemId,Any}
     pool::ColumnPool
     cuts::CutM
-    eq_art_vars::Dict{Any,Any}    # cstr_idx → (MOI.VariableIndex, MOI.VariableIndex)
-    leq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
-    geq_art_vars::Dict{Any,Any}   # cstr_idx → MOI.VariableIndex
+    eq_art_vars::Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}
+    leq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
+    geq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
     ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
@@ -237,7 +239,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     for (sp_id, cstr_idx) in ctx.convexity_ub
         s_neg = add_variable!(model;
             lower_bound = 0.0,
-            constraint_coeffs = Dict(TaggedCI(cstr_idx) => -1.0),
+            constraint_coeffs = Dict(cstr_idx => -1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_ub[$(sp_id)]"
         )
@@ -248,7 +250,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     for (sp_id, cstr_idx) in ctx.convexity_lb
         s_pos = add_variable!(model;
             lower_bound = 0.0,
-            constraint_coeffs = Dict(TaggedCI(cstr_idx) => 1.0),
+            constraint_coeffs = Dict(cstr_idx => 1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_lb[$(sp_id)]"
         )
@@ -346,8 +348,9 @@ struct ColGenIterationOutput
     master_lp_obj::Union{Float64,Nothing}
     dual_bound::Union{Float64,Nothing}
     nb_columns_added::Int64
-    master_lp_primal_sol::Any
-    master_ip_primal_sol::Any
+    # MasterDualSolution (defined in master_optimization.jl, included later)
+    master_lp_dual_sol::Any
+    master_ip_primal_sol::Union{Nothing,MasterIpPrimalSol}
     subproblem_infeasible::Bool
 end
 

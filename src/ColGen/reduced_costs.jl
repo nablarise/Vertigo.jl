@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Proprietary
 
 struct ReducedCosts
-    values::Dict{Any,Dict{Any,Float64}}
+    values::Dict{PricingSubproblemId,Dict{MOI.VariableIndex,Float64}}
 end
 
 """
@@ -63,17 +63,13 @@ function _dual_value(dual_sol::MasterDualSolution, idx::TaggedCI)
     return get(dual_sol.sol.constraint_duals, idx, 0.0)
 end
 
-function _dual_value(dual_sol::MasterDualSolution, cstr_idx)
-    return get(dual_sol.sol.constraint_duals, TaggedCI(cstr_idx), 0.0)
-end
-
 # Hot path: sorted duals built once, shared across subproblems.
 function _compute_sp_reduced_costs(
     ctx::ColGenContext, mast_dual_sol::MasterDualSolution,
     sorted_duals::SortedDualVector, sp_id; zero_cost=false
 )
     decomp = ctx.decomp
-    sp_rc = Dict{Any,Float64}()
+    sp_rc = Dict{MOI.VariableIndex,Float64}()
     for sp_var in subproblem_variables(decomp, sp_id)
         rc = zero_cost ? 0.0 : original_cost(decomp, sp_id, sp_var)
         rc -= _merge_dual_contrib(

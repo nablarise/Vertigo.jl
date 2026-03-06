@@ -15,7 +15,7 @@ function _rebuild_branching_constraints!(space::BPSpace)
     empty!(bcs)
     for (cut_id, ci) in space.cut_helper.active_cuts
         ov = space.branching_cut_info[cut_id]
-        push!(bcs, ColGen.ActiveBranchingConstraint(ci, ov))
+        push!(bcs, ColGen.ActiveBranchingConstraint(TaggedCI(ci), ov))
     end
     return
 end

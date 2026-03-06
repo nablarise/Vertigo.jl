@@ -79,17 +79,19 @@ function _build_stab_ctx(; alpha=0.5)
     decomp = build(builder)
 
     pool = ColumnPool()
-    conv_ub_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => JuMP.index(conv_ub[k]) for k in K
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_ub[k])) for k in K
     )
-    conv_lb_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => JuMP.index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_lb[k])) for k in K
     )
 
     ctx = ColGenContext(
         decomp, master_model, conv_ub_map, conv_lb_map, sp_models,
         pool, NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(), Dict{Any,Any}(), Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=alpha
     )
     return ctx

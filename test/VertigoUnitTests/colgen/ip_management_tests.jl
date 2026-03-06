@@ -239,7 +239,7 @@ function test_ip_has_art_eq_active()
         inst = random_gap_instance(1, 1; seed=7)
         ctx = build_gap_context(inst)
 
-        fake_ci = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(99)
+        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(99))
         s_pos = MOI.VariableIndex(200)
         s_neg = MOI.VariableIndex(201)
         ctx.eq_art_vars[fake_ci] = (s_pos, s_neg)
@@ -261,7 +261,7 @@ function test_ip_has_art_leq_active()
         inst = random_gap_instance(1, 1; seed=8)
         ctx = build_gap_context(inst)
 
-        fake_ci = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}(98)
+        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}(98))
         s = MOI.VariableIndex(202)
         ctx.leq_art_vars[fake_ci] = s
 
@@ -281,7 +281,7 @@ function test_ip_has_art_geq_active()
         inst = random_gap_instance(1, 1; seed=9)
         ctx = build_gap_context(inst)
 
-        fake_ci = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}(97)
+        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}(97))
         s = MOI.VariableIndex(203)
         ctx.geq_art_vars[fake_ci] = s
 
@@ -317,7 +317,7 @@ function test_ip_check_with_art_vars_active()
 
         s_pos = MOI.VariableIndex(300)
         s_neg = MOI.VariableIndex(301)
-        fake_ci = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(88)
+        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(88))
         ctx.eq_art_vars[fake_ci] = (s_pos, s_neg)
 
         var_values = Dict{MOI.VariableIndex,Float64}(s_pos => 1.0)

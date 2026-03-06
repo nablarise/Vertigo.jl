@@ -131,8 +131,8 @@ function build_phase_test_context()
     record_column!(pool, λ1, sp1, sol1, 5.0)
     record_column!(pool, λ2, sp1, sol2, 8.0)
 
-    conv_ub = Dict{PricingSubproblemId,Any}(sp1 => c2)
-    conv_lb = Dict{PricingSubproblemId,Any}(sp1 => c3)
+    conv_ub = Dict{PricingSubproblemId,TaggedCI}(sp1 => TaggedCI(c2))
+    conv_lb = Dict{PricingSubproblemId,TaggedCI}(sp1 => TaggedCI(c3))
 
     ctx = ColGenContext(
         decomp, model,
@@ -140,7 +140,9 @@ function build_phase_test_context()
         Dict{PricingSubproblemId,Any}(),
         pool,
         NonRobustCutManager{CstrEq}(),
-        Dict{Any,Any}(), Dict{Any,Any}(), Dict{Any,Any}()
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}()
     )
 
     return ctx, (λ1=λ1, λ2=λ2, y_cont=y_cont, y_int=y_int)

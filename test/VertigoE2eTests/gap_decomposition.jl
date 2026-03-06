@@ -151,8 +151,8 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
@@ -163,9 +163,9 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -245,11 +245,11 @@ function build_gap_context_with_fixed_cost(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
     )
-    conv_lb_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
     # ── Build context ─────────────────────────────────────────────────
@@ -261,9 +261,9 @@ function build_gap_context_with_fixed_cost(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -351,8 +351,8 @@ function build_gap_shifted_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
@@ -363,9 +363,9 @@ function build_gap_shifted_context(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -491,11 +491,11 @@ function build_gap_identical_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
     )
-    conv_lb_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
     # ── Build context ─────────────────────────────────────────────────
@@ -507,9 +507,9 @@ function build_gap_identical_context(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -598,8 +598,8 @@ function build_gap_with_penalty_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
@@ -610,9 +610,9 @@ function build_gap_with_penalty_context(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -726,11 +726,11 @@ function build_gap_with_penalty_card_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
     )
-    conv_lb_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
     # ── Build context ─────────────────────────────────────────────────
@@ -742,9 +742,9 @@ function build_gap_with_penalty_card_context(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -852,11 +852,11 @@ function build_gap_with_pure_master_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_ub[k]) for k in K
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
     )
-    conv_lb_map = Dict{PricingSubproblemId,Any}(
-        PricingSubproblemId(k) => index(conv_lb[k]) for k in K
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
     # ── Build context ─────────────────────────────────────────────────
@@ -868,9 +868,9 @@ function build_gap_with_pure_master_context(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
@@ -941,8 +941,8 @@ function build_gap_context_max(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────
     inner_ctx = ColGenContext(
@@ -953,9 +953,9 @@ function build_gap_context_max(
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}();
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}();
         smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)

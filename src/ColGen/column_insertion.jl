@@ -47,15 +47,15 @@ function insert_columns!(
                 decomp, bc.orig_var, sp_id, sol
             )
             if !iszero(coeff)
-                all_coeffs[TaggedCI(bc.constraint_index)] = coeff
+                all_coeffs[bc.constraint_index] = coeff
             end
         end
 
         if haskey(ctx.convexity_ub, sp_id)
-            all_coeffs[TaggedCI(ctx.convexity_ub[sp_id])] = 1.0
+            all_coeffs[ctx.convexity_ub[sp_id]] = 1.0
         end
         if haskey(ctx.convexity_lb, sp_id)
-            all_coeffs[TaggedCI(ctx.convexity_lb[sp_id])] = 1.0
+            all_coeffs[ctx.convexity_lb[sp_id]] = 1.0
         end
 
         obj_coeff = _objective_cost(phase, col_cost)

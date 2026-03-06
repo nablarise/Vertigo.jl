@@ -114,8 +114,8 @@ function build_gap_context(inst::GAPInstance)
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_ub[k]) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,Any}(PricingSubproblemId(k) => index(conv_lb[k]) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     # ── Build context ─────────────────────────────────────────────────────────
     ctx = ColGenContext(
@@ -126,9 +126,9 @@ function build_gap_context(inst::GAPInstance)
         sp_models,
         pool,
         NonRobustCutManager{CstrId}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}()
     )
 
     return ctx
