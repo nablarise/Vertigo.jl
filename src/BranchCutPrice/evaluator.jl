@@ -20,6 +20,25 @@ function _rebuild_branching_constraints!(space::BPSpace)
     return
 end
 
+function _should_prune(space::BPSpace, db)::Bool
+    isnothing(space.incumbent) && return false
+    isnothing(db) && return false
+    if is_minimization(space.ctx)
+        return db >= space.incumbent.obj_value - space.tol
+    end
+    return db <= space.incumbent.obj_value + space.tol
+end
+
+function _is_improving_incumbent(
+    space::BPSpace, sol::ColGen.MasterIpPrimalSol
+)::Bool
+    isnothing(space.incumbent) && return true
+    if is_minimization(space.ctx)
+        return sol.obj_value < space.incumbent.obj_value - space.tol
+    end
+    return sol.obj_value > space.incumbent.obj_value + space.tol
+end
+
 function TreeSearch.evaluate!(
     ::BPEvaluator, space::BPSpace, node
 )
@@ -50,28 +69,16 @@ function TreeSearch.evaluate!(
     end
 
     # Prune by bound
-    if !isnothing(space.incumbent) && !isnothing(db)
-        if is_minimization(space.ctx)
-            if db >= space.incumbent.obj_value - space.tol
-                _recompute_global_dual_bound!(space)
-                return TreeSearch.CUTOFF
-            end
-        else
-            if db <= space.incumbent.obj_value + space.tol
-                _recompute_global_dual_bound!(space)
-                return TreeSearch.CUTOFF
-            end
-        end
+    if _should_prune(space, db)
+        _recompute_global_dual_bound!(space)
+        return TreeSearch.CUTOFF
     end
 
     # Detect new IP-feasible solution from CG
     ip_sol = cg_output.ip_incumbent
     if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
         space.last_ip_incumbent = ip_sol
-        if isnothing(space.incumbent) ||
-           (is_minimization(space.ctx) ?
-                ip_sol.obj_value < space.incumbent.obj_value - space.tol :
-                ip_sol.obj_value > space.incumbent.obj_value + space.tol)
+        if _is_improving_incumbent(space, ip_sol)
             space.incumbent = ip_sol
             _recompute_global_dual_bound!(space)
             return TreeSearch.FEASIBLE
@@ -81,14 +88,10 @@ function TreeSearch.evaluate!(
     # Restricted master IP heuristic
     if space.rmp_heuristic
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
-        if !isnothing(rmp_sol)
-            if isnothing(space.incumbent) ||
-               (is_minimization(space.ctx) ?
-                    rmp_sol.obj_value < space.incumbent.obj_value - space.tol :
-                    rmp_sol.obj_value > space.incumbent.obj_value + space.tol)
-                space.incumbent = rmp_sol
-                _recompute_global_dual_bound!(space)
-            end
+        if !isnothing(rmp_sol) &&
+                _is_improving_incumbent(space, rmp_sol)
+            space.incumbent = rmp_sol
+            _recompute_global_dual_bound!(space)
         end
     end
 
