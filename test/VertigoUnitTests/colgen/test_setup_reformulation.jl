@@ -105,7 +105,7 @@ function build_phase_test_context()
     # Decomposition with pure master variables (no real subproblem).
     SpVar = MOI.VariableIndex
     CstrEq = typeof(c1)
-    builder = DecompositionBuilder{Nothing}(minimize=true)
+    builder = DWReformulationBuilder{Nothing}(minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 2.0)
     add_coupling_constraint!(builder, c1, 1.0)
@@ -126,8 +126,8 @@ function build_phase_test_context()
     pool = ColumnPool()
     sp_var_dummy = MOI.VariableIndex(9999)
     sp1 = PricingSubproblemId(1)
-    sol1 = Vertigo.ColGen._SpSolution(sp1, 5.0, [(sp_var_dummy, 1.0)])
-    sol2 = Vertigo.ColGen._SpSolution(sp1, 8.0, [(sp_var_dummy, 1.0)])
+    sol1 = Vertigo.Reformulation._SpSolution(sp1, 5.0, [(sp_var_dummy, 1.0)])
+    sol2 = Vertigo.Reformulation._SpSolution(sp1, 8.0, [(sp_var_dummy, 1.0)])
     record_column!(pool, λ1, sp1, sol1, 5.0)
     record_column!(pool, λ2, sp1, sol2, 8.0)
 

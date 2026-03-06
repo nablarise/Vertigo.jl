@@ -88,7 +88,7 @@ function build_gap_context(inst::GAPInstance)
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DecompositionBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)

@@ -4,6 +4,10 @@
 
 module Vertigo
 
+# ── Reformulation (decomposition types) ──────────────────────────────────────
+include("Reformulation/Reformulation.jl")
+using .Reformulation
+
 # ── Column generation algorithm ───────────────────────────────────────────────
 include("ColGen/ColGen.jl")
 using .ColGen
@@ -27,7 +31,7 @@ include("rk_adapter.jl")
 
 # Decomposition builder
 export PricingSubproblemId
-export Decomposition, DecompositionBuilder
+export DWReformulation, DWReformulationBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build

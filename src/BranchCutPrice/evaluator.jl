@@ -51,7 +51,7 @@ function TreeSearch.evaluate!(
 
     # Prune by bound
     if !isnothing(space.incumbent) && !isnothing(db)
-        if ColGen.is_minimization(space.ctx)
+        if is_minimization(space.ctx)
             if db >= space.incumbent.obj_value - space.tol
                 _recompute_global_dual_bound!(space)
                 return TreeSearch.CUTOFF
@@ -69,7 +69,7 @@ function TreeSearch.evaluate!(
     if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
         space.last_ip_incumbent = ip_sol
         if isnothing(space.incumbent) ||
-           (ColGen.is_minimization(space.ctx) ?
+           (is_minimization(space.ctx) ?
                 ip_sol.obj_value < space.incumbent.obj_value - space.tol :
                 ip_sol.obj_value > space.incumbent.obj_value + space.tol)
             space.incumbent = ip_sol
@@ -83,7 +83,7 @@ function TreeSearch.evaluate!(
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
         if !isnothing(rmp_sol)
             if isnothing(space.incumbent) ||
-               (ColGen.is_minimization(space.ctx) ?
+               (is_minimization(space.ctx) ?
                     rmp_sol.obj_value < space.incumbent.obj_value - space.tol :
                     rmp_sol.obj_value > space.incumbent.obj_value + space.tol)
                 space.incumbent = rmp_sol

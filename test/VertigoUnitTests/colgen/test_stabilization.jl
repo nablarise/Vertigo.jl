@@ -58,7 +58,7 @@ function _build_stab_ctx(; alpha=0.5)
     CstrId = MOI.ConstraintIndex{
         MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
     }
-    builder = DecompositionBuilder{Tuple{Int,Int}}(
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(
         minimize=true
     )
     for k in K

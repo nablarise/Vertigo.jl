@@ -3,4 +3,4 @@
 # SPDX-License-Identifier: Proprietary
 
 # Stub for future ReformulationKit adapter.
-# The current implementation uses DecompositionBuilder directly.
+# The current implementation uses DWReformulationBuilder directly.

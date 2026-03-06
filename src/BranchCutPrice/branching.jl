@@ -16,7 +16,7 @@ function most_fractional_original_variable(
 )
     decomp = bp_decomp(ctx)
     pool = bp_pool(ctx)
-    x_values = ColGen.project_to_original(
+    x_values = project_to_original(
         decomp, pool, v -> get(primal_values, v, 0.0)
     )
 
@@ -59,9 +59,9 @@ function create_branching_children(
 
     # Build constraint terms for all existing columns
     terms = MOI.ScalarAffineTerm{Float64}[]
-    for (col_var, rec) in ColGen.columns(pool)
-        coeff = ColGen.compute_branching_column_coefficient(
-            decomp, orig_var, ColGen.column_sp_id(rec), rec.solution
+    for (col_var, rec) in columns(pool)
+        coeff = compute_branching_column_coefficient(
+            decomp, orig_var, column_sp_id(rec), rec.solution
         )
         if !iszero(coeff)
             push!(terms, MOI.ScalarAffineTerm(coeff, col_var))

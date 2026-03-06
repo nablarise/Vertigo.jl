@@ -72,7 +72,7 @@ function BPSpace(
         Dict{Int,Any}(),
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
-        ColGen.is_minimization(ctx) ? -Inf : Inf,
+        is_minimization(ctx) ? -Inf : Inf,
         Dict{Int,Float64}(),
         0, node_limit, tol, rmp_time_limit,
         rmp_heuristic
@@ -131,11 +131,11 @@ end
 function _recompute_global_dual_bound!(space::BPSpace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        space.best_dual_bound = ColGen.is_minimization(space.ctx) ?
+        space.best_dual_bound = is_minimization(space.ctx) ?
             -Inf : Inf
         return
     end
-    space.best_dual_bound = ColGen.is_minimization(space.ctx) ?
+    space.best_dual_bound = is_minimization(space.ctx) ?
         minimum(values(bounds)) : maximum(values(bounds))
     return
 end
@@ -196,7 +196,7 @@ function TreeSearch.ts_best_dual_bound(s::BPSpace)
 end
 
 function TreeSearch.ts_is_minimization(s::BPSpace)
-    return ColGen.is_minimization(s.ctx)
+    return is_minimization(s.ctx)
 end
 
 function TreeSearch.ts_nodes_explored(s::BPSpace)

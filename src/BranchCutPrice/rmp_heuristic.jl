@@ -29,12 +29,12 @@ function solve_restricted_master_ip!(
     # Add integrality constraints to column variables and integer
     # pure master variables.
     int_cis = MOI.ConstraintIndex{MOI.VariableIndex,MOI.Integer}[]
-    for (col_var, _) in ColGen.columns(pool)
+    for (col_var, _) in columns(pool)
         ci = MOI.add_constraint(backend, col_var, MOI.Integer())
         push!(int_cis, ci)
     end
-    for pmv in ColGen.pure_master_variables(decomp)
-        if ColGen.pure_master_is_integer(decomp, pmv)
+    for pmv in pure_master_variables(decomp)
+        if pure_master_is_integer(decomp, pmv)
             ci = MOI.add_constraint(
                 backend, pmv.id, MOI.Integer()
             )
@@ -53,17 +53,17 @@ function solve_restricted_master_ip!(
         obj = MOI.get(backend, MOI.ObjectiveValue())
         nz_int = Tuple{MOI.VariableIndex,Int}[]
         nz_cont = Tuple{MOI.VariableIndex,Float64}[]
-        for (col_var, _) in ColGen.columns(pool)
+        for (col_var, _) in columns(pool)
             val = MOI.get(backend, MOI.VariablePrimal(), col_var)
             if val > 0.5
                 push!(nz_int, (col_var, round(Int, val)))
             end
         end
-        for pmv in ColGen.pure_master_variables(decomp)
+        for pmv in pure_master_variables(decomp)
             val = MOI.get(
                 backend, MOI.VariablePrimal(), pmv.id
             )
-            if ColGen.pure_master_is_integer(decomp, pmv)
+            if pure_master_is_integer(decomp, pmv)
                 if abs(val) > 0.5
                     push!(nz_int, (pmv.id, round(Int, val)))
                 end
