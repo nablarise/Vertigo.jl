@@ -15,6 +15,9 @@ import ..Reformulation: is_minimization
 # ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
 const ColGen = @__MODULE__
 
+# ── Tolerance constants ──────────────────────────────────────────────────────
+include("constants.jl")
+
 # ── Coluna kernel (DO NOT MODIFY) ─────────────────────────────────────────────
 include("coluna.jl")
 

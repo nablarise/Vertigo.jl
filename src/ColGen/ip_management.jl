@@ -7,7 +7,7 @@
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 # Check art vars using already-captured variable_values — avoids querying the MOI model.
-function _has_artificial_vars_in_solution(ctx, mast_primal_sol; tol=1e-5)
+function _has_artificial_vars_in_solution(ctx, mast_primal_sol; tol=INTEGRALITY_TOL)
     vars = mast_primal_sol.sol.variable_values
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
         (abs(get(vars, s_pos, 0.0)) > tol || abs(get(vars, s_neg, 0.0)) > tol) && return true
@@ -23,7 +23,7 @@ end
 
 # Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
 # Returns (MasterIpPrimalSol, false) if all values are integral, (nothing, false) if not.
-function _project_if_integral(mast_primal_sol, ctx; tol=1e-5)
+function _project_if_integral(mast_primal_sol, ctx; tol=INTEGRALITY_TOL)
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     non_zero_continuous = Tuple{MOI.VariableIndex,Float64}[]
     obj = 0.0
@@ -78,8 +78,8 @@ function _is_strictly_better(
     candidate::MasterIpPrimalSol,
     incumbent::MasterIpPrimalSol
 )
-    is_minimization(ctx) ? candidate.obj_value < incumbent.obj_value - 1e-6 :
-                           candidate.obj_value > incumbent.obj_value + 1e-6
+    is_minimization(ctx) ? candidate.obj_value < incumbent.obj_value - RC_IMPROVING_TOL :
+                           candidate.obj_value > incumbent.obj_value + RC_IMPROVING_TOL
 end
 
 function update_inc_primal_sol!(

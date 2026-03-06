@@ -35,7 +35,7 @@ function compute_dual_bound(
     # Verify dual solution consistency
     recomputed = _recompute_cost(mast_dual_sol.sol, master_model(decomp))
     stored = mast_dual_sol.sol.obj_value
-    abs(recomputed - stored) < 1e-4 || error(
+    abs(recomputed - stored) < DUAL_CONSISTENCY_TOL || error(
         "Dual cost mismatch: recomputed=$recomputed stored=$stored"
     )
 

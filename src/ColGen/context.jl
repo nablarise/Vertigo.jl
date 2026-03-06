@@ -148,9 +148,9 @@ function _dual_bound_dominated(ctx, dual_bound, ip_bound)
     isnothing(ip_bound) && return false
     isnothing(dual_bound) && return false
     if is_minimization(ctx)
-        return dual_bound >= ip_bound - 1e-6
+        return dual_bound >= ip_bound - RC_IMPROVING_TOL
     else
-        return dual_bound <= ip_bound + 1e-6
+        return dual_bound <= ip_bound + RC_IMPROVING_TOL
     end
 end
 
@@ -368,7 +368,7 @@ function stop_colgen_phase(
     lp_gap_closed = (
         !isnothing(master_lp_obj) &&
         !isnothing(incumbent_dual_bound) &&
-        abs(master_lp_obj - incumbent_dual_bound) < 1e-6
+        abs(master_lp_obj - incumbent_dual_bound) < LP_GAP_TOL
     )
     ip_pruned = _dual_bound_dominated(
         ctx, incumbent_dual_bound, ctx.ip_primal_bound
@@ -391,7 +391,7 @@ function stop_colgen_phase(
     lp_gap_closed = (
         !isnothing(master_lp_obj) &&
         !isnothing(incumbent_dual_bound) &&
-        abs(master_lp_obj - incumbent_dual_bound) < 1e-6
+        abs(master_lp_obj - incumbent_dual_bound) < LP_GAP_TOL
     )
     return no_column_added || lp_gap_closed
 end
@@ -433,7 +433,7 @@ end
 
 colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
 
-function has_artificial_vars_in_solution(ctx::ColGenContext, tol=1e-6)::Bool
+function has_artificial_vars_in_solution(ctx::ColGenContext, tol=RC_IMPROVING_TOL)::Bool
     model = master_model(ctx.decomp)
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
@@ -461,7 +461,7 @@ function new_phase_output(
     mlp = colgen_iter_output.master_lp_obj
     lp_gap_closed = (
         !isnothing(mlp) && !isnothing(inc_dual_bound) &&
-        abs(mlp - inc_dual_bound) < 1e-6
+        abs(mlp - inc_dual_bound) < LP_GAP_TOL
     )
     subprob_inf = colgen_iter_output.subproblem_infeasible
     converged   = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)

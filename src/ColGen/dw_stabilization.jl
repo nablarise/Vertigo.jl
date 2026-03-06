@@ -182,7 +182,7 @@ function check_misprice(
         )
 
         # If any column improves at π^out, no misprice
-        is_imp = is_minimization(ctx) ? (rc < -1e-6) : (rc > 1e-6)
+        is_imp = is_minimization(ctx) ? (rc < -RC_IMPROVING_TOL) : (rc > RC_IMPROVING_TOL)
         is_imp && return false
     end
 

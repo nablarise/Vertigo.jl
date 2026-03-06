@@ -172,16 +172,16 @@ function optimize_pricing_problem!(
     # Minimization: improving when reduced_cost < -ε (min(rc) is very negative).
     # Maximization: improving when reduced_cost > +ε (max(rc) is positive).
     is_improving = if is_minimization(ctx)
-        reduced_cost < -1e-6
+        reduced_cost < -RC_IMPROVING_TOL
     else
-        reduced_cost > 1e-6
+        reduced_cost > RC_IMPROVING_TOL
     end
 
     # Extract solution — only iterate SP decision variables from decomp
     entries = Tuple{MOI.VariableIndex,Float64}[]
     for sp_var in subproblem_variables(ctx.decomp, sp_id)
         val = MOI.get(sp_model, MOI.VariablePrimal(), sp_var)
-        if abs(val) > 1e-8
+        if abs(val) > SOLUTION_ENTRY_TOL
             push!(entries, (sp_var, val))
         end
     end
