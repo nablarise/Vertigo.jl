@@ -51,7 +51,10 @@ end
 function _populate_constraint_duals(model)
     constraint_duals = Dict{TaggedCI,Float64}()
     dual_status = MOI.get(model, MOI.DualStatus())
-    dual_status == MOI.FEASIBLE_POINT || return constraint_duals
+    if dual_status != MOI.FEASIBLE_POINT
+        @debug "Dual status is $dual_status, skipping dual extraction"
+        return constraint_duals
+    end
     sense = MOI.get(model, MOI.ObjectiveSense()) == MOI.MAX_SENSE ? -1 : 1
     for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
         for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
