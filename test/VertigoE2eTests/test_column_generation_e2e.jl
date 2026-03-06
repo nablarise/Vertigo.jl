@@ -110,11 +110,11 @@ const BENCHMARK_INSTANCES = [
 # CG e2e tests
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function test_gap_column_generation_converges()
+function test_gap_column_generation_converges(; smoothing_alpha=0.0)
     @testset "[gap] column generation converges (2 machines, 7 tasks)" begin
         expected_root_dual_bound = 63.0
         inst = gap_small_feasible()
-        ctx = build_gap_context(inst)
+        ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -122,11 +122,11 @@ function test_gap_column_generation_converges()
     end
 end
 
-function test_gap_column_generation_converges2()
+function test_gap_column_generation_converges2(; smoothing_alpha=0.0)
     @testset "[gap] column generation converges (2 machines, 7 tasks, instance 2)" begin
         expected_root_dual_bound = 70.33333
         inst = gap_small_feasible2()
-        ctx = build_gap_context(inst)
+        ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -134,13 +134,13 @@ function test_gap_column_generation_converges2()
     end
 end
 
-function test_gap_benchmark_instances()
+function test_gap_benchmark_instances(; smoothing_alpha=0.0)
     for (class, agents, jobs, expected_bound) in BENCHMARK_INSTANCES
         label = "$(uppercase(class)) $(agents)×$(jobs)"
         @testset "[gap][$(label)] dual bound ≈ $(expected_bound)" begin
             filepath = get_gap_instance_path(class, agents, jobs)
             inst = parse_gap_file(filepath)
-            ctx = build_gap_context(inst)
+            ctx = build_gap_context(inst; smoothing_alpha)
 
             output = run_column_generation(ctx)
 
@@ -150,40 +150,40 @@ function test_gap_benchmark_instances()
     end
 end
 
-function test_gap_infeasible_master()
+function test_gap_infeasible_master(; smoothing_alpha=0.0)
     @testset "[gap] infeasible master (3 machines, 30 jobs, max 27 coverable)" begin
         inst = gap_infeasible_master()
-        ctx  = build_gap_context(inst)
+        ctx  = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         # Phase0 converges with art vars → Phase1 confirms infeasibility
         @test output.status == master_infeasible
     end
 end
 
-function test_gap_infeasible_subproblem()
+function test_gap_infeasible_subproblem(; smoothing_alpha=0.0)
     @testset "[gap] infeasible subproblem (machine 1 capacity = -1)" begin
         inst = gap_infeasible_subproblem()
-        ctx = build_gap_context(inst)
+        ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == subproblem_infeasible
     end
 end
 
-function test_gap_maximization()
+function test_gap_maximization(; smoothing_alpha=0.0)
     @testset "[gap] maximization converges (2 machines, 7 tasks, negated costs)" begin
         inst = gap_maximization()
-        ctx = build_gap_context_max(inst)
+        ctx = build_gap_context_max(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
 end
 
-function test_gap_two_identical_machines()
+function test_gap_two_identical_machines(; smoothing_alpha=0.0)
     @testset "[gap] two identical machines (symmetric degeneracy)" begin
         expected_root_dual_bound = 32.0
         inst = gap_two_identical_machines()
-        ctx = build_gap_context(inst)
+        ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -191,11 +191,11 @@ function test_gap_two_identical_machines()
     end
 end
 
-function test_gap_identical_machines()
+function test_gap_identical_machines(; smoothing_alpha=0.0)
     @testset "[gap] identical machines with multiplicity (2 types, 7 tasks)" begin
         expected_root_dual_bound = 32.0
         inst = gap_identical_machines()
-        ctx = build_gap_identical_context(inst)
+        ctx = build_gap_identical_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -203,23 +203,11 @@ function test_gap_identical_machines()
     end
 end
 
-function test_gap_wentges_smoothing()
-    @testset "[gap] Wentges smoothing converges (2 machines, 7 tasks, α=0.5)" begin
-        expected_root_dual_bound = 70.33333
-        inst = gap_small_feasible2()
-        ctx = build_gap_context(inst; smoothing_alpha=0.5)
-        output = run_column_generation(ctx)
-        @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
-    end
-end
-
-function test_gap_shifted_bounds()
+function test_gap_shifted_bounds(; smoothing_alpha=0.0)
     @testset "[gap] shifted formulation z ∈ {1,2} matches standard bounds" begin
         expected_root_dual_bound = 63.0
         inst = gap_small_feasible()
-        shifted_ctx = build_gap_shifted_context(inst)
+        shifted_ctx = build_gap_shifted_context(inst; smoothing_alpha)
         shifted_out = run_column_generation(shifted_ctx)
         @test shifted_out.status == optimal
         @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
@@ -227,12 +215,12 @@ function test_gap_shifted_bounds()
     end
 end
 
-function test_gap_with_penalty()
+function test_gap_with_penalty(; smoothing_alpha=0.0)
     @testset "[gap] penalty unassignment (2 machines, 7 tasks, penalty=10)" begin
         gap = gap_small_feasible2()
         penalty = fill(10.0, gap.n_tasks)
         inst = GAPWithPenaltyInstance(gap, penalty)
-        ctx = build_gap_with_penalty_context(inst)
+        ctx = build_gap_with_penalty_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -241,12 +229,12 @@ function test_gap_with_penalty()
     end
 end
 
-function test_gap_with_penalty_cardinality()
+function test_gap_with_penalty_cardinality(; smoothing_alpha=0.0)
     @testset "[gap] penalty + cardinality (2 machines, 7 tasks, penalty=5, max 3 unassigned)" begin
         gap = gap_small_feasible2()
         penalty = fill(5.0, gap.n_tasks)
         inst = GAPWithPenaltyCardInstance(gap, penalty, 3)
-        ctx = build_gap_with_penalty_card_context(inst)
+        ctx = build_gap_with_penalty_card_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -255,11 +243,11 @@ function test_gap_with_penalty_cardinality()
     end
 end
 
-function test_gap_fixed_master_cost()
+function test_gap_fixed_master_cost(; smoothing_alpha=0.0)
     @testset "[gap] fixed master cost shifts bounds (2 machines, 7 tasks)" begin
         inst = gap_small_feasible()
         fixed_cost = 100.0
-        ctx = build_gap_context_with_fixed_cost(inst, fixed_cost)
+        ctx = build_gap_context_with_fixed_cost(inst, fixed_cost; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
@@ -268,10 +256,10 @@ function test_gap_fixed_master_cost()
     end
 end
 
-function test_gap_dual_bound_with_pure_master()
+function test_gap_dual_bound_with_pure_master(; smoothing_alpha=0.0)
     @testset "[gap] dual bound with pure master variable (pure_master_contrib bug)" begin
         inst = random_gap_instance(1, 2; seed=123)
-        ctx = build_gap_with_pure_master_context(inst)
+        ctx = build_gap_with_pure_master_context(inst; smoothing_alpha)
 
         output = run_column_generation(ctx)
 
@@ -291,18 +279,19 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function test_column_generation_e2e()
-    test_gap_column_generation_converges()
-    test_gap_column_generation_converges2()
-    #test_gap_benchmark_instances()
-    test_gap_infeasible_master()
-    test_gap_infeasible_subproblem()
-    test_gap_maximization()
-    test_gap_two_identical_machines()
-    test_gap_identical_machines()
-    test_gap_with_penalty()
-    test_gap_with_penalty_cardinality()
-    test_gap_shifted_bounds()
-    test_gap_fixed_master_cost()
-    test_gap_wentges_smoothing()
-    test_gap_dual_bound_with_pure_master()
+    for smoothing_alpha in (0.0, 0.5)
+        test_gap_column_generation_converges(; smoothing_alpha)
+        test_gap_column_generation_converges2(; smoothing_alpha)
+        #test_gap_benchmark_instances(; smoothing_alpha)
+        test_gap_infeasible_master(; smoothing_alpha)
+        test_gap_infeasible_subproblem(; smoothing_alpha)
+        test_gap_maximization(; smoothing_alpha)
+        test_gap_two_identical_machines(; smoothing_alpha)
+        test_gap_identical_machines(; smoothing_alpha)
+        test_gap_with_penalty(; smoothing_alpha)
+        test_gap_with_penalty_cardinality(; smoothing_alpha)
+        test_gap_shifted_bounds(; smoothing_alpha)
+        test_gap_fixed_master_cost(; smoothing_alpha)
+        test_gap_dual_bound_with_pure_master(; smoothing_alpha)
+    end
 end

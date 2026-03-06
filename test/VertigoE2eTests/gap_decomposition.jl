@@ -174,7 +174,8 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
 end
 
 function build_gap_context_with_fixed_cost(
-    inst::GAPInstance, fixed_cost::Float64
+    inst::GAPInstance, fixed_cost::Float64;
+    smoothing_alpha::Float64=0.0
 )
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
@@ -262,7 +263,8 @@ function build_gap_context_with_fixed_cost(
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -273,7 +275,9 @@ end
 # Build ColGenContext for a shifted GAP (z ∈ {1,2} instead of x ∈ {0,1})
 # ──────────────────────────────────────────────────────────────────────
 
-function build_gap_shifted_context(inst::GAPInstance)
+function build_gap_shifted_context(
+    inst::GAPInstance; smoothing_alpha::Float64=0.0
+)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -361,7 +365,8 @@ function build_gap_shifted_context(inst::GAPInstance)
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -378,7 +383,8 @@ struct GAPInstanceWithIdenticalMachines
 end
 
 function build_gap_identical_context(
-    inst::GAPInstanceWithIdenticalMachines
+    inst::GAPInstanceWithIdenticalMachines;
+    smoothing_alpha::Float64=0.0
 )
     K = 1:inst.n_machine_types
     T = 1:inst.n_tasks
@@ -503,7 +509,8 @@ function build_gap_identical_context(
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -521,7 +528,9 @@ struct GAPWithPenaltyCardInstance
     max_unassigned::Int         # max number of tasks left unassigned
 end
 
-function build_gap_with_penalty_context(inst::GAPWithPenaltyInstance)
+function build_gap_with_penalty_context(
+    inst::GAPWithPenaltyInstance; smoothing_alpha::Float64=0.0
+)
     gap = inst.gap
     K = 1:gap.n_machines
     T = 1:gap.n_tasks
@@ -603,7 +612,8 @@ function build_gap_with_penalty_context(inst::GAPWithPenaltyInstance)
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -611,7 +621,8 @@ function build_gap_with_penalty_context(inst::GAPWithPenaltyInstance)
 end
 
 function build_gap_with_penalty_card_context(
-    inst::GAPWithPenaltyCardInstance
+    inst::GAPWithPenaltyCardInstance;
+    smoothing_alpha::Float64=0.0
 )
     gap = inst.gap
     K = 1:gap.n_machines
@@ -733,7 +744,8 @@ function build_gap_with_penalty_card_context(
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -749,7 +761,9 @@ assignment constraint. This creates a scenario where `y` has nonzero
 reduced cost at optimality, exposing the pure_master_contrib double-counting bug
 in `compute_dual_bound`.
 """
-function build_gap_with_pure_master_context(inst::GAPInstance)
+function build_gap_with_pure_master_context(
+    inst::GAPInstance; smoothing_alpha::Float64=0.0
+)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -856,14 +870,17 @@ function build_gap_with_pure_master_context(inst::GAPInstance)
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
     return ctx
 end
 
-function build_gap_context_max(inst::GAPInstance)
+function build_gap_context_max(
+    inst::GAPInstance; smoothing_alpha::Float64=0.0
+)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -938,7 +955,8 @@ function build_gap_context_max(inst::GAPInstance)
         NonRobustCutManager{CstrId}(),
         Dict{Any,Any}(),
         Dict{Any,Any}(),
-        Dict{Any,Any}()
+        Dict{Any,Any}();
+        smoothing_alpha=smoothing_alpha
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
