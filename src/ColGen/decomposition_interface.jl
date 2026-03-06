@@ -139,12 +139,12 @@ function compute_column_reduced_cost(
 end
 
 """
-    compute_dual_bound_y_contribution(decomp, dual_values) -> Float64
+    compute_dual_bound_pure_master_contribution(decomp, dual_values) -> Float64
 
 Lagrangian contribution from pure master variables:
     Σₛ min{ (gₛ - Σᵢ φᵢₛ πᵢ) · Yₛ,  (gₛ - Σᵢ φᵢₛ πᵢ) · Ȳₛ }
 """
-function compute_dual_bound_y_contribution(decomp::AbstractDecomposition, dual_values)
+function compute_dual_bound_pure_master_contribution(decomp::AbstractDecomposition, dual_values)
     contrib = 0.0
     for y_var in pure_master_variables(decomp)
         rc_y = pure_master_cost(decomp, y_var)

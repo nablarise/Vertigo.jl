@@ -746,7 +746,7 @@ end
 Like `build_gap_context` but adds one continuous pure master variable `y`
 with cost 2.0, bounds [0, 1], and coupling coefficient 1.0 in the first
 assignment constraint. This creates a scenario where `y` has nonzero
-reduced cost at optimality, exposing the y_contrib double-counting bug
+reduced cost at optimality, exposing the pure_master_contrib double-counting bug
 in `compute_dual_bound`.
 """
 function build_gap_with_pure_master_context(inst::GAPInstance)
