@@ -24,9 +24,9 @@ BPNodeData() = BPNodeData(nothing)
 Search space for branch-and-price. Wraps the CG context, the MOI
 backend, domain/cut tracking, and branching metadata.
 """
-mutable struct BPSpace <: TreeSearch.AbstractSearchSpace
-    ctx::Any
-    backend::Any
+mutable struct BPSpace{Ctx,B} <: TreeSearch.AbstractSearchSpace
+    ctx::Ctx
+    backend::B
     domain_helper::MathOptState.DomainChangeTrackerHelper
     cut_tracker::MathOptState.LocalCutTracker
     cut_helper::MathOptState.LocalCutTrackerHelper
