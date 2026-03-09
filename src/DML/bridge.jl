@@ -113,10 +113,6 @@ function dantzig_wolfe_decomposition(
             sp_jump_models[sp_id], model, var_mapping;
             is_master=false
         )
-        # Subproblems always minimize (CG negates RC for max)
-        JuMP.set_objective_sense(
-            sp_jump_models[sp_id], MOI.MIN_SENSE
-        )
     end
     _register_objective!(
         master_model, model, var_mapping; is_master=true

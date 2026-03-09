@@ -130,16 +130,13 @@ function compute_reduced_costs!(
 end
 
 function update_reduced_costs!(ctx::ColGenContext, ::CGPhase, red_costs::ReducedCosts)
-    # For maximization, negate RC so the SP (which always minimizes) finds the
-    # column with the most positive reduced cost (= most negative negated RC).
-    sign = is_minimization(ctx) ? 1.0 : -1.0
     for (sp_id, sp_rc) in red_costs.values
         spm = sp_model(ctx.decomp, sp_id)
         for (var_index, rc_value) in sp_rc
             MOI.modify(
                 spm,
                 MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-                MOI.ScalarCoefficientChange(var_index, sign * rc_value)
+                MOI.ScalarCoefficientChange(var_index, rc_value)
             )
         end
     end

@@ -149,6 +149,8 @@ function optimize_pricing_problem!(
     stab_changes_mast_dual_sol
 )
     sp_model = moi_pricing_sp(pricing_sp)
+    sp_sense = is_minimization(ctx) ? MOI.MIN_SENSE : MOI.MAX_SENSE
+    MOI.set(sp_model, MOI.ObjectiveSense(), sp_sense)
     MOI.optimize!(sp_model)
 
     status = MOI.get(sp_model, MOI.TerminationStatus())
@@ -159,10 +161,7 @@ function optimize_pricing_problem!(
         return PricingSolution(is_inf, is_unb, 0.0, 0.0, PricingPrimalSolution[])
     end
 
-    # For maximization the SP objective was negated in update_reduced_costs!, so the
-    # raw SP result is min(-rc) = -max(rc).  Convert back so sp_obj = max(rc).
-    sp_obj_raw = MOI.get(sp_model, MOI.ObjectiveValue())
-    sp_obj = is_minimization(ctx) ? sp_obj_raw : -sp_obj_raw
+    sp_obj = MOI.get(sp_model, MOI.ObjectiveValue())
 
     ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ctx.decomp), sp_id)
     ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ctx.decomp), sp_id)
