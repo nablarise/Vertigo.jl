@@ -174,6 +174,8 @@ function _print_cg_footer(
         println("[STATUS] Infeasible master problem.")
     elseif output.status == subproblem_infeasible
         println("[STATUS] Subproblem infeasible.")
+    elseif output.status == ip_pruned
+        println("[STATUS] Node pruned by bound.")
     else
         println("[STATUS] Iteration limit reached.")
     end

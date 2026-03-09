@@ -176,7 +176,7 @@ const CGPhase = Union{Phase0,Phase1,Phase2}
 struct ExactStage end
 struct NoStabilization end
 
-@enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit
+@enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit ip_pruned
 
 new_phase_iterator(::ColGenContext) = ColGenPhaseIterator()
 initial_phase(::ColGenPhaseIterator) = Phase0()
@@ -431,6 +431,7 @@ struct ColGenPhaseOutput
     has_artificial_vars::Bool   # condition A: art vars active in solution
     colgen_converged::Bool      # condition D: CG has converged
     subproblem_infeasible::Bool
+    ip_pruned::Bool
 end
 
 colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
@@ -468,7 +469,10 @@ function new_phase_output(
     subprob_inf = colgen_iter_output.subproblem_infeasible
     converged   = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)
     has_art = has_artificial_vars_in_solution(ctx)
-    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf)
+    ip_pruned_flag = _dual_bound_dominated(
+        ctx, inc_dual_bound, ctx.ip_primal_bound
+    )
+    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag)
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
@@ -525,6 +529,11 @@ function new_output(
     elseif p.colgen_converged
         return ColGenOutput(
             optimal, p.master_lp_obj,
+            p.incumbent_dual_bound, ip
+        )
+    elseif p.ip_pruned
+        return ColGenOutput(
+            ip_pruned, p.master_lp_obj,
             p.incumbent_dual_bound, ip
         )
     else

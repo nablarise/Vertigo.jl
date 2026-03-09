@@ -57,7 +57,8 @@ function TreeSearch.evaluate!(
 
     # Infeasible node
     if cg_output.status == ColGen.master_infeasible ||
-       cg_output.status == ColGen.subproblem_infeasible
+       cg_output.status == ColGen.subproblem_infeasible ||
+       cg_output.status == ColGen.ip_pruned
         _recompute_global_dual_bound!(space)
         return TreeSearch.CUTOFF
     end
