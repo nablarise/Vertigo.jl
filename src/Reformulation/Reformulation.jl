@@ -28,7 +28,7 @@ export TaggedCI, with_typed_ci, _ci_type
 export CouplingEntry, CouplingCoefficients, get_coefficients
 
 # Subproblem data
-export SubproblemData, PureMasterVariableData, ForwardMapping
+export SubproblemData, PureMasterVariableData, AbstractVariableMapping, OneToOneMapping
 
 # DWReformulation
 export DWReformulation
@@ -60,7 +60,7 @@ export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 # Interface functions
 export original_cost, coupling_coefficients
-export mapped_subproblem_variables, original_variables, mapping_to_original
+export mapped_original_var, mapped_subproblem_var, original_variables
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost
 export convexity_bounds, nb_subproblem_multiplicity
 export pure_master_variables, pure_master_cost, pure_master_bounds

@@ -12,9 +12,9 @@ function original_cost end
 function coupling_coefficients end
 
 # ── M direction (x → z): for propagation ────────────────────────────────────
-function mapped_subproblem_variables end
+function mapped_original_var end
+function mapped_subproblem_var end
 function original_variables end
-function mapping_to_original end
 
 # ── Subproblem queries ────────────────────────────────────────────────────────
 function subproblem_ids end
@@ -169,11 +169,8 @@ function compute_branching_column_coefficient(
 )
     coeff = 0.0
     for (sp_var, val) in nonzero_entries(sol)
-        for ov in mapping_to_original(decomp, sp_id, sp_var)
-            if ov == orig_var
-                coeff += val
-                break
-            end
+        if mapped_original_var(decomp, sp_id, sp_var) == orig_var
+            coeff += val
         end
     end
     return coeff
@@ -185,14 +182,17 @@ end
 Project master LP solution (λ̄, ȳ) back to original variable space x̄.
 """
 function project_to_original(
-    decomp::AbstractDecomposition, pool::AbstractColumnPool, master_primal_values
+    decomp::AbstractDecomposition, pool::AbstractColumnPool,
+    master_primal_values
 )
     x_values = Dict{Any,Float64}()
     for (col_var, rec) in columns(pool)
         λ_val = master_primal_values(col_var)
         iszero(λ_val) && continue
+        sp_id = column_sp_id(rec)
         for (sp_var, z_val) in column_nonzero_entries(rec)
-            for orig_var in mapping_to_original(decomp, column_sp_id(rec), sp_var)
+            orig_var = mapped_original_var(decomp, sp_id, sp_var)
+            if orig_var !== nothing
                 x_values[orig_var] = get(x_values, orig_var, 0.0) + z_val * λ_val
             end
         end
