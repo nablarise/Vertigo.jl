@@ -59,8 +59,7 @@ function _derive_dot_status(
     elseif ts_status == TreeSearch.CUTOFF
         if !isnothing(cg_output) && (
             cg_output.status == ColGen.master_infeasible ||
-            cg_output.status == ColGen.subproblem_infeasible ||
-            cg_output.status == ColGen.ip_pruned
+            cg_output.status == ColGen.subproblem_infeasible
         )
             return DotPrunedInfeasible
         end
