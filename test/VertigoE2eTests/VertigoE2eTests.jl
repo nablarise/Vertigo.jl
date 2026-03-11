@@ -35,6 +35,12 @@ include("test_branch_and_price_e2e.jl")
 include("test_dml_e2e.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# Branch-cut-price with cuts e2e tests
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+include("test_cut_col_gen_e2e.jl")
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -44,6 +50,8 @@ function run()
     test_bp_gap_a_instances()
     println("---------")
     test_dml_e2e()
+    println("---------")
+    test_cut_col_gen_e2e()
 end
 
 end # module VertigoE2eTests

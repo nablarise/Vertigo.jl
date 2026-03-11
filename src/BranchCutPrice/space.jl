@@ -43,6 +43,7 @@ mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSear
     rmp_heuristic::Bool
     separator::S
     cutcolgen_ctx::CutColGenContext
+    total_cuts_separated::Int
 end
 
 """
@@ -82,7 +83,8 @@ function BPSpace(
         Dict{Int,Float64}(),
         0, node_limit, tol, rmp_time_limit,
         rmp_heuristic, separator,
-        CutColGenContext(max_cut_rounds, min_gap_improvement)
+        CutColGenContext(max_cut_rounds, min_gap_improvement),
+        0
     )
 end
 
@@ -240,6 +242,10 @@ function TreeSearch.ts_active_columns(s::BPSpace)
         end
     end
     return count
+end
+
+function TreeSearch.ts_total_cuts(s::BPSpace)
+    return s.total_cuts_separated
 end
 
 function TreeSearch.ts_branching_description(

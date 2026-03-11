@@ -45,5 +45,7 @@ export LimitedDiscrepancyStrategy, DiscrepancyData, filter_by_discrepancy
 export TreeSearchLoggerContext
 export ts_incumbent_value, ts_best_dual_bound, ts_is_minimization
 export ts_nodes_explored, ts_search_status_message
+export ts_open_node_count, ts_total_columns, ts_active_columns
+export ts_total_cuts, ts_branching_description
 
 end # module TreeSearch

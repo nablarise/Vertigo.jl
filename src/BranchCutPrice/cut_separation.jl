@@ -64,13 +64,20 @@ function _separate_and_add_cuts!(
     cg_output.status != ColGen.optimal && return 0
     decomp = bp_decomp(space.ctx)
     pool = bp_pool(space.ctx)
+    primal_cache = Dict{MOI.VariableIndex,Float64}()
+    for vi in MOI.get(space.backend, MOI.ListOfVariableIndices())
+        primal_cache[vi] = MOI.get(
+            space.backend, MOI.VariablePrimal(), vi
+        )
+    end
     x = project_to_original(
         decomp, pool,
-        v -> MOI.get(space.backend, MOI.VariablePrimal(), v)
+        v -> get(primal_cache, v, 0.0)
     )
     cuts = separate(space.separator, x)
     for cut in cuts
         _add_robust_cut!(space, cut)
     end
+    space.total_cuts_separated += length(cuts)
     return length(cuts)
 end
