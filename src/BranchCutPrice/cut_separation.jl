@@ -44,50 +44,25 @@ function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
 end
 
 """
-    _run_cut_separation_loop!(space, node)
+    _separate_and_add_cuts!(space, cg_output) -> Int
 
-Run the cut separation loop after CG converges at a node.
-Returns the final `ColGenOutput` if cuts were added, or `nothing`.
+Project the master LP solution to original space, separate cuts,
+and add them to the master. Returns the number of cuts added.
 """
-function _run_cut_separation_loop!(space::BPSpace, node)
-    isnothing(space.separator) && return nothing
-    space.max_cut_rounds <= 0 && return nothing
-
-    ctx = space.ctx
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
-    master = space.backend
-    final_output = nothing
-
-    for _ in 1:space.max_cut_rounds
-        # Project master LP solution to original space
-        x = project_to_original(
-            decomp, pool,
-            v -> MOI.get(master, MOI.VariablePrimal(), v)
-        )
-
-        # Separate cuts
-        cuts = separate(space.separator, x)
-        isempty(cuts) && break
-
-        # Add each cut
-        for cut in cuts
-            _add_robust_cut!(space, cut)
-        end
-
-        # Re-run CG
-        raw_ctx = ctx isa ColGen.ColGenLoggerContext ?
-            ctx.inner : ctx
-        raw_ctx.ip_primal_bound = isnothing(space.incumbent) ?
-            nothing : space.incumbent.obj_value
-        _rebuild_branching_constraints!(space)
-        cg_output = ColGen.run_column_generation(ctx)
-        node.user_data = BPNodeData(cg_output)
-        final_output = cg_output
-
-        # Stop if CG did not converge to optimal
-        cg_output.status != ColGen.optimal && break
+function _separate_and_add_cuts!(
+    space::BPSpace, cg_output::ColGen.ColGenOutput
+)::Int
+    isnothing(space.separator) && return 0
+    cg_output.status != ColGen.optimal && return 0
+    decomp = bp_decomp(space.ctx)
+    pool = bp_pool(space.ctx)
+    x = project_to_original(
+        decomp, pool,
+        v -> MOI.get(space.backend, MOI.VariablePrimal(), v)
+    )
+    cuts = separate(space.separator, x)
+    for cut in cuts
+        _add_robust_cut!(space, cut)
     end
-
-    return final_output
+    return length(cuts)
 end

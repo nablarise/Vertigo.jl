@@ -16,6 +16,7 @@ using ..MathOptState
 include("interface.jl")
 include("bp_output.jl")
 include("branching.jl")
+include("cut_col_gen.jl")
 include("space.jl")
 include("cut_separation.jl")
 include("evaluator.jl")

@@ -39,31 +39,44 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
+function _set_incumbent_bound!(space::BPSpace)
+    raw_ctx = space.ctx isa ColGen.ColGenLoggerContext ?
+        space.ctx.inner : space.ctx
+    raw_ctx.ip_primal_bound = isnothing(space.incumbent) ?
+        nothing : space.incumbent.obj_value
+    return
+end
+
 function TreeSearch.evaluate!(
     ::BPEvaluator, space::BPSpace, node
 )
     space.nodes_explored += 1
     delete!(space.open_node_bounds, node.id)
 
-    # Pass incumbent bound to CG for early pruning
-    raw_ctx = space.ctx isa ColGen.ColGenLoggerContext ?
-        space.ctx.inner : space.ctx
-    raw_ctx.ip_primal_bound = isnothing(space.incumbent) ?
-        nothing : space.incumbent.obj_value
-
+    _set_incumbent_bound!(space)
     _rebuild_branching_constraints!(space)
-    cg_output = ColGen.run_column_generation(space.ctx)
-    node.user_data = BPNodeData(cg_output)
 
-    # Cut separation after CG converges
-    if cg_output.status == ColGen.optimal &&
-            !isnothing(space.separator)
-        cut_output = _run_cut_separation_loop!(space, node)
-        if !isnothing(cut_output)
-            cg_output = cut_output
-            node.user_data = BPNodeData(cg_output)
-        end
+    # First CG + cut separation (unconditional)
+    cg_output = ColGen.run_column_generation(space.ctx)
+    nb_cuts = _separate_and_add_cuts!(space, cg_output)
+    gap = _colgen_gap(cg_output)
+    round = 0
+    prev_gap = Inf
+
+    # Cut-and-column-generation loop
+    while !stop_cutcolgen(
+        space.cutcolgen_ctx, round, nb_cuts,
+        cg_output.status, prev_gap, gap
+    )
+        prev_gap = gap
+        round += 1
+        _set_incumbent_bound!(space)
+        cg_output = ColGen.run_column_generation(space.ctx)
+        nb_cuts = _separate_and_add_cuts!(space, cg_output)
+        gap = _colgen_gap(cg_output)
     end
+
+    node.user_data = BPNodeData(cg_output)
 
     # Infeasible node
     if cg_output.status == ColGen.master_infeasible ||

@@ -42,13 +42,13 @@ mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSear
     rmp_time_limit::Float64
     rmp_heuristic::Bool
     separator::S
-    max_cut_rounds::Int
+    cutcolgen_ctx::CutColGenContext
 end
 
 """
     BPSpace(ctx; node_limit=10_000, tol=1e-6, rmp_time_limit=60.0,
             rmp_heuristic=true, separator=nothing,
-            max_cut_rounds=0)
+            max_cut_rounds=0, min_gap_improvement=0.01)
 
 Create a branch-and-price search space from a column generation
 context. Registers existing variable bound constraints for tracking.
@@ -60,7 +60,8 @@ function BPSpace(
     rmp_time_limit::Float64 = 60.0,
     rmp_heuristic::Bool = true,
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
-    max_cut_rounds::Int = 0
+    max_cut_rounds::Int = 0,
+    min_gap_improvement::Float64 = 0.01
 )
     master = bp_master_model(ctx)
     tracker = MathOptState.DomainChangeTracker()
@@ -80,7 +81,8 @@ function BPSpace(
         is_minimization(ctx) ? -Inf : Inf,
         Dict{Int,Float64}(),
         0, node_limit, tol, rmp_time_limit,
-        rmp_heuristic, separator, max_cut_rounds
+        rmp_heuristic, separator,
+        CutColGenContext(max_cut_rounds, min_gap_improvement)
     )
 end
 
@@ -282,6 +284,8 @@ node and most-fractional branching on original variables.
 - `separator`: Robust cut separator (default: `nothing`).
 - `max_cut_rounds::Int`: Maximum cut separation rounds per node
   (default: 0).
+- `min_gap_improvement::Float64`: Minimum relative gap improvement
+  to continue cut rounds (default: 0.01).
 - `log::Bool`: Enable VERTIGO-styled per-node logging (default: false).
 - `log_level::Int`: Logging verbosity (0 = off, 1 = table, 2 = BaPCod-style
   verbose). When > 0, overrides `log` (default: 0).
@@ -297,6 +301,7 @@ function run_branch_and_price(
     rmp_heuristic::Bool = true,
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
     max_cut_rounds::Int = 0,
+    min_gap_improvement::Float64 = 0.01,
     log::Bool = false,
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
@@ -309,7 +314,8 @@ function run_branch_and_price(
         rmp_time_limit = rmp_time_limit,
         rmp_heuristic = rmp_heuristic,
         separator = separator,
-        max_cut_rounds = max_cut_rounds
+        max_cut_rounds = max_cut_rounds,
+        min_gap_improvement = min_gap_improvement
     )
     evaluator = BPEvaluator()
     if !isnothing(dot_file)
