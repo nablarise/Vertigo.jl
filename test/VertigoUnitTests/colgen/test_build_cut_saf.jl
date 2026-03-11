@@ -7,7 +7,7 @@ function test_build_cut_saf_empty_pool()
         ctx, refs = build_insert_columns_context()
         model = master_model(ctx.decomp)
 
-        cut_coeffs = Dict{Any,Float64}((1, 1) => 3.0)
+        cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
         saf = Vertigo.BranchCutPrice._build_cut_saf(
@@ -34,7 +34,7 @@ function test_build_cut_saf_single_column()
         )
 
         # Cut on original var (1,1) with coeff 3.0
-        cut_coeffs = Dict{Any,Float64}((1, 1) => 3.0)
+        cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
         saf = Vertigo.BranchCutPrice._build_cut_saf(
@@ -73,7 +73,7 @@ function test_build_cut_saf_two_columns()
         # Cut on (1,2) with coeff 5.0
         # col_a: z1→(1,1), no contribution
         # col_b: z2→(1,2), coeff = 5.0 * 2.0 = 10.0
-        cut_coeffs = Dict{Any,Float64}((1, 2) => 5.0)
+        cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 2) => 5.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
         saf = Vertigo.BranchCutPrice._build_cut_saf(
@@ -103,7 +103,7 @@ function test_build_cut_saf_mixed_sp_vars()
 
         # Cut coefficients: (1,1) → 3.0, (1,2) → 5.0
         # Expected: 3.0*1.0 + 5.0*2.0 = 13.0
-        cut_coeffs = Dict{Any,Float64}(
+        cut_coeffs = Dict{Tuple{Int,Int},Float64}(
             (1, 1) => 3.0, (1, 2) => 5.0
         )
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
@@ -132,7 +132,7 @@ function test_build_cut_saf_skips_invalid_column()
             ctx.pool, fake_var, PricingSubproblemId(1), sol, 3.0
         )
 
-        cut_coeffs = Dict{Any,Float64}((1, 1) => 3.0)
+        cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
         saf = Vertigo.BranchCutPrice._build_cut_saf(

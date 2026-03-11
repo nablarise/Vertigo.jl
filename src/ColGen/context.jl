@@ -82,14 +82,15 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ActiveRobustCut
+    ActiveRobustCut{X}
 
 A robust cut currently active in the master LP. Maps a MOI constraint
 to the original-variable coefficients of the cut.
+`X` is the original variable key type (matching `DWReformulation{X}`).
 """
-struct ActiveRobustCut
+struct ActiveRobustCut{X}
     constraint_index::TaggedCI
-    coefficients::Dict{Any,Float64}
+    coefficients::Dict{X,Float64}
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────

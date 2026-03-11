@@ -11,16 +11,17 @@ return a vector of `SeparatedCut` from a fractional solution `x`.
 abstract type AbstractCutSeparator end
 
 """
-    SeparatedCut
+    SeparatedCut{X}
 
 A robust cut expressed as a linear function of original variables.
+`X` is the original variable key type (matching `DWReformulation{X}`).
 
 # Fields
 - `coefficients`: mapping from original variable to coefficient.
 - `set`: constraint set (`LessThan`, `GreaterThan`, or `EqualTo`).
 """
-struct SeparatedCut
-    coefficients::Dict{Any,Float64}
+struct SeparatedCut{X}
+    coefficients::Dict{X,Float64}
     set::Union{
         MOI.LessThan{Float64},
         MOI.GreaterThan{Float64},
@@ -29,10 +30,10 @@ struct SeparatedCut
 end
 
 """
-    separate(separator, x) -> Vector{SeparatedCut}
+    separate(separator, x) -> Vector{SeparatedCut{X}}
 
 Separate robust cuts violated by the fractional solution `x`.
-`x` is a `Dict{Any,Float64}` mapping original variables to values.
+`x` is a `Dict{X,Float64}` mapping original variables to values.
 """
 function separate end
 
@@ -42,7 +43,7 @@ function separate end
 Wraps a user callback for cut separation.
 
 # Fields
-- `callback`: function `(x::Dict{Any,Float64}) -> Vector{SeparatedCut}`.
+- `callback`: function `(x::Dict{X,Float64}) -> Vector{SeparatedCut{X}}`.
 """
 struct CustomCutSeparator <: AbstractCutSeparator
     callback::Function
