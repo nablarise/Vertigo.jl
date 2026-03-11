@@ -40,10 +40,11 @@ function _is_improving_incumbent(
 end
 
 function _set_incumbent_bound!(space::BPSpace)
-    raw_ctx = space.ctx isa ColGen.ColGenLoggerContext ?
-        space.ctx.inner : space.ctx
-    raw_ctx.ip_primal_bound = isnothing(space.incumbent) ?
-        nothing : space.incumbent.obj_value
+    bp_set_ip_primal_bound!(
+        space.ctx,
+        isnothing(space.incumbent) ?
+            nothing : space.incumbent.obj_value
+    )
     return
 end
 

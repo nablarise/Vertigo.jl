@@ -25,3 +25,12 @@ bp_branching_constraints(ctx::ColGen.ColGenLoggerContext) =
 bp_robust_cuts(ctx::ColGen.ColGenContext) = ctx.robust_cuts
 bp_robust_cuts(ctx::ColGen.ColGenLoggerContext) =
     ctx.inner.robust_cuts
+
+bp_ip_primal_bound(ctx::ColGen.ColGenContext) = ctx.ip_primal_bound
+bp_ip_primal_bound(ctx::ColGen.ColGenLoggerContext) =
+    ctx.inner.ip_primal_bound
+
+bp_set_ip_primal_bound!(ctx::ColGen.ColGenContext, val) =
+    ctx.ip_primal_bound = val
+bp_set_ip_primal_bound!(ctx::ColGen.ColGenLoggerContext, val) =
+    ctx.inner.ip_primal_bound = val
