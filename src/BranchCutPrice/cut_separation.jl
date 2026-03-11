@@ -3,28 +3,6 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    _compute_robust_cut_column_coeff(decomp, coefficients, sp_id, sol)
-
-Compute a single column's coefficient in a robust cut defined by
-`coefficients` (orig_var => coeff).
-"""
-function _compute_robust_cut_column_coeff(
-    decomp, coefficients::Dict{Any,Float64}, sp_id, sol
-)
-    coeff = 0.0
-    for (sp_var, val) in nonzero_entries(sol)
-        for ov in mapping_to_original(decomp, sp_id, sp_var)
-            c = get(coefficients, ov, 0.0)
-            if !iszero(c)
-                coeff += c * val
-                break
-            end
-        end
-    end
-    return coeff
-end
-
-"""
     _add_robust_cut!(space, separated_cut)
 
 Add a single separated robust cut to the master model and register
