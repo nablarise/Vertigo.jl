@@ -97,3 +97,25 @@ function set_models!(
     d.convexity_lb = conv_lb
     return nothing
 end
+
+# Typed specialization: returns Dict{X,Float64} instead of Dict{Any,Float64}
+function project_to_original(
+    decomp::DWReformulation{X}, pool::AbstractColumnPool,
+    master_primal_values
+) where {X}
+    x_values = Dict{X,Float64}()
+    for (col_var, rec) in columns(pool)
+        λ_val = master_primal_values(col_var)
+        iszero(λ_val) && continue
+        sp_id = column_sp_id(rec)
+        for (sp_var, z_val) in column_nonzero_entries(rec)
+            orig_var = mapped_original_var(decomp, sp_id, sp_var)
+            if orig_var !== nothing
+                x_values[orig_var] = get(
+                    x_values, orig_var, 0.0
+                ) + z_val * λ_val
+            end
+        end
+    end
+    return x_values
+end

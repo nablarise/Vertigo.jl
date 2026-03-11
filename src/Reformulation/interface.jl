@@ -177,7 +177,7 @@ function compute_branching_column_coefficient(
 end
 
 """
-    project_to_original(decomp, pool, master_primal_values) -> Dict{Any, Float64}
+    project_to_original(decomp, pool, master_primal_values) -> Dict
 
 Project master LP solution (λ̄, ȳ) back to original variable space x̄.
 """

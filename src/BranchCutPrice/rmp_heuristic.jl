@@ -18,7 +18,8 @@ function solve_restricted_master_ip!(
     cg_output::ColGen.ColGenOutput
 )
     if cg_output.status == ColGen.master_infeasible ||
-       cg_output.status == ColGen.subproblem_infeasible
+       cg_output.status == ColGen.subproblem_infeasible ||
+       cg_output.status == ColGen.ip_pruned
         return nothing
     end
 

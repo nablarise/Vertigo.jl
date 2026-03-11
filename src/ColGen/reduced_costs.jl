@@ -84,6 +84,17 @@ function _compute_sp_reduced_costs(
                 rc -= σ
             end
         end
+        for cut in ctx.robust_cuts
+            σ = _dual_value(mast_dual_sol, cut.constraint_index)
+            iszero(σ) && continue
+            ov = mapped_original_var(decomp, sp_id, sp_var)
+            if ov !== nothing
+                c = get(cut.coefficients, ov, 0.0)
+                if !iszero(c)
+                    rc -= c * σ
+                end
+            end
+        end
         sp_rc[sp_var] = rc
     end
     return sp_rc

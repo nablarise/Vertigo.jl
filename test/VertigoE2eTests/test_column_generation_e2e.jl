@@ -256,6 +256,20 @@ function test_gap_fixed_master_cost(; smoothing_alpha=0.0)
     end
 end
 
+function test_gap_ip_pruned()
+    @testset "[gap] ip pruned when cutoff below LP relaxation" begin
+        inst = gap_small_feasible2()
+        ctx = build_gap_context(inst)
+        # Set IP cutoff below LP relaxation (≈70.33)
+        raw = ctx.inner
+        raw.ip_primal_bound = 60.0
+        output = run_column_generation(ctx)
+        @test output.status == ip_pruned
+        @test !isnothing(output.master_lp_obj)
+        @test !isnothing(output.incumbent_dual_bound)
+    end
+end
+
 function test_gap_dual_bound_with_pure_master(; smoothing_alpha=0.0)
     @testset "[gap] dual bound with pure master variable (pure_master_contrib bug)" begin
         inst = random_gap_instance(1, 2; seed=123)
@@ -279,6 +293,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function test_column_generation_e2e()
+    test_gap_ip_pruned()
     for smoothing_alpha in (0.0, 0.5)
         test_gap_column_generation_converges(; smoothing_alpha)
         test_gap_column_generation_converges2(; smoothing_alpha)

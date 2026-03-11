@@ -49,7 +49,7 @@ export ColumnPool, NonRobustCutManager
 
 # Context and solver entry point
 export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput
-export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit
+export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions
@@ -70,5 +70,8 @@ export convexity_ub_pairs, convexity_lb_pairs
 # Branch-and-price
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 export TreeSearchLoggerContext
+
+# Robust cut separation
+export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 end # module Vertigo

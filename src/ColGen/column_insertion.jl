@@ -51,6 +51,21 @@ function insert_columns!(
             end
         end
 
+        for cut in ctx.robust_cuts
+            coeff = 0.0
+            for (sp_var_inner, val_inner) in nonzero_entries(sol)
+                ov = mapped_original_var(decomp, sp_id, sp_var_inner)
+                ov === nothing && continue
+                c = get(cut.coefficients, ov, 0.0)
+                if !iszero(c)
+                    coeff += c * val_inner
+                end
+            end
+            if !iszero(coeff)
+                all_coeffs[cut.constraint_index] = coeff
+            end
+        end
+
         if has_convexity_ub(decomp, sp_id)
             all_coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
         end
