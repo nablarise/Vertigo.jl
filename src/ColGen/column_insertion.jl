@@ -54,14 +54,11 @@ function insert_columns!(
         for cut in ctx.robust_cuts
             coeff = 0.0
             for (sp_var_inner, val_inner) in nonzero_entries(sol)
-                for ov in mapping_to_original(
-                    decomp, sp_id, sp_var_inner
-                )
-                    c = get(cut.coefficients, ov, 0.0)
-                    if !iszero(c)
-                        coeff += c * val_inner
-                        break
-                    end
+                ov = mapped_original_var(decomp, sp_id, sp_var_inner)
+                ov === nothing && continue
+                c = get(cut.coefficients, ov, 0.0)
+                if !iszero(c)
+                    coeff += c * val_inner
                 end
             end
             if !iszero(coeff)

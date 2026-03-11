@@ -22,12 +22,11 @@ function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
         sol_entries = column_nonzero_entries(rec)
         coeff = 0.0
         for (sp_var, val) in sol_entries
-            for ov in mapping_to_original(decomp, sp_id, sp_var)
-                c = get(cut.coefficients, ov, 0.0)
-                if !iszero(c)
-                    coeff += c * val
-                    break
-                end
+            ov = mapped_original_var(decomp, sp_id, sp_var)
+            ov === nothing && continue
+            c = get(cut.coefficients, ov, 0.0)
+            if !iszero(c)
+                coeff += c * val
             end
         end
         if !iszero(coeff)
