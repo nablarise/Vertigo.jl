@@ -71,4 +71,7 @@ export convexity_ub_pairs, convexity_lb_pairs
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 export TreeSearchLoggerContext
 
+# Robust cut separation
+export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
+
 end # module Vertigo

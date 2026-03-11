@@ -55,6 +55,16 @@ function TreeSearch.evaluate!(
     cg_output = ColGen.run_column_generation(space.ctx)
     node.user_data = BPNodeData(cg_output)
 
+    # Cut separation after CG converges
+    if cg_output.status == ColGen.optimal &&
+            !isnothing(space.separator)
+        cut_output = _run_cut_separation_loop!(space, node)
+        if !isnothing(cut_output)
+            cg_output = cut_output
+            node.user_data = BPNodeData(cg_output)
+        end
+    end
+
     # Infeasible node
     if cg_output.status == ColGen.master_infeasible ||
        cg_output.status == ColGen.subproblem_infeasible ||

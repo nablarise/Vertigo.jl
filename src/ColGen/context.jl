@@ -78,6 +78,21 @@ struct ActiveBranchingConstraint{X}
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# ACTIVE ROBUST CUT
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    ActiveRobustCut
+
+A robust cut currently active in the master LP. Maps a MOI constraint
+to the original-variable coefficients of the cut.
+"""
+struct ActiveRobustCut
+    constraint_index::TaggedCI
+    coefficients::Dict{Any,Float64}
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN CONTEXT
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -104,6 +119,7 @@ mutable struct ColGenContext{D<:AbstractDecomposition,CutM<:NonRobustCutManager}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
     ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
+    robust_cuts::Vector{ActiveRobustCut}
     smoothing_alpha::Float64
 
     function ColGenContext(
@@ -114,7 +130,8 @@ mutable struct ColGenContext{D<:AbstractDecomposition,CutM<:NonRobustCutManager}
         new{typeof(decomp),typeof(cuts)}(
             decomp, pool, cuts,
             eq_art_vars, leq_art_vars, geq_art_vars, nothing,
-            nothing, ActiveBranchingConstraint[], smoothing_alpha
+            nothing, ActiveBranchingConstraint[],
+            ActiveRobustCut[], smoothing_alpha
         )
     end
 end

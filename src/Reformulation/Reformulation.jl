@@ -15,6 +15,7 @@ include("subproblem_solution.jl")
 include("column_pool.jl")
 include("builder.jl")
 include("non_robust_cuts.jl")
+include("cut_separation.jl")
 
 # Abstract types
 export AbstractDecomposition, AbstractSubproblemSolution
@@ -53,6 +54,9 @@ export add_coupling_constraint!, build
 export ActiveNonRobustCut, NonRobustCutManager
 export add_cut!, update_duals!, total_cut_dual_contribution
 export compute_column_cut_coefficients
+
+# Cut separation
+export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 # Interface functions
 export original_cost, coupling_coefficients

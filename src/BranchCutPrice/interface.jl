@@ -21,3 +21,7 @@ bp_branching_constraints(ctx::ColGen.ColGenContext) =
     ctx.branching_constraints
 bp_branching_constraints(ctx::ColGen.ColGenLoggerContext) =
     ctx.inner.branching_constraints
+
+bp_robust_cuts(ctx::ColGen.ColGenContext) = ctx.robust_cuts
+bp_robust_cuts(ctx::ColGen.ColGenLoggerContext) =
+    ctx.inner.robust_cuts
