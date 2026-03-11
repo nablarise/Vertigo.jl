@@ -21,21 +21,28 @@ struct PureMasterVariableData
 end
 
 """
-    ForwardMapping{X}
+    AbstractVariableMapping{X}
 
-Bidirectional mapping between original variables and subproblem
-variables.
+Abstract supertype for variable mappings between original and subproblem spaces.
+Allows dispatch-based specialization for different mapping cardinalities.
+"""
+abstract type AbstractVariableMapping{X} end
+
+"""
+    OneToOneMapping{X} <: AbstractVariableMapping{X}
+
+Bidirectional 1:1 mapping between original variables and subproblem variables.
 
 `X` is the original variable identifier type (e.g. `Tuple{Int,Int}`
 for a (machine, task) pair in GAP).
 
 # Fields
-- `forward`: original var → subproblem copies it maps to.
-- `inverse_set`: (subproblem, sp_var) → original vars it represents.
+- `forward`: original var → (subproblem_id, sp_var).
+- `inverse`: (subproblem_id, sp_var) → original var.
 - `all_orig_vars`: every original variable registered in the mapping.
 """
-struct ForwardMapping{X}
-    forward::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
-    inverse_set::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
+struct OneToOneMapping{X} <: AbstractVariableMapping{X}
+    forward::Dict{X,Tuple{PricingSubproblemId,_VI}}
+    inverse::Dict{Tuple{PricingSubproblemId,_VI},X}
     all_orig_vars::Vector{X}
 end

@@ -3,17 +3,18 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    DWReformulation{X}
+    DWReformulation{X,M}
 
 Mutable concrete implementation of AbstractDecomposition.
 
 Type parameters:
   - X: original/linking variable identifier type
+  - M: variable mapping type (<: AbstractVariableMapping{X})
 """
-mutable struct DWReformulation{X} <: AbstractDecomposition
+mutable struct DWReformulation{X,M<:AbstractVariableMapping{X}} <: AbstractDecomposition
     subproblems::Dict{PricingSubproblemId,SubproblemData}
     pure_master_vars::Vector{PureMasterVariableData}
-    mapping::ForwardMapping{X}
+    mapping::M
     coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
     minimize::Bool
     master_model::Any
@@ -31,14 +32,17 @@ end
     return get_coefficients(d.subproblems[sp_id].coupling_coeffs, sp_var)
 end
 
-# M forward (cold path)
-function mapped_subproblem_variables(d::DWReformulation, orig_var)
-    return get(d.mapping.forward, orig_var, eltype(values(d.mapping.forward))[])
-end
+# M⁻¹ : (sp_id, sp_var) → original var or nothing
+mapped_original_var(d::DWReformulation, sp_id, sp_var) =
+    _mapped_original_var(d.mapping, sp_id, sp_var)
+_mapped_original_var(m::OneToOneMapping, sp_id, sp_var) =
+    get(m.inverse, (sp_id, sp_var), nothing)
 
-function mapping_to_original(d::DWReformulation, sp_id, sp_var)
-    return get(d.mapping.inverse_set, (sp_id, sp_var), eltype(d.mapping.all_orig_vars)[])
-end
+# M : orig_var → (sp_id, sp_var) or nothing
+mapped_subproblem_var(d::DWReformulation, orig_var) =
+    _mapped_subproblem_var(d.mapping, orig_var)
+_mapped_subproblem_var(m::OneToOneMapping, orig_var) =
+    get(m.forward, orig_var, nothing)
 
 original_variables(d::DWReformulation) = d.mapping.all_orig_vars
 
