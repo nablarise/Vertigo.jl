@@ -17,8 +17,8 @@ mutable struct DWReformulationBuilder{X}
     pm_vars::Vector{PureMasterVariableData}
     pm_coupling_accum::Dict{_VI,Vector{CouplingEntry}}
     pm_data_accum::Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}
-    forward_map::Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}
-    inverse_map::Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}
+    forward_map::Dict{X,Tuple{PricingSubproblemId,_VI}}
+    inverse_map::Dict{Tuple{PricingSubproblemId,_VI},X}
     all_orig_vars_set::Set{X}
     coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
 end
@@ -34,8 +34,8 @@ function DWReformulationBuilder{X}(; minimize::Bool=true) where {X}
         PureMasterVariableData[],
         Dict{_VI,Vector{CouplingEntry}}(),
         Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}(),
-        Dict{X,Vector{Tuple{PricingSubproblemId,_VI}}}(),
-        Dict{Tuple{PricingSubproblemId,_VI},Vector{X}}(),
+        Dict{X,Tuple{PricingSubproblemId,_VI}}(),
+        Dict{Tuple{PricingSubproblemId,_VI},X}(),
         Set{X}(),
         Tuple{TaggedCI,Float64}[]
     )
@@ -78,8 +78,10 @@ function add_mapping!(
     b::DWReformulationBuilder{X}, orig_var::X,
     sp_id::PricingSubproblemId, sp_var::_VI
 ) where {X}
-    push!(get!(Vector{Tuple{PricingSubproblemId,_VI}}, b.forward_map, orig_var), (sp_id, sp_var))
-    push!(get!(Vector{X}, b.inverse_map, (sp_id, sp_var)), orig_var)
+    @assert !haskey(b.forward_map, orig_var) "Duplicate forward mapping for $orig_var"
+    @assert !haskey(b.inverse_map, (sp_id, sp_var)) "Duplicate inverse mapping for ($sp_id, $sp_var)"
+    b.forward_map[orig_var] = (sp_id, sp_var)
+    b.inverse_map[(sp_id, sp_var)] = orig_var
     push!(b.all_orig_vars_set, orig_var)
     return nothing
 end
@@ -173,13 +175,13 @@ function build(b::DWReformulationBuilder{X}) where {X}
         push!(pm_vars, PureMasterVariableData(y_id, cost, lb, ub, is_int, coeffs))
     end
 
-    mapping = ForwardMapping(
+    mapping = OneToOneMapping(
         b.forward_map,
         b.inverse_map,
         collect(b.all_orig_vars_set)
     )
 
-    return DWReformulation{X}(
+    return DWReformulation(
         subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize,
         nothing,
         Dict{PricingSubproblemId,Any}(),
