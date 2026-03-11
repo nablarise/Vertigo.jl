@@ -3,25 +3,20 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    _add_robust_cut!(space, separated_cut)
+    _build_cut_saf(decomp, pool, master, cut)
 
-Add a single separated robust cut to the master model and register
-it in the CG context.
+Build a `MOI.ScalarAffineFunction` for a robust cut over the
+columns currently in `pool`. Each column's coefficient is the
+inner product of the cut's original-variable coefficients with
+the column's subproblem solution.
 """
-function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
-    ctx = space.ctx
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
-    master = space.backend
-
-    # Build SAF terms from existing columns
+function _build_cut_saf(decomp, pool, master, cut)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (col_var, rec) in columns(pool)
         MOI.is_valid(master, col_var) || continue
         sp_id = column_sp_id(rec)
-        sol_entries = column_nonzero_entries(rec)
         coeff = 0.0
-        for (sp_var, val) in sol_entries
+        for (sp_var, val) in column_nonzero_entries(rec)
             ov = mapped_original_var(decomp, sp_id, sp_var)
             ov === nothing && continue
             c = get(cut.coefficients, ov, 0.0)
@@ -33,12 +28,26 @@ function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
             push!(terms, MOI.ScalarAffineTerm(coeff, col_var))
         end
     end
+    return MOI.ScalarAffineFunction(terms, 0.0)
+end
 
-    saf = MOI.ScalarAffineFunction(terms, 0.0)
-    ci = MOI.add_constraint(master, saf, cut.set)
+"""
+    _add_robust_cut!(space, separated_cut)
+
+Add a single separated robust cut to the master model and register
+it in the CG context.
+"""
+function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
+    ctx = space.ctx
+    saf = _build_cut_saf(
+        bp_decomp(ctx), bp_pool(ctx), space.backend, cut
+    )
+    ci = MOI.add_constraint(space.backend, saf, cut.set)
     tagged = TaggedCI(ci)
-    active = ColGen.ActiveRobustCut(tagged, cut.coefficients)
-    push!(bp_robust_cuts(ctx), active)
+    push!(
+        bp_robust_cuts(ctx),
+        ColGen.ActiveRobustCut(tagged, cut.coefficients)
+    )
     return tagged
 end
 
