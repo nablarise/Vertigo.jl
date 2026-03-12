@@ -66,9 +66,13 @@ function _separate_and_add_cuts!(
     pool = bp_pool(space.ctx)
     primal_cache = Dict{MOI.VariableIndex,Float64}()
     for vi in MOI.get(space.backend, MOI.ListOfVariableIndices())
-        primal_cache[vi] = MOI.get(
-            space.backend, MOI.VariablePrimal(), vi
-        )
+        val = try
+            MOI.get(space.backend, MOI.VariablePrimal(), vi)
+        catch
+            nothing
+        end
+        val === nothing && continue
+        primal_cache[vi] = val
     end
     x = project_to_original(
         decomp, pool,

@@ -60,21 +60,21 @@ function TreeSearch.evaluate!(
     # First CG + cut separation (unconditional)
     cg_output = ColGen.run_column_generation(space.ctx)
     nb_cuts = _separate_and_add_cuts!(space, cg_output)
-    gap = _colgen_gap(cg_output)
+    lp = _master_lp_obj(cg_output)
     round = 0
-    prev_gap = Inf
+    prev_lp = Inf
 
     # Cut-and-column-generation loop
     while !stop_cutcolgen(
         space.cutcolgen_ctx, round, nb_cuts,
-        cg_output.status, prev_gap, gap
+        cg_output.status, prev_lp, lp
     )
-        prev_gap = gap
+        prev_lp = lp
         round += 1
         _set_incumbent_bound!(space)
         cg_output = ColGen.run_column_generation(space.ctx)
         nb_cuts = _separate_and_add_cuts!(space, cg_output)
-        gap = _colgen_gap(cg_output)
+        lp = _master_lp_obj(cg_output)
     end
 
     node.user_data = BPNodeData(cg_output)
