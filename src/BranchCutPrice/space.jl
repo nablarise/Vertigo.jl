@@ -273,7 +273,7 @@ end
     run_branch_and_price(ctx; strategy, node_limit, tol,
                          rmp_time_limit, rmp_heuristic,
                          separator, max_cut_rounds,
-                         log, log_level, dot_file) -> BPOutput
+                         log_level, dot_file) -> BPOutput
 
 Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on original variables.
@@ -292,9 +292,8 @@ node and most-fractional branching on original variables.
   (default: 0).
 - `min_gap_improvement::Float64`: Minimum relative gap improvement
   to continue cut rounds (default: 0.01).
-- `log::Bool`: Enable VERTIGO-styled per-node logging (default: false).
-- `log_level::Int`: Logging verbosity (0 = off, 1 = table, 2 = BaPCod-style
-  verbose). When > 0, overrides `log` (default: 0).
+- `log_level::Int`: Logging verbosity (0 = off, 1 = table,
+  2 = BaPCod-style verbose). Default: 0.
 - `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
   (default: `nothing` — no dot file written).
 """
@@ -308,11 +307,10 @@ function run_branch_and_price(
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
     max_cut_rounds::Int = 0,
     min_gap_improvement::Float64 = 0.01,
-    log::Bool = false,
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
 )
-    effective_level = log_level > 0 ? log_level : (log ? 1 : 0)
+    effective_level = log_level
     space = BPSpace(
         ctx;
         node_limit = node_limit,
