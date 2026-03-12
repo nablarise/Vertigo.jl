@@ -46,11 +46,8 @@ include("test_cut_col_gen_e2e.jl")
 
 function run()
     test_column_generation_e2e()
-    println("---------")
     test_bp_gap_a_instances()
-    println("---------")
     test_dml_e2e()
-    println("---------")
     test_cut_col_gen_e2e()
 end
 
