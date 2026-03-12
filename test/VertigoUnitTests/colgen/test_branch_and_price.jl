@@ -40,7 +40,7 @@ function test_branch_and_price()
         ctx = build_gap_context(inst)
         output = redirect_stdout(devnull) do
             run_branch_and_price(
-                ctx; node_limit = 100, log = true
+                ctx; node_limit = 100, log_level = 1
             )
         end
         @test output.status in (:optimal, :node_limit)
@@ -54,7 +54,7 @@ function test_branch_and_price()
 
         ctx2 = build_gap_context(inst)
         out2 = redirect_stdout(devnull) do
-            run_branch_and_price(ctx2; node_limit = 50, log = true)
+            run_branch_and_price(ctx2; node_limit = 50, log_level = 1)
         end
 
         @test out1.status == out2.status

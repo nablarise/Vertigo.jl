@@ -130,7 +130,6 @@ function test_fenchel_cut_gap()
             max_cut_rounds=20,
             min_gap_improvement=0.0,
             node_limit=1,
-            log=true,
             log_level=2
         )
 
