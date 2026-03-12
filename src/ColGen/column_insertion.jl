@@ -32,14 +32,11 @@ function insert_columns!(
         coupling_coeffs = compute_column_coupling_coefficients(
             decomp, sp_id, sol
         )
-        cut_coeffs = compute_column_cut_coefficients(ctx.cuts, sol)
+        # TODO: compute non-robust cut coefficients for new columns
 
         all_coeffs = Dict{TaggedCI,Float64}()
         for (tagged_ci, v) in coupling_coeffs
             all_coeffs[tagged_ci] = v
-        end
-        for (k, v) in cut_coeffs
-            all_coeffs[TaggedCI(k)] = v
         end
 
         for bc in ctx.branching_constraints

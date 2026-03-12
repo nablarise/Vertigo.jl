@@ -123,7 +123,6 @@ function build_gap_context(inst::GAPInstance)
     ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}()
