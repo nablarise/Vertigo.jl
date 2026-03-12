@@ -15,36 +15,39 @@ end
 
 """
     stop_cutcolgen(ctx, round, nb_cuts, cg_status,
-                   prev_gap, gap) -> Bool
+                   prev_lp, lp) -> Bool
 
-Single pure stopping criterion for the cut-column-generation loop.
+Stopping criterion for the cut-column-generation loop. Tracks
+master LP objective between rounds and stops when improvement
+falls below `min_gap_improvement`.
 """
 function stop_cutcolgen(
     ctx::CutColGenContext,
     round::Int,
     nb_cuts::Int,
     cg_status::ColGen.ColGenStatus,
-    prev_gap::Float64,
-    gap::Float64
+    prev_lp::Float64,
+    lp::Float64
 )::Bool
     round >= ctx.max_rounds && return true
     nb_cuts == 0 && return true
     cg_status != ColGen.optimal && return true
-    prev_gap <= 0.0 && return true
-    improvement = (prev_gap - gap) / abs(prev_gap)
+    isinf(prev_lp) && return false
+    iszero(prev_lp) && return iszero(lp)
+    improvement = abs(lp - prev_lp) / abs(prev_lp)
     improvement < ctx.min_gap_improvement && return true
     return false
 end
 
 """
-    _colgen_gap(output) -> Float64
+    _master_lp_obj(output) -> Float64
 
-Relative gap between dual bound and master LP objective.
+Extract master LP objective from CG output, or `Inf` if
+unavailable.
 """
-function _colgen_gap(output::ColGen.ColGenOutput)::Float64
-    db = output.incumbent_dual_bound
-    pb = output.master_lp_obj
-    (isnothing(db) || isnothing(pb)) && return Inf
-    iszero(pb) && return iszero(db) ? 0.0 : Inf
-    return abs(pb - db) / abs(pb)
+function _master_lp_obj(
+    output::ColGen.ColGenOutput
+)::Float64
+    isnothing(output.master_lp_obj) && return Inf
+    return output.master_lp_obj
 end
