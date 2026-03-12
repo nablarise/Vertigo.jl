@@ -13,7 +13,6 @@ function _build_colgen_context_from_dml(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();

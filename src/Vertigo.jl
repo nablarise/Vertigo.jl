@@ -45,7 +45,7 @@ export add_coupling_constraint!, build
 export TaggedCI, with_typed_ci
 
 # Data structures
-export ColumnPool, NonRobustCutManager
+export ColumnPool
 
 # Context and solver entry point
 export ColGenContext, ColGenLoggerContext, run_column_generation, ColGenOutput

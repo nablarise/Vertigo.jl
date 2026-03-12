@@ -160,7 +160,6 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -256,7 +255,6 @@ function build_gap_context_with_fixed_cost(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -356,7 +354,6 @@ function build_gap_shifted_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -498,7 +495,6 @@ function build_gap_identical_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -599,7 +595,6 @@ function build_gap_with_penalty_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -729,7 +724,6 @@ function build_gap_with_penalty_card_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -853,7 +847,6 @@ function build_gap_with_pure_master_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();
@@ -1017,7 +1010,6 @@ function build_gap_fenchel_context(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{
             MOI.VariableIndex,MOI.VariableIndex
         }}(),
@@ -1102,7 +1094,6 @@ function build_gap_context_max(
     inner_ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrId}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();

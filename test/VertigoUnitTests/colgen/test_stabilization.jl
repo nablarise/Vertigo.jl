@@ -90,7 +90,7 @@ function _build_stab_ctx(; alpha=0.5)
 
     ctx = ColGenContext(
         decomp,
-        pool, NonRobustCutManager{CstrId}(),
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}();

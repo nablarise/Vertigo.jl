@@ -98,22 +98,21 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ColGenContext{D,CutM}
+    ColGenContext{D}
 
 Column generation context. Bundles all static data (decomposition),
-and runtime structures (column pool, cut manager, artificial variable tracking).
+and runtime structures (column pool, artificial variable tracking).
 
 MOI models and convexity constraint indices are owned by `decomp`
 (`DWReformulation`), not by this struct.
 
 Type parameters:
   - D: AbstractDecomposition implementation
-  - CutM: NonRobustCutManager type
 """
-mutable struct ColGenContext{D<:AbstractDecomposition,CutM<:NonRobustCutManager}
+mutable struct ColGenContext{D<:AbstractDecomposition}
     decomp::D
     pool::ColumnPool
-    cuts::CutM
+    # TODO: support non-robust cuts
     eq_art_vars::Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}
     leq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
     geq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
@@ -124,12 +123,12 @@ mutable struct ColGenContext{D<:AbstractDecomposition,CutM<:NonRobustCutManager}
     smoothing_alpha::Float64
 
     function ColGenContext(
-        decomp, pool, cuts,
+        decomp, pool,
         eq_art_vars, leq_art_vars, geq_art_vars;
         smoothing_alpha::Float64 = 0.0
     )
-        new{typeof(decomp),typeof(cuts)}(
-            decomp, pool, cuts,
+        new{typeof(decomp)}(
+            decomp, pool,
             eq_art_vars, leq_art_vars, geq_art_vars, nothing,
             nothing, ActiveBranchingConstraint[],
             ActiveRobustCut[], smoothing_alpha

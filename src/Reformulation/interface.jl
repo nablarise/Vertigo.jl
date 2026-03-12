@@ -5,7 +5,6 @@
 abstract type AbstractDecomposition end
 abstract type AbstractSubproblemSolution end
 abstract type AbstractColumnPool end
-abstract type AbstractNonRobustCutFamily end
 
 # ── M⁻¹ direction (z → x): hot path ──────────────────────────────────────────
 function original_cost end
@@ -48,11 +47,6 @@ function get_column_cost end
 function columns end
 function columns_for_subproblem end
 function has_column end
-
-# ── Non-robust cut interface ──────────────────────────────────────────────────
-function compute_cut_coefficient end
-function compute_cut_dual_contribution end
-function is_robust end
 
 # ── Bound propagation ─────────────────────────────────────────────────────────
 function propagate_bounds! end

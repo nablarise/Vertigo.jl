@@ -14,12 +14,11 @@ include("dw_reformulation.jl")
 include("subproblem_solution.jl")
 include("column_pool.jl")
 include("builder.jl")
-include("non_robust_cuts.jl")
 include("cut_separation.jl")
 
 # Abstract types
 export AbstractDecomposition, AbstractSubproblemSolution
-export AbstractColumnPool, AbstractNonRobustCutFamily
+export AbstractColumnPool
 
 # MOI types
 export PricingSubproblemId, _SAF, _VI
@@ -50,11 +49,6 @@ export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
-# Non-robust cuts
-export ActiveNonRobustCut, NonRobustCutManager
-export add_cut!, update_duals!, total_cut_dual_contribution
-export compute_column_cut_coefficients
-
 # Cut separation
 export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
@@ -69,7 +63,6 @@ export coupling_constraints, is_minimization
 export solution_value, nonzero_entries, subproblem_id, objective_value
 export record_column!, get_column_solution, get_column_sp_id, get_column_cost
 export columns, columns_for_subproblem, has_column
-export compute_cut_coefficient, compute_cut_dual_contribution, is_robust
 export propagate_bounds!, is_column_proper
 export column_sp_id, column_original_cost, pricing_objective_value
 export column_nonzero_entries

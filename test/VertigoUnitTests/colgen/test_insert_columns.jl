@@ -126,7 +126,6 @@ function build_insert_columns_context()
     ctx = ColGenContext(
         decomp,
         pool,
-        NonRobustCutManager{CstrEq}(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}()
