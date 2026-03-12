@@ -543,14 +543,14 @@ function new_output(
         return ColGenOutput(
             master_infeasible, nothing, nothing, ip
         )
-    elseif p.colgen_converged
-        return ColGenOutput(
-            optimal, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
-        )
     elseif p.ip_pruned
         return ColGenOutput(
             ip_pruned, p.master_lp_obj,
+            p.incumbent_dual_bound, ip
+        )
+    elseif p.colgen_converged
+        return ColGenOutput(
+            optimal, p.master_lp_obj,
             p.incumbent_dual_bound, ip
         )
     else
