@@ -310,7 +310,6 @@ function run_branch_and_price(
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
 )
-    effective_level = log_level
     space = BPSpace(
         ctx;
         node_limit = node_limit,
@@ -326,9 +325,9 @@ function run_branch_and_price(
         dot_ctx = BPDotLoggerContext(space, evaluator, dot_file)
         return TreeSearch.search(strategy, dot_ctx)
     end
-    if effective_level > 0
+    if log_level > 0
         ts_ctx = TreeSearch.TreeSearchLoggerContext(
-            space, evaluator, effective_level
+            space, evaluator, log_level
         )
         return TreeSearch.search(strategy, ts_ctx)
     end
