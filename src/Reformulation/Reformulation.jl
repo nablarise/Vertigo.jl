@@ -9,6 +9,7 @@ const MOI = MathOptInterface
 
 include("interface.jl")
 include("moi_types.jl")
+include("moi_utils.jl")
 include("subproblem_data.jl")
 include("dw_reformulation.jl")
 include("subproblem_solution.jl")
@@ -21,6 +22,7 @@ export AbstractDecomposition, AbstractSubproblemSolution
 export AbstractColumnPool
 
 # MOI types
+export ZERO_TOL, get_primal_solution
 export PricingSubproblemId, _SAF, _VI
 export CIKind, SAF_EQ, SAF_LEQ, SAF_GEQ, VI_EQ, VI_LEQ, VI_GEQ
 export TaggedCI, with_typed_ci, _ci_type

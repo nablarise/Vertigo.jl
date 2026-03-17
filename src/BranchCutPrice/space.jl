@@ -150,12 +150,7 @@ function _recompute_global_dual_bound!(space::BPSpace)
 end
 
 function TreeSearch.branch!(space::BPSpace, node)
-    primal_values = Dict{MOI.VariableIndex,Float64}()
-    for v in MOI.get(space.backend, MOI.ListOfVariableIndices())
-        primal_values[v] = MOI.get(
-            space.backend, MOI.VariablePrimal(), v
-        )
-    end
+    primal_values = get_primal_solution(space.backend)
 
     orig_var, x_val = most_fractional_original_variable(
         space.ctx, primal_values; tol = space.tol

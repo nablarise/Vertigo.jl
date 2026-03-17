@@ -36,18 +36,6 @@ get_dual_sol(sol::MasterSolution) = sol.dual_sol
 
 is_better_primal_sol(::MasterPrimalSolution, ::Nothing) = true
 
-function _populate_variable_values(model)
-    variable_values = Dict{MOI.VariableIndex,Float64}()
-    primal_status = MOI.get(model, MOI.PrimalStatus())
-    if primal_status == MOI.FEASIBLE_POINT
-        variables = MOI.get(model, MOI.ListOfVariableIndices())
-        for var in variables
-            variable_values[var] = MOI.get(model, MOI.VariablePrimal(), var)
-        end
-    end
-    return variable_values
-end
-
 function _populate_constraint_duals(model)
     constraint_duals = Dict{TaggedCI,Float64}()
     dual_status = MOI.get(model, MOI.DualStatus())
@@ -69,7 +57,7 @@ function optimize_master_lp_problem!(master, ::ColGenContext)
     MOI.optimize!(moi_master(master))
 
     obj_value = MOI.get(moi_master(master), MOI.ObjectiveValue())
-    variable_values = _populate_variable_values(moi_master(master))
+    variable_values = get_primal_solution(moi_master(master))
     primal_sol = MasterPrimalSolution(PrimalMoiSolution(obj_value, variable_values))
 
     dual_obj_value = MOI.get(moi_master(master), MOI.DualObjectiveValue())

@@ -176,12 +176,13 @@ function optimize_pricing_problem!(
         reduced_cost > RC_IMPROVING_TOL
     end
 
-    # Extract solution — only iterate SP decision variables from decomp
+    # Extract solution — filter to SP decision variables
+    sp_vars = Set(subproblem_variables(ctx.decomp, sp_id))
+    all_vals = get_primal_solution(sp_model)
     entries = Tuple{MOI.VariableIndex,Float64}[]
-    for sp_var in subproblem_variables(ctx.decomp, sp_id)
-        val = MOI.get(sp_model, MOI.VariablePrimal(), sp_var)
-        if abs(val) > SOLUTION_ENTRY_TOL
-            push!(entries, (sp_var, val))
+    for (var, val) in all_vals
+        if var in sp_vars
+            push!(entries, (var, val))
         end
     end
     sol = _SpSolution(sp_id, reduced_cost, entries)
