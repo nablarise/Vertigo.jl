@@ -64,16 +64,7 @@ function _separate_and_add_cuts!(
     cg_output.status != ColGen.optimal && return 0
     decomp = bp_decomp(space.ctx)
     pool = bp_pool(space.ctx)
-    primal_cache = Dict{MOI.VariableIndex,Float64}()
-    for vi in MOI.get(space.backend, MOI.ListOfVariableIndices())
-        val = try
-            MOI.get(space.backend, MOI.VariablePrimal(), vi)
-        catch
-            nothing
-        end
-        val === nothing && continue
-        primal_cache[vi] = val
-    end
+    primal_cache = get_primal_solution(space.backend)
     x = project_to_original(
         decomp, pool,
         v -> get(primal_cache, v, 0.0)
