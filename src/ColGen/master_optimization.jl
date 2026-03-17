@@ -36,23 +36,6 @@ get_dual_sol(sol::MasterSolution) = sol.dual_sol
 
 is_better_primal_sol(::MasterPrimalSolution, ::Nothing) = true
 
-function _populate_constraint_duals(model)
-    constraint_duals = Dict{TaggedCI,Float64}()
-    dual_status = MOI.get(model, MOI.DualStatus())
-    if dual_status != MOI.FEASIBLE_POINT
-        @debug "Dual status is $dual_status, skipping dual extraction"
-        return constraint_duals
-    end
-    sense = MOI.get(model, MOI.ObjectiveSense()) == MOI.MAX_SENSE ? -1 : 1
-    for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
-        for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
-            dual_val = MOI.get(model, MOI.ConstraintDual(), ci)
-            constraint_duals[TaggedCI(ci)] = sense * dual_val
-        end
-    end
-    return constraint_duals
-end
-
 function optimize_master_lp_problem!(master, ::ColGenContext)
     MOI.optimize!(moi_master(master))
 
@@ -61,7 +44,7 @@ function optimize_master_lp_problem!(master, ::ColGenContext)
     primal_sol = MasterPrimalSolution(PrimalMoiSolution(obj_value, variable_values))
 
     dual_obj_value = MOI.get(moi_master(master), MOI.DualObjectiveValue())
-    constraint_duals = _populate_constraint_duals(moi_master(master))
+    constraint_duals = get_dual_solution(moi_master(master))
     dual_sol = MasterDualSolution(
         DualMoiSolution(dual_obj_value, constraint_duals),
         master.coupling_constraint_ids
