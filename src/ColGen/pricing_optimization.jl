@@ -181,7 +181,7 @@ function optimize_pricing_problem!(
     all_vals = get_primal_solution(sp_model)
     entries = Tuple{MOI.VariableIndex,Float64}[]
     for (var, val) in all_vals
-        if var in sp_vars && abs(val) > SOLUTION_ENTRY_TOL
+        if var in sp_vars
             push!(entries, (var, val))
         end
     end
