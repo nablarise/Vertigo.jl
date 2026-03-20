@@ -41,6 +41,7 @@ The work is decomposed into 4 independent sub-issues, each merged separately.
 | Action | File |
 |--------|------|
 | Modify | `src/ColGen/context.jl` — struct field, constructor, accessor, mutator, stop logic |
+| Modify | `src/ColGen/logger.jl` — forward `set_max_cg_iterations!` to inner context |
 
 ---
 
@@ -175,15 +176,26 @@ function run_sb_probe(
 ```
 
 For each direction (floor/ceil):
-1. Save current `max_cg_iterations(ctx)`.
+1. Save current `max_cg_iterations(ctx)`, `ctx.ip_incumbent`, and `ctx.ip_primal_bound`.
 2. `set_max_cg_iterations!(ctx, probe_budget)`.
-3. Add temporary branching constraint via `MathOptState.apply_change!` with `AddLocalCutChange`.
-4. `_rebuild_branching_constraints!(space)`.
-5. `ColGen.run_column_generation(ctx)` — limited CG run.
+3. Add temporary branching constraint directly via `MOI.add_constraint` on the backend (not through `LocalCutTracker`). Register it in `branching_constraints` manually so CG includes it in reduced cost computation.
+4. Add a single artificial variable on the branching constraint with high penalty cost (same as regular Phase 0).
+5. Run a local 3-phase CG probe:
+   - **Probe Phase 0:** Run CG with the artificial variable at high penalty cost. If the artificial variable reaches 0, feasibility is recovered → go to Probe Phase 2.
+   - **Probe Phase 1:** If Phase 0 ends with the artificial variable still nonzero, run a pure feasibility phase — zero out all column/variable objective coefficients, minimize only the artificial variable. If the artificial variable reaches 0, feasibility is recovered → restore original objective, go to Probe Phase 2. If it stays nonzero → direction is truly infeasible, stop.
+   - **Probe Phase 2:** Delete the artificial variable. Run CG with original objective to get the dual bound.
 6. Record dual bound, LP obj, infeasibility.
-7. In `finally`: remove constraint via `RemoveLocalCutChange`, rebuild, restore `max_cg_iterations`.
+7. In `finally`: delete branching constraint (and artificial variable if still present) via `MOI.delete`, restore `branching_constraints` to pre-probe state, restore original objective coefficients if modified by Phase 1, restore `max_cg_iterations`, `ip_incumbent`, and `ip_primal_bound`.
 
-**State after probes:** Columns discovered during probes remain in the pool (beneficial). The LP solution is stale after reverting constraints, but this is harmless — the next `evaluate!` call on a child node re-runs full CG from scratch.
+**Why a local artificial variable with 3 phases:** Probes add a branching constraint that may render the restricted master infeasible. Instead of running the full global CG phase sequence (Phase 0 creates artificial variables on *all* constraints), we scope the feasibility recovery to the single probe constraint. Phase 0 with high penalty often suffices. Phase 1 is a pure feasibility fallback — it must be available to distinguish true infeasibility from restricted master infeasibility. Phase 2 optimizes with the original objective to obtain the dual bound improvement.
+
+**Why not use `LocalCutTracker`:** Probe constraints are ephemeral. Routing them through `apply_change!` would add the probe cut ID to `cut_helper.active_cuts`, and `_rebuild_branching_constraints!` would then crash with a `KeyError` because the probe cut ID is not in `branching_cut_info`. Using `MOI.add_constraint`/`MOI.delete` directly avoids this entirely.
+
+**Implementation:** The 3-phase probe logic is encapsulated in a `run_sb_cg_probe(ctx, constraint_ci, art_var)` function that manages the phase transitions locally, reusing the existing CG iteration machinery from `coluna.jl` but with its own phase control. Each phase respects `max_cg_iterations`.
+
+**Context state save/restore:** Probes can discover IP-feasible solutions or update the primal bound. Since these side effects could mislead the parent node's subsequent branching decision, we save and restore `ip_incumbent` and `ip_primal_bound`. Columns discovered during probes remain in the pool (beneficial).
+
+**State after probes:** The LP solution is stale after deleting the probe constraint, but this is harmless — the next `evaluate!` call on a child node re-runs full CG from scratch.
 
 ### Strategy type
 
@@ -216,6 +228,7 @@ end
 | Create | `src/BranchCutPrice/strong_branching.jl` |
 | Modify | `src/BranchCutPrice/branching_strategy.jl` — add `StrongBranching` + `select_branching_variable` |
 | Modify | `src/BranchCutPrice/BranchCutPrice.jl` — include + export |
+| Modify | `src/ColGen/context.jl` — add `run_cg_phase2_only` entry point |
 
 ---
 
