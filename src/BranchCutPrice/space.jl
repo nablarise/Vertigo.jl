@@ -44,6 +44,7 @@ mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSear
     separator::S
     cutcolgen_ctx::CutColGenContext
     total_cuts_separated::Int
+    branching_strategy::AbstractBranchingStrategy
 end
 
 """
@@ -62,7 +63,8 @@ function BPSpace(
     rmp_heuristic::Bool = true,
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
     max_cut_rounds::Int = 0,
-    min_gap_improvement::Float64 = 0.01
+    min_gap_improvement::Float64 = 0.01,
+    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching()
 )
     master = bp_master_model(ctx)
     tracker = MathOptState.DomainChangeTracker()
@@ -84,7 +86,8 @@ function BPSpace(
         0, node_limit, tol, rmp_time_limit,
         rmp_heuristic, separator,
         CutColGenContext(max_cut_rounds, min_gap_improvement),
-        0
+        0,
+        branching_strategy
     )
 end
 
@@ -152,10 +155,11 @@ end
 function TreeSearch.branch!(space::BPSpace, node)
     primal_values = get_primal_solution(space.backend)
 
-    orig_var, x_val = most_fractional_original_variable(
-        space.ctx, primal_values; tol = space.tol
+    result = select_branching_variable(
+        space.branching_strategy, space, node, primal_values
     )
-    isnothing(orig_var) && return typeof(node)[]
+    isnothing(result) && return typeof(node)[]
+    orig_var, x_val = result
 
     cg_output = node.user_data.cg_output
     db = if isnothing(cg_output) ||
@@ -302,6 +306,7 @@ function run_branch_and_price(
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
     max_cut_rounds::Int = 0,
     min_gap_improvement::Float64 = 0.01,
+    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching(),
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
 )
@@ -313,7 +318,8 @@ function run_branch_and_price(
         rmp_heuristic = rmp_heuristic,
         separator = separator,
         max_cut_rounds = max_cut_rounds,
-        min_gap_improvement = min_gap_improvement
+        min_gap_improvement = min_gap_improvement,
+        branching_strategy = branching_strategy
     )
     evaluator = BPEvaluator()
     if !isnothing(dot_file)
