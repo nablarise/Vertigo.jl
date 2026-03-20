@@ -62,6 +62,8 @@ insert_columns!(lctx::ColGenLoggerContext, args...)                  = insert_co
 compute_dual_bound(lctx::ColGenLoggerContext, args...)               = compute_dual_bound(lctx.inner, args...)
 compute_sp_init_db(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_db(lctx.inner, sp)
 compute_sp_init_pb(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_pb(lctx.inner, sp)
+max_cg_iterations(lctx::ColGenLoggerContext)                         = max_cg_iterations(lctx.inner)
+set_max_cg_iterations!(lctx::ColGenLoggerContext, n::Int)            = set_max_cg_iterations!(lctx.inner, n)
 
 # ── Protocol delegation (context as arg 2) ───────────────────────────
 

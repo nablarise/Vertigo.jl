@@ -53,7 +53,7 @@ The master model contains:
 
 Each subproblem is a binary knapsack for one machine.
 """
-function build_gap_context(inst::GAPInstance)
+function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -125,7 +125,8 @@ function build_gap_context(inst::GAPInstance)
         pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}()
+        Dict{TaggedCI,MOI.VariableIndex}();
+        max_cg_iterations=max_cg_iterations
     )
 
     return ctx
@@ -147,6 +148,7 @@ include("test_local_cut_tracker.jl")
 include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
 include("test_cut_pool_tracker.jl")
+include("colgen/test_max_cg_iterations.jl")
 include("dml/test_dml.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -166,6 +168,7 @@ function run()
     test_lp_basis_tracker()
     test_column_tracker()
     test_cut_pool_tracker()
+    test_max_cg_iterations()
     test_branch_and_price()
     test_stabilization()
     test_setup_reformulation()
