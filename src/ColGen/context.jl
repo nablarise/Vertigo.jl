@@ -392,7 +392,7 @@ function stop_colgen_phase(
 )
     master_lp_obj = colgen_iter_output.master_lp_obj
     no_column_added = colgen_iter_output.nb_columns_added == 0
-    iteration_limit = iteration > 1000
+    iteration_limit = iteration > max_cg_iterations(ctx)
     lp_gap_closed = (
         !isnothing(master_lp_obj) &&
         !isnothing(incumbent_dual_bound) &&
