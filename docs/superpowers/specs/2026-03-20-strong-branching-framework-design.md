@@ -29,7 +29,12 @@ The work is decomposed into 4 independent sub-issues, each merged separately.
 ### Scope boundaries
 
 - Phase 1 (feasibility) keeps no iteration limit — only Phase 0 and Phase 2 are affected.
+- The limit applies **per phase**, not globally. A `max_cg_iterations=10` allows up to 10 iterations in Phase 0 and 10 in Phase 2 (20 total, Phase 1 unlimited). This is intentional: it matches the existing hardcoded behavior (1000 per phase).
 - All existing behavior is preserved (default is 1000).
+
+### Semantic note
+
+This field serves double duty: it configures the normal CG iteration limit and is also used by strong branching probes (sub-issue 3) which save/restore it temporarily. The save/restore pattern ensures probes don't leak their low budget to normal CG runs. Users configuring `ColGenContext` directly should set the limit for normal CG behavior; probes manage their own budget internally.
 
 ### Tests
 
@@ -178,24 +183,32 @@ function run_sb_probe(
 For each direction (floor/ceil):
 1. Save current `max_cg_iterations(ctx)`, `ctx.ip_incumbent`, and `ctx.ip_primal_bound`.
 2. `set_max_cg_iterations!(ctx, probe_budget)`.
-3. `add_branching_constraint!(backend, ctx, terms, set, orig_var)` — adds the MOI constraint and registers it in `branching_constraints` atomically.
+3. `add_branching_constraint!(backend, ctx, terms, set, orig_var)` — adds the MOI constraint and registers it in `branching_constraints` in a single function call.
 4. `ColGen.run_column_generation(ctx)` — full CG with Phase 0 → 1 → 2. CG creates and manages its own artificial variables as usual. The branching constraint may make the restricted master infeasible; Phase 0/1 handle feasibility recovery, Phase 2 optimizes. The iteration limit applies per phase.
 5. Record dual bound, LP obj, infeasibility from CG output.
-6. In `finally`: `remove_branching_constraint!(backend, ctx, ci)` — deletes the MOI constraint and removes it from `branching_constraints` atomically. Restore `max_cg_iterations`, `ip_incumbent`, and `ip_primal_bound`.
+6. In `finally`: `remove_branching_constraint!(backend, ctx, ci)` — deletes the MOI constraint and removes it from `branching_constraints`. Restore `max_cg_iterations`, `ip_incumbent`, and `ip_primal_bound`.
+
+**Both children infeasible:** If the left probe returns infeasible and the right probe also returns infeasible, the parent node is itself infeasible. `run_sb_probe` detects this and returns early with a result indicating node infeasibility, without evaluating remaining candidates.
 
 **Why full `run_column_generation`:** The existing CG already handles artificial variable creation (Phase 0), feasibility recovery (Phase 1), and optimization (Phase 2). Probes reuse this machinery as-is rather than reimplementing phase logic. The overhead of Phase 0/1 on all constraints is acceptable for probes.
 
-**Why not use `LocalCutTracker`:** Probe constraints are ephemeral. Routing them through `apply_change!` would add the probe cut ID to `cut_helper.active_cuts`, and `_rebuild_branching_constraints!` would then crash with a `KeyError` because the probe cut ID is not in `branching_cut_info`. Using `MOI.add_constraint`/`MOI.delete` directly avoids this entirely.
+**Why not use `LocalCutTracker`:** Probe constraints are ephemeral. Routing them through `apply_change!` would add the probe cut ID to `cut_helper.active_cuts`, and `_rebuild_branching_constraints!` would then crash with a `KeyError` because the probe cut ID is not in `branching_cut_info`. Using `MOI.add_constraint`/`MOI.delete` directly avoids this.
+
+**Exception safety:** `remove_branching_constraint!` must be defensive: if the MOI constraint exists, delete it; if the entry is in `branching_constraints`, remove it. This handles partial state if `add_branching_constraint!` succeeded on the MOI side but failed before registering (unlikely but possible).
 
 **Context state save/restore:** Probes can discover IP-feasible solutions or update the primal bound. Since these side effects could mislead the parent node's subsequent branching decision, we save and restore `ip_incumbent` and `ip_primal_bound`. Columns discovered during probes remain in the pool (beneficial).
 
-**State after probes:** The LP solution is stale after deleting the probe constraint, but this is harmless — the next `evaluate!` call on a child node re-runs full CG from scratch.
+**LP basis between probes:** After each probe, the branching constraint is removed and the LP basis is stale. Before the next probe, the parent's LP basis should be restored so each probe starts from the same point. This ensures consistent scoring across candidates.
+
+**State after all probes:** The LP solution is stale after the last probe, but this is harmless — the next `evaluate!` call on a child node re-runs full CG from scratch.
+
+**Logging:** Each probe logs: candidate variable, direction (floor/ceil), CG iterations consumed, dual bound obtained, infeasibility status, and `sb_score`. This is essential for debugging and parameter tuning.
 
 ### Strategy type
 
 ```julia
 struct StrongBranching <: AbstractBranchingStrategy
-    max_candidates::Int       # default 5
+    max_candidates::Int       # default 15
     max_cg_iterations::Int    # default 10
     mu::Float64               # default 1/6
     rule::AbstractBranchingRule  # default MostFractionalRule()
@@ -258,7 +271,7 @@ Unit pseudocosts normalize the dual bound improvement by fractionality, making s
 
 ```julia
 struct ReliabilityBranching <: AbstractBranchingStrategy
-    max_candidates::Int          # default 5
+    max_candidates::Int          # default 15
     max_cg_iterations::Int       # default 10
     mu::Float64                  # default 1/6
     reliability_threshold::Int   # default 8
@@ -275,7 +288,9 @@ end
 
 **Pseudocost updates from two sources:**
 1. **During probes** (in `select_branching_variable`): after each `run_sb_probe`, call `update_pseudocosts!` with the `SBCandidateResult`. This covers unreliable variables.
-2. **After node evaluation** (in `evaluate!`): once CG completes on a child node, compute Δ from the parent's LP obj and the child's dual bound, and call `update_pseudocosts!` for the variable that was branched on. This requires storing the branching variable and parent LP obj in `BPNodeData` at branching time. This is the primary source of observations once variables become reliable.
+2. **After node evaluation** via `on_node_evaluated(strategy, node_data, cg_output)` callback: once CG completes on a child node, compute Δ from the parent's LP obj and the child's dual bound, and call `update_pseudocosts!` for the variable that was branched on. This requires storing the branching variable and parent LP obj in `BPNodeData` at branching time. This is the primary source of observations once variables become reliable.
+
+The `on_node_evaluated` interface is defined on `AbstractBranchingStrategy` with a no-op default. Only `ReliabilityBranching` overrides it. `evaluate!` calls `on_node_evaluated(space.branching_strategy, ...)` unconditionally — no `isa` check needed.
 
 **Cold start:** Early in the tree, most variables are unreliable → behaves like full strong branching. As the tree grows, probes decrease and pseudocost estimates take over.
 
@@ -310,6 +325,14 @@ Sub-issue 2 (strategy interface) ─┘
 ```
 
 Sub-issues 1 and 2 can be developed in parallel. Sub-issue 3 requires both. Sub-issue 4 requires 3.
+
+---
+
+## Future improvements (out of scope)
+
+- **Early termination in probes:** Once pseudocosts are available (sub-issue 4), skip candidates whose estimated score is well below the best evaluated score.
+- **Refactor `create_branching_children`** to use `add_branching_constraint!` / `remove_branching_constraint!` instead of going through `LocalCutTracker` — unify the branching constraint lifecycle.
+- **Global iteration budget for probes:** Make `max_cg_iterations` apply as a total budget across all phases instead of per-phase, for more predictable probe cost.
 
 ---
 
