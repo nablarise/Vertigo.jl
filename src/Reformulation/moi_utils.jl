@@ -32,15 +32,13 @@ Extract constraint dual values from a solved MOI model.
 Returns a sparse dictionary — entries with `abs(val) <= ZERO_TOL`
 are skipped. Duals are sign-normalized so that positive values
 always mean "tightening the constraint increases the objective"
-regardless of the optimization sense. Returns an empty dictionary
-when the dual status is not `MOI.FEASIBLE_POINT`.
+regardless of the optimization sense.
+
+The caller is responsible for ensuring the model has a valid dual
+solution before calling this function.
 """
 function get_dual_solution(model)
     result = Dict{TaggedCI,Float64}()
-    dual_status = MOI.get(model, MOI.DualStatus())
-    if dual_status != MOI.FEASIBLE_POINT
-        return result
-    end
     sense = MOI.get(
         model, MOI.ObjectiveSense()
     ) == MOI.MAX_SENSE ? -1 : 1
