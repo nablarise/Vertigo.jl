@@ -198,7 +198,9 @@ For each direction (floor/ceil):
 
 **Context state save/restore:** Probes can discover IP-feasible solutions or update the primal bound. Since these side effects could mislead the parent node's subsequent branching decision, we save and restore `ip_incumbent` and `ip_primal_bound`. Columns discovered during probes remain in the pool (beneficial).
 
-**LP basis between probes:** After each probe, the branching constraint is removed and the LP basis is stale. Before the next probe, the parent's LP basis should be restored so each probe starts from the same point. This ensures consistent scoring across candidates.
+**Column warm-start:** Each probe starts with all columns from the parent's pool already in the master restricted problem. The pool is global and persists across probes — pricing only adds new columns. This means probes start from a good restricted master and 10 CG iterations is typically sufficient to get a meaningful dual bound.
+
+**LP basis between probes:** After each probe, the branching constraint is removed and the LP basis is stale. Before the next probe, the parent's LP basis should be restored so each probe starts from the same point. This ensures consistent scoring across candidates. New columns added by a probe enter hors-base in the restored basis — most LP solvers handle this gracefully, but a targeted test should verify no basis mismatch crash occurs.
 
 **State after all probes:** The LP solution is stale after the last probe, but this is harmless — the next `evaluate!` call on a child node re-runs full CG from scratch.
 
@@ -208,7 +210,7 @@ For each direction (floor/ceil):
 
 ```julia
 struct StrongBranching <: AbstractBranchingStrategy
-    max_candidates::Int       # default 15
+    max_candidates::Int       # default 5
     max_cg_iterations::Int    # default 10
     mu::Float64               # default 1/6
     rule::AbstractBranchingRule  # default MostFractionalRule()
@@ -226,6 +228,8 @@ end
 
 - Unit: `sb_score` — formula correctness, both feasible, one infeasible, both infeasible.
 - Unit: `run_sb_probe` — small CG-capable fixture using GAP test infrastructure.
+- Unit: `run_sb_probe` with both children infeasible — verify early detection.
+- Unit: LP basis restoration after probe with new columns — verify no solver crash from basis mismatch.
 - E2e: Small GAP with `StrongBranching()` → finds optimal, fewer nodes than `MostFractionalBranching`.
 
 ### Files
