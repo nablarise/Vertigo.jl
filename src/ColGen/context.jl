@@ -121,23 +121,32 @@ mutable struct ColGenContext{D<:AbstractDecomposition}
     branching_constraints::Vector{ActiveBranchingConstraint}
     robust_cuts::Vector{ActiveRobustCut}
     smoothing_alpha::Float64
+    max_cg_iterations::Int
 
     function ColGenContext(
         decomp, pool,
         eq_art_vars, leq_art_vars, geq_art_vars;
-        smoothing_alpha::Float64 = 0.0
+        smoothing_alpha::Float64 = 0.0,
+        max_cg_iterations::Int = 1000
     )
         new{typeof(decomp)}(
             decomp, pool,
             eq_art_vars, leq_art_vars, geq_art_vars, nothing,
             nothing, ActiveBranchingConstraint[],
-            ActiveRobustCut[], smoothing_alpha
+            ActiveRobustCut[], smoothing_alpha, max_cg_iterations
         )
     end
 end
 
 # Core accessors
 is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
+
+max_cg_iterations(ctx::ColGenContext) = ctx.max_cg_iterations
+
+function set_max_cg_iterations!(ctx::ColGenContext, n::Int)
+    ctx.max_cg_iterations = n
+    return
+end
 
 function get_master(ctx::ColGenContext)
     cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ctx.decomp)]
