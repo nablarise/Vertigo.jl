@@ -9,18 +9,17 @@ const ZERO_TOL = 1e-8
 
 Extract the primal variable values from a solved MOI model.
 Returns a sparse dictionary — entries with `abs(val) <= ZERO_TOL`
-are skipped. Returns an empty dictionary when the primal status
-is not `MOI.FEASIBLE_POINT`.
+are skipped.
+
+The caller is responsible for ensuring the model has a valid primal
+solution before calling this function.
 """
 function get_primal_solution(model)
     result = Dict{MOI.VariableIndex,Float64}()
-    primal_status = MOI.get(model, MOI.PrimalStatus())
-    if primal_status == MOI.FEASIBLE_POINT
-        for var in MOI.get(model, MOI.ListOfVariableIndices())
-            val = MOI.get(model, MOI.VariablePrimal(), var)
-            if abs(val) > ZERO_TOL
-                result[var] = val
-            end
+    for var in MOI.get(model, MOI.ListOfVariableIndices())
+        val = MOI.get(model, MOI.VariablePrimal(), var)
+        if abs(val) > ZERO_TOL
+            result[var] = val
         end
     end
     return result
