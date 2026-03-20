@@ -19,7 +19,8 @@ using Vertigo.TreeSearch
 using Vertigo.MathOptState
 using Vertigo.Reformulation: get_primal_solution
 using Vertigo.BranchCutPrice: find_fractional_variables,
-    BranchingCandidate, bp_master_model
+    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
+    select_candidates, bp_master_model
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
