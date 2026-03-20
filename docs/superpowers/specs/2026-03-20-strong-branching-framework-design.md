@@ -178,10 +178,10 @@ function run_sb_probe(
 For each direction (floor/ceil):
 1. Save current `max_cg_iterations(ctx)`, `ctx.ip_incumbent`, and `ctx.ip_primal_bound`.
 2. `set_max_cg_iterations!(ctx, probe_budget)`.
-3. `add_temporary_branching_constraint!(backend, ctx, terms, set, orig_var)` — adds the MOI constraint and registers it in `branching_constraints` atomically.
+3. `add_branching_constraint!(backend, ctx, terms, set, orig_var)` — adds the MOI constraint and registers it in `branching_constraints` atomically.
 4. `ColGen.run_column_generation(ctx)` — full CG with Phase 0 → 1 → 2. CG creates and manages its own artificial variables as usual. The branching constraint may make the restricted master infeasible; Phase 0/1 handle feasibility recovery, Phase 2 optimizes. The iteration limit applies per phase.
 5. Record dual bound, LP obj, infeasibility from CG output.
-6. In `finally`: `remove_temporary_branching_constraint!(backend, ctx, ci)` — deletes the MOI constraint and removes it from `branching_constraints` atomically. Restore `max_cg_iterations`, `ip_incumbent`, and `ip_primal_bound`.
+6. In `finally`: `remove_branching_constraint!(backend, ctx, ci)` — deletes the MOI constraint and removes it from `branching_constraints` atomically. Restore `max_cg_iterations`, `ip_incumbent`, and `ip_primal_bound`.
 
 **Why full `run_column_generation`:** The existing CG already handles artificial variable creation (Phase 0), feasibility recovery (Phase 1), and optimization (Phase 2). Probes reuse this machinery as-is rather than reimplementing phase logic. The overhead of Phase 0/1 on all constraints is acceptable for probes.
 
@@ -220,7 +220,7 @@ end
 | Action | File |
 |--------|------|
 | Create | `src/BranchCutPrice/strong_branching.jl` |
-| Modify | `src/BranchCutPrice/branching.jl` — add `add_temporary_branching_constraint!` and `remove_temporary_branching_constraint!` |
+| Modify | `src/BranchCutPrice/branching.jl` — add `add_branching_constraint!` and `remove_branching_constraint!` |
 | Modify | `src/BranchCutPrice/branching_strategy.jl` — add `StrongBranching` + `select_branching_variable` |
 | Modify | `src/BranchCutPrice/BranchCutPrice.jl` — include + export |
 
