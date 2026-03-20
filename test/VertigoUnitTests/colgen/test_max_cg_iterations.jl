@@ -2,7 +2,7 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-using Vertigo.ColGen: ColGenContext, max_cg_iterations,
+using Vertigo.ColGen: ColGenContext, ColGenLoggerContext, max_cg_iterations,
     set_max_cg_iterations!, stop_colgen_phase,
     ColGenIterationOutput, Phase0, Phase1, Phase2
 
@@ -60,5 +60,16 @@ function test_max_cg_iterations()
 
         # Phase1 does not stop even beyond limit
         @test !stop_colgen_phase(ctx, Phase1(), iter_output, nothing, nothing, 100)
+    end
+
+    @testset "[max_cg_iterations] ColGenLoggerContext forwarding" begin
+        inst = random_gap_instance(2, 5)
+        ctx = build_gap_context(inst; max_cg_iterations=42)
+        lctx = ColGenLoggerContext(ctx; log_level=0)
+        @test max_cg_iterations(lctx) == 42
+        set_max_cg_iterations!(lctx, 7)
+        @test max_cg_iterations(lctx) == 7
+        # Verify it changed the inner context too
+        @test max_cg_iterations(ctx) == 7
     end
 end
