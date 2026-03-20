@@ -18,6 +18,7 @@ include("bp_output.jl")
 include("branching.jl")
 include("branching_candidates.jl")
 include("branching_rules.jl")
+include("branching_strategy.jl")
 include("cut_col_gen.jl")
 include("space.jl")
 include("cut_separation.jl")
@@ -27,5 +28,7 @@ include("dot_logger.jl")
 
 export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 export BPDotLoggerContext
+export AbstractBranchingStrategy, MostFractionalBranching
+export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 
 end # module BranchCutPrice
