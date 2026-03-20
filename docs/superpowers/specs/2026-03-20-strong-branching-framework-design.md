@@ -273,6 +273,10 @@ end
 3. For each candidate: if `is_reliable` → `estimate_score`; else → `run_sb_probe` + `update_pseudocosts!` + `sb_score`.
 4. Pick best score, return `(orig_var, value)`.
 
+**Pseudocost updates from two sources:**
+1. **During probes** (in `select_branching_variable`): after each `run_sb_probe`, call `update_pseudocosts!` with the `SBCandidateResult`. This covers unreliable variables.
+2. **After node evaluation** (in `evaluate!`): once CG completes on a child node, compute Δ from the parent's LP obj and the child's dual bound, and call `update_pseudocosts!` for the variable that was branched on. This requires storing the branching variable and parent LP obj in `BPNodeData` at branching time. This is the primary source of observations once variables become reliable.
+
 **Cold start:** Early in the tree, most variables are unreliable → behaves like full strong branching. As the tree grows, probes decrease and pseudocost estimates take over.
 
 **Lifecycle:** `PseudocostTracker` lives inside `ReliabilityBranching`, which lives inside `BPSpace`. It accumulates across all nodes — pseudocosts are global properties of variables, not node-local.
@@ -291,6 +295,8 @@ end
 |--------|------|
 | Create | `src/BranchCutPrice/pseudocosts.jl` |
 | Modify | `src/BranchCutPrice/branching_strategy.jl` — add `ReliabilityBranching` + `select_branching_variable` |
+| Modify | `src/BranchCutPrice/bp_output.jl` — add `branching_var` and `parent_lp_obj` to `BPNodeData` |
+| Modify | `src/BranchCutPrice/evaluator.jl` — call `update_pseudocosts!` after CG on child nodes |
 | Modify | `src/BranchCutPrice/BranchCutPrice.jl` — include + export |
 
 ---
