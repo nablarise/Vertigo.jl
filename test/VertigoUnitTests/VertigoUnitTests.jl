@@ -17,6 +17,11 @@ using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
     get_column_sp_id, get_column_cost, get_column_solution
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
+using Vertigo.Reformulation: get_primal_solution
+using Vertigo.BranchCutPrice: find_fractional_variables,
+    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
+    select_candidates, MostFractionalBranching, select_branching_variable,
+    bp_master_model, most_fractional_original_variable
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -149,6 +154,7 @@ include("test_lp_basis_tracker.jl")
 include("test_column_tracker.jl")
 include("test_cut_pool_tracker.jl")
 include("colgen/test_max_cg_iterations.jl")
+include("colgen/test_branching_strategy.jl")
 include("dml/test_dml.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -169,6 +175,7 @@ function run()
     test_column_tracker()
     test_cut_pool_tracker()
     test_max_cg_iterations()
+    test_branching_strategy()
     test_branch_and_price()
     test_stabilization()
     test_setup_reformulation()
