@@ -117,7 +117,7 @@ function _restore_probe_state!(ctx, space, snapshot)
     append!(bcs, snapshot.bcs)
     ColGen.set_max_cg_iterations!(ctx, snapshot.max_iter)
     bp_set_ip_primal_bound!(ctx, snapshot.ip_bound)
-    _set_ip_incumbent!(ctx, snapshot.ip_inc)
+    bp_set_ip_incumbent!(ctx, snapshot.ip_inc)
     MathOptState.apply_change!(
         space.backend,
         MathOptState.LPBasisDiff(snapshot.basis),
@@ -125,11 +125,6 @@ function _restore_probe_state!(ctx, space, snapshot)
     )
     return
 end
-
-_set_ip_incumbent!(ctx::ColGen.ColGenContext, val) =
-    ctx.ip_incumbent = val
-_set_ip_incumbent!(ctx::ColGen.ColGenLoggerContext, val) =
-    ctx.inner.ip_incumbent = val
 
 function _run_one_direction(space, candidate, set, max_cg_iter)
     ctx = space.ctx
@@ -239,8 +234,9 @@ function select_branching_variable(
         nothing
     end
 
-    # Fallback: if no parent LP obj, use most fractional candidate
     if isnothing(parent_lp)
+        @warn "StrongBranching: no parent LP obj available, " *
+              "falling back to most fractional candidate"
         c = first(selected)
         return (c.orig_var, c.value)
     end
@@ -254,7 +250,7 @@ function select_branching_variable(
         )
         if result.left.is_infeasible && result.right.is_infeasible
             @debug "SB: both children infeasible" var=c.orig_var
-            return nothing
+            return :node_infeasible
         end
         score = sb_score(result; mu=sb.mu)
         @debug "SB candidate scored" var=c.orig_var score=score
