@@ -103,16 +103,16 @@ function _capture_probe_state(ctx, space)
     )
 end
 
-function _restore_probe_state!(ctx, space, saved)
+function _restore_probe_state!(ctx, space, snapshot)
     bcs = bp_branching_constraints(ctx)
     empty!(bcs)
-    append!(bcs, saved.bcs)
-    ColGen.set_max_cg_iterations!(ctx, saved.max_iter)
-    bp_set_ip_primal_bound!(ctx, saved.ip_bound)
-    _set_ip_incumbent!(ctx, saved.ip_inc)
+    append!(bcs, snapshot.bcs)
+    ColGen.set_max_cg_iterations!(ctx, snapshot.max_iter)
+    bp_set_ip_primal_bound!(ctx, snapshot.ip_bound)
+    _set_ip_incumbent!(ctx, snapshot.ip_inc)
     MathOptState.apply_change!(
         space.backend,
-        MathOptState.LPBasisDiff(saved.basis),
+        MathOptState.LPBasisDiff(snapshot.basis),
         nothing
     )
     return
@@ -161,14 +161,14 @@ function run_sb_probe(
     space::BPSpace, candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
-    saved = _capture_probe_state(space.ctx, space)
+    snapshot = _capture_probe_state(space.ctx, space)
     try
         left = _run_one_direction(
             space, candidate,
             MOI.LessThan(candidate.floor_val),
             max_cg_iterations
         )
-        _restore_probe_state!(space.ctx, space, saved)
+        _restore_probe_state!(space.ctx, space, snapshot)
         right = _run_one_direction(
             space, candidate,
             MOI.GreaterThan(candidate.ceil_val),
@@ -179,7 +179,7 @@ function run_sb_probe(
             candidate, parent_lp_obj, left, right
         )
     finally
-        _restore_probe_state!(space.ctx, space, saved)
+        _restore_probe_state!(space.ctx, space, snapshot)
     end
 end
 
