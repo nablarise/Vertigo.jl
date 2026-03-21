@@ -8,13 +8,17 @@
     BPNodeData
 
 User data attached to each search node. Stores the column generation
-output after evaluation.
+output after evaluation, plus branching context set by `branch!`.
 """
 mutable struct BPNodeData
     cg_output::Union{Nothing,ColGen.ColGenOutput}
+    branching_var::Any
+    parent_lp_obj::Union{Nothing,Float64}
+    branching_direction::Union{Nothing,BranchingDirection}
+    branching_frac::Union{Nothing,Float64}
 end
 
-BPNodeData() = BPNodeData(nothing)
+BPNodeData() = BPNodeData(nothing, nothing, nothing, nothing, nothing)
 
 # ── Search space ─────────────────────────────────────────────────────────
 
@@ -175,6 +179,14 @@ function TreeSearch.branch!(space::BPSpace, node)
         cg_output.incumbent_dual_bound
     end
 
+    parent_lp = if !isnothing(node.user_data) &&
+                   !isnothing(node.user_data.cg_output)
+        node.user_data.cg_output.master_lp_obj
+    else
+        nothing
+    end
+    branching_frac = x_val - floor(x_val)
+
     children, cut_info = create_branching_children(
         space.id_counter, node, orig_var, x_val,
         space.ctx, db, space.cut_tracker
@@ -182,6 +194,14 @@ function TreeSearch.branch!(space::BPSpace, node)
     for (cut_id, ov) in cut_info
         space.branching_cut_info[cut_id] = ov
     end
+    children[1].user_data.branching_var = orig_var
+    children[1].user_data.parent_lp_obj = parent_lp
+    children[1].user_data.branching_direction = branch_down
+    children[1].user_data.branching_frac = branching_frac
+    children[2].user_data.branching_var = orig_var
+    children[2].user_data.parent_lp_obj = parent_lp
+    children[2].user_data.branching_direction = branch_up
+    children[2].user_data.branching_frac = branching_frac
     for child in children
         space.open_node_bounds[child.id] = child.dual_bound
     end

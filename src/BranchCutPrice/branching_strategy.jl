@@ -10,6 +10,14 @@ Status of a branching variable selection.
 @enum BranchingStatus branching_ok all_integral node_infeasible
 
 """
+    BranchingDirection
+
+Direction of a branching constraint: `branch_down` (≤ floor)
+or `branch_up` (≥ ceil).
+"""
+@enum BranchingDirection branch_down branch_up
+
+"""
     BranchingResult{X}
 
 Result of a branching variable selection. Check `status` before
@@ -36,6 +44,13 @@ end
 Determines how to select a branching variable at each node.
 """
 abstract type AbstractBranchingStrategy end
+
+"""
+    on_node_evaluated(strategy, space, node, cg_output)
+
+Callback after CG completes on a node. Default: no-op.
+"""
+on_node_evaluated(::AbstractBranchingStrategy, space, node, cg_output) = nothing
 
 """
     MostFractionalBranching <: AbstractBranchingStrategy
