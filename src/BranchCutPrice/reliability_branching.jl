@@ -21,6 +21,7 @@ struct ReliabilityBranching <: AbstractBranchingStrategy
     mu::Float64
     reliability_threshold::Int
     lookahead::Int
+    # Any because orig_var type depends on DWReformulation{X}
     pseudocosts::PseudocostTracker{Any}
 
     function ReliabilityBranching(;
@@ -64,16 +65,20 @@ function _rb_evaluate_candidate(
     parent_lp::Float64
 )
     if is_reliable(rb.pseudocosts, c)
+        @debug "RB reliable" var=c.orig_var score=pc_score
         return pc_score, false
     end
     probe = run_sb_probe(
         space, c, rb.max_cg_iterations, parent_lp
     )
     if probe.left.is_infeasible && probe.right.is_infeasible
+        @debug "RB: both infeasible" var=c.orig_var
         return nothing, true
     end
     update_pseudocosts!(rb.pseudocosts, c, probe)
-    return sb_score(probe; mu=rb.mu), false
+    score = sb_score(probe; mu=rb.mu)
+    @debug "RB probed" var=c.orig_var score=score
+    return score, false
 end
 
 function select_branching_variable(
@@ -115,10 +120,12 @@ function select_branching_variable(
         end
 
         if no_improvement_count >= rb.lookahead
+            @debug "RB lookahead triggered" count=no_improvement_count
             break
         end
     end
 
+    @debug "RB selected" var=best_candidate.orig_var score=best_score
     return BranchingResult(
         best_candidate.orig_var, best_candidate.value
     )

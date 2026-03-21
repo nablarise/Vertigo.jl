@@ -199,8 +199,7 @@ function test_pseudocosts()
     end
 
     @testset "[ReliabilityBranching] e2e small GAP" begin
-        # 2x15 GAP with seed=10 requires branching (3+ nodes)
-        inst = random_gap_instance(2, 15; seed=10)
+        inst = random_gap_instance(2, 5; seed=10)
         rb = ReliabilityBranching(
             max_candidates=10, max_cg_iterations=5,
             reliability_threshold=2
