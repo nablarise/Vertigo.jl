@@ -165,10 +165,10 @@ function test_pseudocosts()
 
     @testset "[pseudocosts] global_average_pseudocost" begin
         tracker = PseudocostTracker{Int}()
-        # Empty tracker — returns (0.0, 0.0)
+        # Empty tracker — returns (1.0, 1.0) per Achterberg §2.2
         avg_down, avg_up = global_average_pseudocost(tracker)
-        @test avg_down == 0.0
-        @test avg_up == 0.0
+        @test avg_down == 1.0
+        @test avg_up == 1.0
 
         # Add one observation
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
@@ -277,8 +277,8 @@ function global_average_pseudocost(tracker::PseudocostTracker)
             n_up += 1
         end
     end
-    avg_down = n_down > 0 ? total_down / n_down : 0.0
-    avg_up = n_up > 0 ? total_up / n_up : 0.0
+    avg_down = n_down > 0 ? total_down / n_down : 1.0
+    avg_up = n_up > 0 ? total_up / n_up : 1.0
     return avg_down, avg_up
 end
 
@@ -449,7 +449,16 @@ But `node.user_data` already has `branching_var` etc. set by `branch!` in the pa
     node.user_data.cg_output = cg_output
 ```
 
-Instead of `node.user_data = BPNodeData(cg_output)`. This preserves the branching info set by `branch!`.
+But first add a guard for the root node which has no `user_data`:
+
+```julia
+    if isnothing(node.user_data)
+        node.user_data = BPNodeData()
+    end
+    node.user_data.cg_output = cg_output
+```
+
+This preserves the branching info set by `branch!` on non-root nodes, and creates a fresh `BPNodeData` for the root.
 
 - [ ] **Step 5: Run all unit tests**
 
@@ -495,7 +504,7 @@ Tests:
 
         primal = get_primal_solution(bp_master_model(ctx))
         rb = ReliabilityBranching(
-            max_candidates=3, max_cg_iterations=5,
+            max_candidates=10, max_cg_iterations=5,
             reliability_threshold=2
         )
         space = BPSpace(
@@ -520,11 +529,11 @@ Tests:
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
         cg_out = run_column_generation(ctx)
-
         primal = get_primal_solution(bp_master_model(ctx))
-        # lookahead=1: stop after 1 candidate without improvement
+
+        # lookahead=1, all unreliable → at most 2 probed
         rb = ReliabilityBranching(
-            max_candidates=5, max_cg_iterations=5,
+            max_candidates=100, max_cg_iterations=5,
             reliability_threshold=100, lookahead=1
         )
         space = BPSpace(
@@ -538,6 +547,10 @@ Tests:
             rb, space, mock_node, primal
         )
         @test result.status == branching_ok
+
+        # Verify lookahead actually cut the loop
+        n_probed = length(rb.pseudocosts.records)
+        @test n_probed <= 2
     end
 ```
 
@@ -564,19 +577,17 @@ struct ReliabilityBranching <: AbstractBranchingStrategy
     mu::Float64
     reliability_threshold::Int
     lookahead::Int
-    rule::AbstractBranchingRule
     pseudocosts::PseudocostTracker{MOI.VariableIndex}
 
     function ReliabilityBranching(;
-        max_candidates::Int = 5,
+        max_candidates::Int = 100,
         max_cg_iterations::Int = 10,
         mu::Float64 = 1.0 / 6.0,
         reliability_threshold::Int = 8,
-        lookahead::Int = 8,
-        rule::AbstractBranchingRule = MostFractionalRule()
+        lookahead::Int = 8
     )
         new(max_candidates, max_cg_iterations, mu,
-            reliability_threshold, lookahead, rule,
+            reliability_threshold, lookahead,
             PseudocostTracker{MOI.VariableIndex}(
                 reliability_threshold=reliability_threshold
             ))
@@ -593,10 +604,6 @@ function select_branching_variable(
     )
     isempty(candidates) && return BranchingResult(all_integral)
 
-    selected = select_candidates(
-        rb.rule, candidates, rb.max_candidates
-    )
-
     parent_lp = if !isnothing(node) &&
                    !isnothing(node.user_data) &&
                    !isnothing(node.user_data.cg_output)
@@ -608,15 +615,18 @@ function select_branching_variable(
     if isnothing(parent_lp)
         @warn "ReliabilityBranching: no parent LP obj, " *
               "falling back to most fractional candidate"
-        c = first(selected)
+        c = first(candidates)
         return BranchingResult(c.orig_var, c.value)
     end
 
-    # Score all candidates with pseudocost estimates,
-    # then sort by score descending (best first)
+    # Sort ALL candidates by pseudocost score descending
     scored = [(c, estimate_score(rb.pseudocosts, c; mu=rb.mu))
-              for c in selected]
+              for c in candidates]
     sort!(scored; by=x -> x[2], rev=true)
+    # Apply max_candidates as safety guard
+    if length(scored) > rb.max_candidates
+        resize!(scored, rb.max_candidates)
+    end
 
     best_score = -Inf
     best_candidate = scored[1][1]
@@ -721,7 +731,7 @@ Append to `test_pseudocosts()`:
     @testset "[ReliabilityBranching] e2e small GAP" begin
         inst = random_gap_instance(2, 4; seed=10)
         rb = ReliabilityBranching(
-            max_candidates=3, max_cg_iterations=5,
+            max_candidates=10, max_cg_iterations=5,
             reliability_threshold=2
         )
         ctx = build_gap_context(inst)
