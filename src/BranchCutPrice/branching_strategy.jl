@@ -10,6 +10,14 @@ Status of a branching variable selection.
 @enum BranchingStatus branching_ok all_integral node_infeasible
 
 """
+    BranchingDirection
+
+Direction of a branching constraint: `branch_down` (≤ floor)
+or `branch_up` (≥ ceil).
+"""
+@enum BranchingDirection branch_down branch_up
+
+"""
     BranchingResult{X}
 
 Result of a branching variable selection. Check `status` before

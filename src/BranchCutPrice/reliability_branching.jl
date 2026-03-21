@@ -151,10 +151,10 @@ function on_node_evaluated(
         rb.pseudocosts.records, bvar, PseudocostRecord()
     )
 
-    if dir === :down && frac > 0.0
+    if dir == branch_down && frac > 0.0
         rec.sum_down += delta / frac
         rec.count_down += 1
-    elseif dir === :up && (1.0 - frac) > 0.0
+    elseif dir == branch_up && (1.0 - frac) > 0.0
         rec.sum_up += delta / (1.0 - frac)
         rec.count_up += 1
     end

@@ -35,6 +35,7 @@ export AbstractBranchingStrategy, MostFractionalBranching, StrongBranching, Reli
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible
+export BranchingDirection, branch_down, branch_up
 export PseudocostRecord, PseudocostTracker
 export update_pseudocosts!, estimate_score, is_reliable, global_average_pseudocost
 
