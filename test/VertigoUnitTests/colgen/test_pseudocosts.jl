@@ -197,4 +197,23 @@ function test_pseudocosts()
         n_probed = length(rb.pseudocosts.records)
         @test n_probed <= 2
     end
+
+    @testset "[ReliabilityBranching] e2e small GAP" begin
+        # 2x15 GAP with seed=10 requires branching (3+ nodes)
+        inst = random_gap_instance(2, 15; seed=10)
+        rb = ReliabilityBranching(
+            max_candidates=10, max_cg_iterations=5,
+            reliability_threshold=2
+        )
+        ctx = build_gap_context(inst)
+        output = run_branch_and_price(
+            ctx;
+            node_limit=100,
+            branching_strategy=rb
+        )
+        @test output.status in (:optimal, :node_limit)
+        @test !isnothing(output.incumbent)
+        # Verify pseudocosts were actually updated
+        @test !isempty(rb.pseudocosts.records)
+    end
 end
