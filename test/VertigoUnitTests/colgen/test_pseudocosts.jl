@@ -5,7 +5,10 @@
 using Vertigo.BranchCutPrice: PseudocostRecord, PseudocostTracker,
     update_pseudocosts!, estimate_score, is_reliable,
     global_average_pseudocost,
-    BranchingCandidate, SBProbeResult, SBCandidateResult
+    BranchingCandidate, SBProbeResult, SBCandidateResult,
+    ReliabilityBranching, select_branching_variable,
+    bp_master_model, BPSpace, branching_ok, BPNodeData
+using Vertigo.Reformulation: get_primal_solution
 
 function test_pseudocosts()
     @testset "[pseudocosts] cold start" begin
@@ -137,5 +140,61 @@ function test_pseudocosts()
         avg_down, avg_up = global_average_pseudocost(tracker)
         @test avg_down ≈ 2.0 / 0.3
         @test avg_up ≈ 4.0 / 0.7
+    end
+
+    @testset "[ReliabilityBranching] selects variable with cg_output" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        ctx = build_gap_context(inst)
+        cg_out = run_column_generation(ctx)
+
+        primal = get_primal_solution(bp_master_model(ctx))
+        rb = ReliabilityBranching(
+            max_candidates=10, max_cg_iterations=5,
+            reliability_threshold=2
+        )
+        space = BPSpace(
+            ctx; node_limit=1, branching_strategy=rb
+        )
+
+        # Create a mock node with cg_output
+        node_data = BPNodeData()
+        node_data.cg_output = cg_out
+        mock_node = (user_data=node_data,)
+
+        result = select_branching_variable(
+            rb, space, mock_node, primal
+        )
+        @test result.status == branching_ok
+        frac = result.value - floor(result.value)
+        @test frac > 1e-6
+        @test frac < 1.0 - 1e-6
+    end
+
+    @testset "[ReliabilityBranching] lookahead stops early" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        ctx = build_gap_context(inst)
+        cg_out = run_column_generation(ctx)
+        primal = get_primal_solution(bp_master_model(ctx))
+
+        # lookahead=1, all unreliable -> at most 2 probed
+        rb = ReliabilityBranching(
+            max_candidates=100, max_cg_iterations=5,
+            reliability_threshold=100, lookahead=1
+        )
+        space = BPSpace(
+            ctx; node_limit=1, branching_strategy=rb
+        )
+        node_data = BPNodeData()
+        node_data.cg_output = cg_out
+        mock_node = (user_data=node_data,)
+
+        result = select_branching_variable(
+            rb, space, mock_node, primal
+        )
+        @test result.status == branching_ok
+
+        # Verify lookahead actually cut the loop
+        n_probed = length(rb.pseudocosts.records)
+        @test n_probed <= 2
     end
 end
