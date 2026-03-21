@@ -6,7 +6,9 @@ using Vertigo.BranchCutPrice: SBProbeResult, SBCandidateResult,
     sb_score, BranchingCandidate, find_fractional_variables,
     bp_master_model, bp_pool, bp_decomp, bp_branching_constraints,
     build_branching_terms, add_branching_constraint!,
-    remove_branching_constraint!, BPSpace
+    remove_branching_constraint!, BPSpace,
+    bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe
+using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 
 function test_strong_branching()
@@ -84,5 +86,58 @@ function test_strong_branching()
         remove_branching_constraint!(backend, ctx, ci)
         @test isempty(bcs)
         @test !MOI.is_valid(backend, ci)
+    end
+
+    @testset "[run_sb_probe] returns dual bounds" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        ctx = build_gap_context(inst)
+        cg_out = run_column_generation(ctx)
+        parent_lp = cg_out.master_lp_obj
+
+        backend = bp_master_model(ctx)
+        primal = get_primal_solution(backend)
+        candidates = find_fractional_variables(
+            ctx, primal; tol=1e-6
+        )
+        space = BPSpace(ctx; node_limit=1)
+        candidate = first(candidates)
+
+        result = run_sb_probe(space, candidate, 10, parent_lp)
+        @test result isa SBCandidateResult
+        @test result.parent_lp_obj ≈ parent_lp
+        # At least one direction should produce a dual bound
+        has_bound = !isnothing(result.left.dual_bound) ||
+                    !isnothing(result.right.dual_bound)
+        @test has_bound || result.left.is_infeasible ||
+              result.right.is_infeasible
+    end
+
+    @testset "[run_sb_probe] restores context state" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        ctx = build_gap_context(inst)
+        cg_out = run_column_generation(ctx)
+        parent_lp = cg_out.master_lp_obj
+
+        backend = bp_master_model(ctx)
+        primal = get_primal_solution(backend)
+        candidates = find_fractional_variables(
+            ctx, primal; tol=1e-6
+        )
+        space = BPSpace(ctx; node_limit=1)
+        candidate = first(candidates)
+
+        # Save state before probe
+        orig_max_iter = max_cg_iterations(ctx)
+        orig_ip_inc = bp_ip_incumbent(ctx)
+        orig_ip_bound = bp_ip_primal_bound(ctx)
+        orig_n_bcs = length(bp_branching_constraints(ctx))
+
+        run_sb_probe(space, candidate, 10, parent_lp)
+
+        # State must be restored
+        @test max_cg_iterations(ctx) == orig_max_iter
+        @test bp_ip_incumbent(ctx) === orig_ip_inc
+        @test bp_ip_primal_bound(ctx) === orig_ip_bound
+        @test length(bp_branching_constraints(ctx)) == orig_n_bcs
     end
 end

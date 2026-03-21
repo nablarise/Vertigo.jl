@@ -90,3 +90,95 @@ function remove_branching_constraint!(backend, ctx, ci)
     filter!(bc -> bc.constraint_index != tagged, bcs)
     return
 end
+
+# ── Probe execution ──────────────────────────────────────────────────
+
+function _save_probe_state(ctx, space)
+    return (
+        max_iter = ColGen.max_cg_iterations(ctx),
+        ip_inc = bp_ip_incumbent(ctx),
+        ip_bound = bp_ip_primal_bound(ctx),
+        bcs = copy(bp_branching_constraints(ctx)),
+        basis = MathOptState.capture_basis(space.backend),
+    )
+end
+
+function _restore_probe_state!(ctx, space, saved)
+    bcs = bp_branching_constraints(ctx)
+    empty!(bcs)
+    append!(bcs, saved.bcs)
+    ColGen.set_max_cg_iterations!(ctx, saved.max_iter)
+    bp_set_ip_primal_bound!(ctx, saved.ip_bound)
+    _set_ip_incumbent!(ctx, saved.ip_inc)
+    MathOptState.apply_change!(
+        space.backend,
+        MathOptState.LPBasisDiff(saved.basis),
+        nothing
+    )
+    return
+end
+
+_set_ip_incumbent!(ctx::ColGen.ColGenContext, val) =
+    ctx.ip_incumbent = val
+_set_ip_incumbent!(ctx::ColGen.ColGenLoggerContext, val) =
+    ctx.inner.ip_incumbent = val
+
+function _run_one_direction(space, candidate, set, max_cg_iter)
+    ctx = space.ctx
+    backend = space.backend
+    decomp = bp_decomp(ctx)
+    pool = bp_pool(ctx)
+
+    terms = build_branching_terms(decomp, pool, candidate.orig_var)
+    ci = add_branching_constraint!(
+        backend, ctx, terms, set, candidate.orig_var
+    )
+    ColGen.set_max_cg_iterations!(ctx, max_cg_iter)
+
+    try
+        cg_output = ColGen.run_column_generation(ctx)
+        is_inf = cg_output.status == ColGen.master_infeasible ||
+                 cg_output.status == ColGen.subproblem_infeasible
+        return SBProbeResult(
+            cg_output.incumbent_dual_bound,
+            cg_output.master_lp_obj,
+            is_inf
+        )
+    finally
+        remove_branching_constraint!(backend, ctx, ci)
+    end
+end
+
+"""
+    run_sb_probe(space, candidate, max_cg_iterations, parent_lp_obj)
+
+Run strong branching probes in both directions (floor/ceil) for
+the given candidate. Saves and restores context state (iteration
+limit, IP incumbent, primal bound, branching constraints, LP basis)
+around both probes. Returns `SBCandidateResult`.
+"""
+function run_sb_probe(
+    space::BPSpace, candidate::BranchingCandidate,
+    max_cg_iterations::Int, parent_lp_obj::Float64
+)
+    saved = _save_probe_state(space.ctx, space)
+    try
+        left = _run_one_direction(
+            space, candidate,
+            MOI.LessThan(candidate.floor_val),
+            max_cg_iterations
+        )
+        _restore_probe_state!(space.ctx, space, saved)
+        right = _run_one_direction(
+            space, candidate,
+            MOI.GreaterThan(candidate.ceil_val),
+            max_cg_iterations
+        )
+        @debug "SB probe" candidate.orig_var left right
+        return SBCandidateResult(
+            candidate, parent_lp_obj, left, right
+        )
+    finally
+        _restore_probe_state!(space.ctx, space, saved)
+    end
+end
