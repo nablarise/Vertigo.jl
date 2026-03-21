@@ -22,6 +22,7 @@ include("branching_strategy.jl")
 include("cut_col_gen.jl")
 include("space.jl")
 include("strong_branching.jl")
+include("pseudocosts.jl")
 include("cut_separation.jl")
 include("evaluator.jl")
 include("rmp_heuristic.jl")
@@ -33,5 +34,7 @@ export AbstractBranchingStrategy, MostFractionalBranching, StrongBranching
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible
+export PseudocostRecord, PseudocostTracker
+export update_pseudocosts!, estimate_score, is_reliable, global_average_pseudocost
 
 end # module BranchCutPrice
