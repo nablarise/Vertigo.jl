@@ -3,6 +3,34 @@
 # SPDX-License-Identifier: Proprietary
 
 """
+    BranchingStatus
+
+Status of a branching variable selection.
+"""
+@enum BranchingStatus branching_ok all_integral node_infeasible
+
+"""
+    BranchingResult{X}
+
+Result of a branching variable selection. Check `status` before
+accessing `orig_var` or `value`.
+"""
+struct BranchingResult{X}
+    status::BranchingStatus
+    orig_var::Union{Nothing,X}
+    value::Float64
+end
+
+BranchingResult(status::BranchingStatus) =
+    BranchingResult{Nothing}(status, nothing, 0.0)
+
+function BranchingResult(orig_var, value::Float64)
+    return BranchingResult{typeof(orig_var)}(
+        branching_ok, orig_var, value
+    )
+end
+
+"""
     AbstractBranchingStrategy
 
 Determines how to select a branching variable at each node.
@@ -20,9 +48,8 @@ struct MostFractionalBranching <: AbstractBranchingStrategy end
 """
     select_branching_variable(strategy, space, node, primal_values)
 
-Select a variable to branch on. Returns `(orig_var, x_val)` or
-`nothing` if all variables are integral. Tolerance comes from
-`space.tol`.
+Select a branching variable. Returns a `BranchingResult` with
+`status` indicating the outcome.
 """
 function select_branching_variable(
     ::MostFractionalBranching, space, node,
@@ -31,6 +58,6 @@ function select_branching_variable(
     orig_var, x_val = most_fractional_original_variable(
         space.ctx, primal_values; tol=space.tol
     )
-    isnothing(orig_var) && return nothing
-    return (orig_var, x_val)
+    isnothing(orig_var) && return BranchingResult(all_integral)
+    return BranchingResult(orig_var, x_val)
 end

@@ -11,6 +11,11 @@ bp_master_model(ctx::ColGen.ColGenLoggerContext) = master_model(ctx.inner.decomp
 bp_ip_incumbent(ctx::ColGen.ColGenContext) = ctx.ip_incumbent
 bp_ip_incumbent(ctx::ColGen.ColGenLoggerContext) = ctx.inner.ip_incumbent
 
+bp_set_ip_incumbent!(ctx::ColGen.ColGenContext, val) =
+    ctx.ip_incumbent = val
+bp_set_ip_incumbent!(ctx::ColGen.ColGenLoggerContext, val) =
+    ctx.inner.ip_incumbent = val
+
 bp_pool(ctx::ColGen.ColGenContext) = ctx.pool
 bp_pool(ctx::ColGen.ColGenLoggerContext) = ctx.inner.pool
 
