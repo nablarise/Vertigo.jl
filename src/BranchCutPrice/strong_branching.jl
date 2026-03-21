@@ -25,7 +25,10 @@ end
 
 function _sb_delta(probe::SBProbeResult, parent_lp_obj::Float64)
     probe.is_infeasible && return Inf
-    isnothing(probe.dual_bound) && return 0.0
+    if isnothing(probe.dual_bound)
+        @warn "SB probe returned no dual bound; scoring as Δ=0"
+        return 0.0
+    end
     return max(0.0, probe.dual_bound - parent_lp_obj)
 end
 
