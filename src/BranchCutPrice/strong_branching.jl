@@ -93,7 +93,7 @@ end
 
 # ── Probe execution ──────────────────────────────────────────────────
 
-function _save_probe_state(ctx, space)
+function _capture_probe_state(ctx, space)
     return (
         max_iter = ColGen.max_cg_iterations(ctx),
         ip_inc = bp_ip_incumbent(ctx),
@@ -153,7 +153,7 @@ end
     run_sb_probe(space, candidate, max_cg_iterations, parent_lp_obj)
 
 Run strong branching probes in both directions (floor/ceil) for
-the given candidate. Saves and restores context state (iteration
+the given candidate. Captures and restores context state (iteration
 limit, IP incumbent, primal bound, branching constraints, LP basis)
 around both probes. Returns `SBCandidateResult`.
 """
@@ -161,7 +161,7 @@ function run_sb_probe(
     space::BPSpace, candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
-    saved = _save_probe_state(space.ctx, space)
+    saved = _capture_probe_state(space.ctx, space)
     try
         left = _run_one_direction(
             space, candidate,
