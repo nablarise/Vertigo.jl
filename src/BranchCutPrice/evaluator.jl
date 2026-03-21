@@ -77,7 +77,13 @@ function TreeSearch.evaluate!(
         lp = _master_lp_obj(cg_output)
     end
 
-    node.user_data = BPNodeData(cg_output)
+    if isnothing(node.user_data)
+        node.user_data = BPNodeData()
+    end
+    node.user_data.cg_output = cg_output
+    on_node_evaluated(
+        space.branching_strategy, space, node, cg_output
+    )
 
     # Infeasible node
     if cg_output.status == ColGen.master_infeasible ||

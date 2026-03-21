@@ -38,6 +38,13 @@ Determines how to select a branching variable at each node.
 abstract type AbstractBranchingStrategy end
 
 """
+    on_node_evaluated(strategy, space, node, cg_output)
+
+Callback after CG completes on a node. Default: no-op.
+"""
+on_node_evaluated(::AbstractBranchingStrategy, space, node, cg_output) = nothing
+
+"""
     MostFractionalBranching <: AbstractBranchingStrategy
 
 Select the most fractional original variable for branching.
