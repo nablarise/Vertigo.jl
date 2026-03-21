@@ -182,3 +182,77 @@ function run_sb_probe(
         _restore_probe_state!(space.ctx, space, saved)
     end
 end
+
+# ── StrongBranching strategy ─────────────────────────────────────────
+
+"""
+    StrongBranching <: AbstractBranchingStrategy
+
+Evaluate candidate variables with limited CG probes and pick
+the one with the best product score.
+"""
+struct StrongBranching <: AbstractBranchingStrategy
+    max_candidates::Int
+    max_cg_iterations::Int
+    mu::Float64
+    rule::AbstractBranchingRule
+
+    function StrongBranching(;
+        max_candidates::Int = 5,
+        max_cg_iterations::Int = 10,
+        mu::Float64 = 1.0 / 6.0,
+        rule::AbstractBranchingRule = MostFractionalRule()
+    )
+        new(max_candidates, max_cg_iterations, mu, rule)
+    end
+end
+
+function select_branching_variable(
+    sb::StrongBranching, space, node,
+    primal_values::Dict{MOI.VariableIndex,Float64}
+)
+    ctx = space.ctx
+    candidates = find_fractional_variables(
+        ctx, primal_values; tol=space.tol
+    )
+    isempty(candidates) && return nothing
+
+    selected = select_candidates(
+        sb.rule, candidates, sb.max_candidates
+    )
+
+    parent_lp = if !isnothing(node) &&
+                   !isnothing(node.user_data) &&
+                   !isnothing(node.user_data.cg_output)
+        node.user_data.cg_output.master_lp_obj
+    else
+        nothing
+    end
+
+    # Fallback: if no parent LP obj, use most fractional candidate
+    if isnothing(parent_lp)
+        c = first(selected)
+        return (c.orig_var, c.value)
+    end
+
+    best_score = -Inf
+    best_candidate = first(selected)
+
+    for c in selected
+        result = run_sb_probe(
+            space, c, sb.max_cg_iterations, parent_lp
+        )
+        if result.left.is_infeasible && result.right.is_infeasible
+            @debug "SB: both children infeasible" var=c.orig_var
+            return nothing
+        end
+        score = sb_score(result; mu=sb.mu)
+        @debug "SB candidate scored" var=c.orig_var score=score
+        if score > best_score
+            best_score = score
+            best_candidate = c
+        end
+    end
+    @debug "SB selected" var=best_candidate.orig_var score=best_score
+    return (best_candidate.orig_var, best_candidate.value)
+end

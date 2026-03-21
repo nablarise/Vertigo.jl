@@ -7,7 +7,8 @@ using Vertigo.BranchCutPrice: SBProbeResult, SBCandidateResult,
     bp_master_model, bp_pool, bp_decomp, bp_branching_constraints,
     build_branching_terms, add_branching_constraint!,
     remove_branching_constraint!, BPSpace,
-    bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe
+    bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe,
+    StrongBranching, select_branching_variable
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 
@@ -139,5 +140,27 @@ function test_strong_branching()
         @test bp_ip_incumbent(ctx) === orig_ip_inc
         @test bp_ip_primal_bound(ctx) === orig_ip_bound
         @test length(bp_branching_constraints(ctx)) == orig_n_bcs
+    end
+
+    @testset "[StrongBranching] selects branching variable" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        ctx = build_gap_context(inst)
+        run_column_generation(ctx)
+
+        primal = get_primal_solution(bp_master_model(ctx))
+        space = BPSpace(
+            ctx; node_limit=1,
+            branching_strategy=StrongBranching()
+        )
+
+        result = select_branching_variable(
+            StrongBranching(), space, nothing, primal
+        )
+        @test !isnothing(result)
+        orig_var, x_val = result
+        # Should pick a fractional variable
+        frac = x_val - floor(x_val)
+        @test frac > 1e-6
+        @test frac < 1.0 - 1e-6
     end
 end
