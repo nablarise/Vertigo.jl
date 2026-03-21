@@ -2,7 +2,9 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-# ── Probe result types ───────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────────────
+# PROBE RESULT TYPES
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 struct SBProbeResult
     dual_bound::Union{Nothing,Float64}
@@ -17,7 +19,9 @@ struct SBCandidateResult{X}
     right::SBProbeResult
 end
 
-# ── Scoring ──────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────────────
+# SCORING
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 function _sb_delta(probe::SBProbeResult, parent_lp_obj::Float64)
     probe.is_infeasible && return Inf
@@ -38,7 +42,9 @@ function sb_score(result::SBCandidateResult; mu::Float64=1.0/6.0)
            mu * max(d_left, d_right)
 end
 
-# ── Branching constraint helpers ─────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────────────
+# BRANCHING CONSTRAINT HELPERS
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 """
     build_branching_terms(decomp, pool, orig_var)
@@ -91,7 +97,9 @@ function remove_branching_constraint!(backend, ctx, ci)
     return
 end
 
-# ── Probe execution ──────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────────────
+# PROBE EXECUTION
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 function _capture_probe_state(ctx, space)
     return (
@@ -183,7 +191,9 @@ function run_sb_probe(
     end
 end
 
-# ── StrongBranching strategy ─────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────────────────────────────
+# STRONG BRANCHING STRATEGY
+# ────────────────────────────────────────────────────────────────────────────────────────
 
 """
     StrongBranching <: AbstractBranchingStrategy
