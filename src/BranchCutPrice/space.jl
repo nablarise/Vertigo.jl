@@ -49,6 +49,7 @@ mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSear
     cutcolgen_ctx::CutColGenContext
     total_cuts_separated::Int
     branching_strategy::AbstractBranchingStrategy
+    log_level::Int
 end
 
 """
@@ -68,7 +69,8 @@ function BPSpace(
     separator::Union{Nothing,AbstractCutSeparator} = nothing,
     max_cut_rounds::Int = 0,
     min_gap_improvement::Float64 = 0.01,
-    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching()
+    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching(),
+    log_level::Int = 0
 )
     master = bp_master_model(ctx)
     tracker = MathOptState.DomainChangeTracker()
@@ -91,7 +93,8 @@ function BPSpace(
         rmp_heuristic, separator,
         CutColGenContext(max_cut_rounds, min_gap_improvement),
         0,
-        branching_strategy
+        branching_strategy,
+        log_level
     )
 end
 
@@ -345,7 +348,8 @@ function run_branch_and_price(
         separator = separator,
         max_cut_rounds = max_cut_rounds,
         min_gap_improvement = min_gap_improvement,
-        branching_strategy = branching_strategy
+        branching_strategy = branching_strategy,
+        log_level = log_level
     )
     evaluator = BPEvaluator()
     if !isnothing(dot_file)

@@ -65,20 +65,17 @@ function _rb_evaluate_candidate(
     parent_lp::Float64
 )
     if is_reliable(rb.pseudocosts, c)
-        @debug "RB reliable" var=c.orig_var score=pc_score
-        return pc_score, false
+        return pc_score, false, nothing
     end
     probe = run_sb_probe(
         space, c, rb.max_cg_iterations, parent_lp
     )
     if probe.left.is_infeasible && probe.right.is_infeasible
-        @debug "RB: both infeasible" var=c.orig_var
-        return nothing, true
+        return nothing, true, probe
     end
     update_pseudocosts!(rb.pseudocosts, c, probe)
     score = sb_score(probe; mu=rb.mu)
-    @debug "RB probed" var=c.orig_var score=score
-    return score, false
+    return score, false, probe
 end
 
 function select_branching_variable(
@@ -99,17 +96,41 @@ function select_branching_variable(
         return BranchingResult(c.orig_var, c.value)
     end
 
+    log = space.log_level > 0
+    t0 = time()
+    log && _sb_log_header(stdout)
+
     scored = _rb_score_and_sort!(rb, candidates)
 
     best_score = -Inf
     best_candidate = scored[1][1]
     no_improvement_count = 0
 
-    for (c, pc_score) in scored
-        score, both_inf = _rb_evaluate_candidate(
+    for (idx, (c, pc_score)) in enumerate(scored)
+        score, both_inf, probe = _rb_evaluate_candidate(
             rb, space, c, pc_score, parent_lp
         )
-        both_inf && return BranchingResult(node_infeasible)
+        if both_inf
+            log && println(stdout,
+                "  RB cand. $(lpad(idx, 2)) branch on " *
+                "$(c.orig_var): both infeasible"
+            )
+            return BranchingResult(node_infeasible)
+        end
+        if log && !isnothing(probe)
+            _sb_log_candidate(
+                stdout, idx, c, probe, score, t0
+            )
+        elseif log
+            et = @sprintf("%.2f", time() - t0)
+            lhs = @sprintf("%.4f", c.value)
+            sc = @sprintf("%.2f", score)
+            println(stdout,
+                "  RB cand. $(lpad(idx, 2)) branch on " *
+                "$(c.orig_var) (lhs=$(lhs)): " *
+                "reliable, score = $(sc)  <et=$(et)>"
+            )
+        end
 
         if score > best_score
             best_score = score
@@ -120,12 +141,15 @@ function select_branching_variable(
         end
 
         if no_improvement_count >= rb.lookahead
-            @debug "RB lookahead triggered" count=no_improvement_count
+            log && println(stdout,
+                "  RB lookahead: no improvement for " *
+                "$(no_improvement_count) candidates, stopping"
+            )
             break
         end
     end
 
-    @debug "RB selected" var=best_candidate.orig_var score=best_score
+    log && _sb_log_selected(stdout, best_candidate, best_score)
     return BranchingResult(
         best_candidate.orig_var, best_candidate.value
     )
