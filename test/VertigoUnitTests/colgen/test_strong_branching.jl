@@ -142,6 +142,20 @@ function test_strong_branching()
         @test length(bp_branching_constraints(ctx)) == orig_n_bcs
     end
 
+    @testset "[StrongBranching] e2e small GAP finds optimal" begin
+        inst = random_gap_instance(2, 4; seed=10)
+        ctx = build_gap_context(inst)
+        output = run_branch_and_price(
+            ctx;
+            node_limit=100,
+            branching_strategy=StrongBranching(
+                max_candidates=3, max_cg_iterations=5
+            )
+        )
+        @test output.status in (:optimal, :node_limit)
+        @test !isnothing(output.incumbent)
+    end
+
     @testset "[StrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
