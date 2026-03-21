@@ -158,12 +158,14 @@ function TreeSearch.branch!(space::BPSpace, node)
     result = select_branching_variable(
         space.branching_strategy, space, node, primal_values
     )
-    isnothing(result) && return typeof(node)[]
-    if result === :node_infeasible
+    if result.status == all_integral
+        return typeof(node)[]
+    elseif result.status == node_infeasible
         @debug "branch!: node infeasible (detected by strategy)"
         return typeof(node)[]
     end
-    orig_var, x_val = result
+    orig_var = result.orig_var
+    x_val = result.value
 
     cg_output = node.user_data.cg_output
     db = if isnothing(cg_output) ||

@@ -31,5 +31,7 @@ export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
 export BPDotLoggerContext
 export AbstractBranchingStrategy, MostFractionalBranching, StrongBranching
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
+export BranchingStatus, BranchingResult
+export branching_ok, all_integral, node_infeasible
 
 end # module BranchCutPrice

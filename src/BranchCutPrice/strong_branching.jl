@@ -220,7 +220,7 @@ function select_branching_variable(
     candidates = find_fractional_variables(
         ctx, primal_values; tol=space.tol
     )
-    isempty(candidates) && return nothing
+    isempty(candidates) && return BranchingResult(all_integral)
 
     selected = select_candidates(
         sb.rule, candidates, sb.max_candidates
@@ -238,21 +238,21 @@ function select_branching_variable(
         @warn "StrongBranching: no parent LP obj available, " *
               "falling back to most fractional candidate"
         c = first(selected)
-        return (c.orig_var, c.value)
+        return BranchingResult(c.orig_var, c.value)
     end
 
     best_score = -Inf
     best_candidate = first(selected)
 
     for c in selected
-        result = run_sb_probe(
+        probe = run_sb_probe(
             space, c, sb.max_cg_iterations, parent_lp
         )
-        if result.left.is_infeasible && result.right.is_infeasible
+        if probe.left.is_infeasible && probe.right.is_infeasible
             @debug "SB: both children infeasible" var=c.orig_var
-            return :node_infeasible
+            return BranchingResult(node_infeasible)
         end
-        score = sb_score(result; mu=sb.mu)
+        score = sb_score(probe; mu=sb.mu)
         @debug "SB candidate scored" var=c.orig_var score=score
         if score > best_score
             best_score = score
@@ -260,5 +260,5 @@ function select_branching_variable(
         end
     end
     @debug "SB selected" var=best_candidate.orig_var score=best_score
-    return (best_candidate.orig_var, best_candidate.value)
+    return BranchingResult(best_candidate.orig_var, best_candidate.value)
 end

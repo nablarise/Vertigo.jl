@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: Proprietary
 
 using Vertigo.BranchCutPrice: find_fractional_variables,
-    BranchingCandidate, MostFractionalRule, LeastFractionalRule, select_candidates,
-    MostFractionalBranching, select_branching_variable, bp_master_model,
-    most_fractional_original_variable, BPSpace
+    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
+    select_candidates, MostFractionalBranching,
+    select_branching_variable, bp_master_model,
+    most_fractional_original_variable, BPSpace,
+    BranchingResult, branching_ok, all_integral
 
 function test_branching_strategy()
     @testset "[find_fractional_variables] all integral" begin
@@ -96,8 +98,8 @@ function test_branching_strategy()
         )
         # GAP(2,5) with seed=10 always has fractional LP relaxation
         @test !isnothing(orig_var)
-        @test !isnothing(result)
-        @test result[1] == orig_var
-        @test result[2] ≈ x_val
+        @test result.status == branching_ok
+        @test result.orig_var == orig_var
+        @test result.value ≈ x_val
     end
 end

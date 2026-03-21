@@ -8,7 +8,8 @@ using Vertigo.BranchCutPrice: SBProbeResult, SBCandidateResult,
     build_branching_terms, add_branching_constraint!,
     remove_branching_constraint!, BPSpace,
     bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe,
-    StrongBranching, select_branching_variable
+    StrongBranching, select_branching_variable,
+    BranchingResult, branching_ok
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 
@@ -170,10 +171,9 @@ function test_strong_branching()
         result = select_branching_variable(
             StrongBranching(), space, nothing, primal
         )
-        @test !isnothing(result)
-        orig_var, x_val = result
+        @test result.status == branching_ok
         # Should pick a fractional variable
-        frac = x_val - floor(x_val)
+        frac = result.value - floor(result.value)
         @test frac > 1e-6
         @test frac < 1.0 - 1e-6
     end
