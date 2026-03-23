@@ -180,7 +180,7 @@ limit, IP incumbent, primal bound, branching constraints, LP basis)
 around both probes. Returns `SBCandidateResult`.
 """
 function run_sb_probe(
-    space::BPSpace, candidate::BranchingCandidate,
+    space, candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
     snapshot = _capture_probe_state(space.ctx, space)

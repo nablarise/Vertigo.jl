@@ -2,12 +2,13 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-using Vertigo.BranchCutPrice: PseudocostRecord, PseudocostTracker,
+using Vertigo.Branching: PseudocostRecord, PseudocostTracker,
     update_pseudocosts!, estimate_score, is_reliable,
     global_average_pseudocost,
     BranchingCandidate, SBProbeResult, SBCandidateResult,
     ReliabilityBranching, select_branching_variable,
-    bp_master_model, BPSpace, branching_ok, BPNodeData
+    bp_master_model, branching_ok
+using Vertigo.BranchCutPrice: BPSpace, BPNodeData
 using Vertigo.Reformulation: get_primal_solution
 
 function test_pseudocosts()

@@ -2,12 +2,13 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-using Vertigo.BranchCutPrice: find_fractional_variables,
+using Vertigo.Branching: find_fractional_variables,
     BranchingCandidate, MostFractionalRule, LeastFractionalRule,
     select_candidates, MostFractionalBranching,
     select_branching_variable, bp_master_model,
-    most_fractional_original_variable, BPSpace,
+    most_fractional_original_variable,
     BranchingResult, branching_ok, all_integral
+using Vertigo.BranchCutPrice: BPSpace
 
 function test_branching_strategy()
     @testset "[find_fractional_variables] all integral" begin

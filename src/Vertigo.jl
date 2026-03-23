@@ -20,7 +20,11 @@ using .MathOptState
 include("TreeSearch/TreeSearch.jl")
 using .TreeSearch
 
-# ── Branch-cut-price ─────────────────────────────────────────────────────────
+# ── Branching strategies ──────────────────────────────────────────────────────
+include("Branching/Branching.jl")
+using .Branching
+
+# ── Branch-cut-price ──────────────────────────────────────────────────────────
 include("BranchCutPrice/BranchCutPrice.jl")
 using .BranchCutPrice
 
