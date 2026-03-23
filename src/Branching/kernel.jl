@@ -246,3 +246,96 @@ function _eval_candidate(
     end
     return score
 end
+
+# ─────────────────────────────────────────────────────────────
+# MULTI-PHASE STRONG BRANCHING STRATEGY
+# ─────────────────────────────────────────────────────────────
+
+"""
+    MultiPhaseStrongBranching <: AbstractBranchingStrategy
+
+Multi-phase strong branching with configurable phases and
+pseudocost-based candidate selection with reliability skip.
+"""
+struct MultiPhaseStrongBranching <: AbstractBranchingStrategy
+    max_candidates::Int
+    mu::Float64
+    phases::Vector{AbstractBranchingPhase}
+    pseudocosts::PseudocostTracker{Any}
+
+    function MultiPhaseStrongBranching(;
+        max_candidates::Int = 20,
+        mu::Float64 = 1.0 / 6.0,
+        phases::Vector{<:AbstractBranchingPhase} = AbstractBranchingPhase[
+            LPProbePhase(keep_fraction=0.25),
+            CGProbePhase(max_cg_iterations=10, lookahead=8)
+        ],
+        reliability_threshold::Int = 8
+    )
+        new(
+            max_candidates, mu,
+            convert(Vector{AbstractBranchingPhase}, phases),
+            PseudocostTracker{Any}(
+                reliability_threshold=reliability_threshold
+            )
+        )
+    end
+end
+
+"""
+    select_branching_variable(mpsb, space, node, primal_values)
+        -> BranchingResult
+
+Delegate to the generic multi-phase kernel using the strategy's
+configured phases and pseudocost tracker.
+"""
+function select_branching_variable(
+    mpsb::MultiPhaseStrongBranching, space, node,
+    primal_values::Dict{MOI.VariableIndex,Float64}
+)
+    return run_branching_selection(
+        space, node, mpsb.phases, mpsb.pseudocosts,
+        primal_values;
+        max_candidates=mpsb.max_candidates,
+        mu=mpsb.mu,
+        tol=space.tol,
+        log_level=space.log_level
+    )
+end
+
+"""
+    on_node_evaluated(mpsb, space, node, cg_output)
+
+Passive pseudocost update after CG completes on a node. Uses
+the branching metadata stored in `node.user_data` to update
+the pseudocost record for the variable that was branched on.
+"""
+function on_node_evaluated(
+    mpsb::MultiPhaseStrongBranching, space, node, cg_output
+)
+    bvar = node.user_data.branching_var
+    isnothing(bvar) && return
+    parent_lp = node.user_data.parent_lp_obj
+    isnothing(parent_lp) && return
+    isnothing(cg_output.incumbent_dual_bound) && return
+    dir = node.user_data.branching_direction
+    isnothing(dir) && return
+    frac = node.user_data.branching_frac
+    isnothing(frac) && return
+
+    delta = max(
+        0.0, cg_output.incumbent_dual_bound - parent_lp
+    )
+    rec = get!(
+        mpsb.pseudocosts.records, bvar, PseudocostRecord()
+    )
+
+    if dir == branch_down && frac > 0.0
+        rec.sum_down += delta / frac
+        rec.count_down += 1
+    elseif dir == branch_up && (1.0 - frac) > 0.0
+        rec.sum_up += delta / (1.0 - frac)
+        rec.count_up += 1
+    end
+    return
+end
