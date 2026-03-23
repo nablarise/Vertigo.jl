@@ -22,6 +22,7 @@ include("strong_branching.jl")
 include("lp_probe.jl")
 include("cg_probe.jl")
 include("pseudocosts.jl")
+include("kernel.jl")
 include("reliability_branching.jl")
 
 # ── Public API ────────────────────────────────────────────────────────────
