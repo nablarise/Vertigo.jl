@@ -50,3 +50,32 @@ function _run_one_lp_direction(space, candidate, set)
         remove_branching_constraint!(backend, ctx, ci)
     end
 end
+
+"""
+    probe_candidate(::LPProbePhase, space, candidate, parent_lp)
+
+LP probe: solve master LP only (no CG) in both directions.
+Uses same state capture/restore as CG probes.
+"""
+function probe_candidate(
+    ::LPProbePhase, space,
+    candidate::BranchingCandidate, parent_lp::Float64
+)
+    snapshot = _capture_probe_state(space.ctx, space)
+    try
+        left = _run_one_lp_direction(
+            space, candidate,
+            MOI.LessThan(candidate.floor_val)
+        )
+        _restore_probe_state!(space.ctx, space, snapshot)
+        right = _run_one_lp_direction(
+            space, candidate,
+            MOI.GreaterThan(candidate.ceil_val)
+        )
+        return SBCandidateResult(
+            candidate, parent_lp, left, right
+        )
+    finally
+        _restore_probe_state!(space.ctx, space, snapshot)
+    end
+end
