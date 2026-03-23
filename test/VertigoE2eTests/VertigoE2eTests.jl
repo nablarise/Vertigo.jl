@@ -13,7 +13,7 @@ using ZipFile
 const MOI = MathOptInterface
 
 using Vertigo
-using Vertigo.BranchCutPrice: StrongBranching, ReliabilityBranching
+using Vertigo.Branching: StrongBranching, ReliabilityBranching
 
 include("gap_decomposition.jl")
 

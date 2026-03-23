@@ -2,14 +2,15 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: Proprietary
 
-using Vertigo.BranchCutPrice: SBProbeResult, SBCandidateResult,
+using Vertigo.Branching: SBProbeResult, SBCandidateResult,
     sb_score, BranchingCandidate, find_fractional_variables,
     bp_master_model, bp_pool, bp_decomp, bp_branching_constraints,
     build_branching_terms, add_branching_constraint!,
-    remove_branching_constraint!, BPSpace,
+    remove_branching_constraint!,
     bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe,
     StrongBranching, select_branching_variable,
     BranchingResult, branching_ok
+using Vertigo.BranchCutPrice: BPSpace
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 

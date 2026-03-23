@@ -18,7 +18,7 @@ using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
 using Vertigo.Reformulation: get_primal_solution
-using Vertigo.BranchCutPrice: find_fractional_variables,
+using Vertigo.Branching: find_fractional_variables,
     BranchingCandidate, MostFractionalRule, LeastFractionalRule,
     select_candidates, MostFractionalBranching, select_branching_variable,
     bp_master_model, most_fractional_original_variable
