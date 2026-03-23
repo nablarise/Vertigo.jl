@@ -14,7 +14,7 @@ function test_strong_branching_e2e()
             branching_strategy=StrongBranching(
                 max_candidates=3, max_cg_iterations=5
             ),
-            log_level=1
+            log_level=2
         )
         @test output.status in (:optimal, :node_limit)
         @test output.nodes_explored >= 2
@@ -30,7 +30,7 @@ function test_strong_branching_e2e()
             ctx;
             node_limit=20,
             branching_strategy=rb,
-            log_level=1
+            log_level=2
         )
         @test output.status in (:optimal, :node_limit)
         @test output.nodes_explored >= 2
