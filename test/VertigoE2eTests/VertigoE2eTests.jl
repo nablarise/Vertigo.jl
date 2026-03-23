@@ -13,6 +13,7 @@ using ZipFile
 const MOI = MathOptInterface
 
 using Vertigo
+using Vertigo.BranchCutPrice: StrongBranching, ReliabilityBranching
 
 include("gap_decomposition.jl")
 
@@ -41,6 +42,12 @@ include("test_dml_e2e.jl")
 include("test_cut_col_gen_e2e.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# Strong branching e2e tests
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+include("test_strong_branching_e2e.jl")
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -49,6 +56,7 @@ function run()
     test_bp_gap_a_instances()
     test_dml_e2e()
     test_cut_col_gen_e2e()
+    test_strong_branching_e2e()
 end
 
 end # module VertigoE2eTests

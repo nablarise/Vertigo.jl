@@ -104,13 +104,21 @@ end
 # PROBE EXECUTION
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+function _try_capture_basis(backend)
+    try
+        return MathOptState.capture_basis(backend)
+    catch
+        return nothing
+    end
+end
+
 function _capture_probe_state(ctx, space)
     return (
         max_iter = ColGen.max_cg_iterations(ctx),
         ip_inc = bp_ip_incumbent(ctx),
         ip_bound = bp_ip_primal_bound(ctx),
         bcs = copy(bp_branching_constraints(ctx)),
-        basis = MathOptState.capture_basis(space.backend),
+        basis = _try_capture_basis(space.backend),
     )
 end
 
@@ -121,11 +129,19 @@ function _restore_probe_state!(ctx, space, snapshot)
     ColGen.set_max_cg_iterations!(ctx, snapshot.max_iter)
     bp_set_ip_primal_bound!(ctx, snapshot.ip_bound)
     bp_set_ip_incumbent!(ctx, snapshot.ip_inc)
-    MathOptState.apply_change!(
-        space.backend,
-        MathOptState.LPBasisDiff(snapshot.basis),
-        nothing
-    )
+    if !isnothing(snapshot.basis)
+        try
+            MathOptState.apply_change!(
+                space.backend,
+                MathOptState.LPBasisDiff(snapshot.basis),
+                nothing
+            )
+        catch
+            # Basis restore failed (e.g., variable mismatch
+            # after Phase 0/2 artificial variable lifecycle).
+            # Fall through — solver will re-solve from scratch.
+        end
+    end
     return
 end
 
@@ -190,6 +206,49 @@ function run_sb_probe(
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# STRONG BRANCHING LOGGING
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+function _sb_log_header(io::IO)
+    println(io, "**** Strong branching ****")
+    return
+end
+
+function _sb_fmt_bound(probe::SBProbeResult)
+    probe.is_infeasible && return "infeasible"
+    isnothing(probe.dual_bound) && return "N/A"
+    return @sprintf("%.4f", probe.dual_bound)
+end
+
+function _sb_log_candidate(
+    io::IO, idx::Int, candidate::BranchingCandidate,
+    result::SBCandidateResult, score::Float64, t0::Float64
+)
+    lhs = @sprintf("%.4f", candidate.value)
+    left_str = _sb_fmt_bound(result.left)
+    right_str = _sb_fmt_bound(result.right)
+    et = @sprintf("%.2f", time() - t0)
+    sc = @sprintf("%.2f", score)
+    println(io,
+        "  SB cand. $(lpad(idx, 2)) branch on " *
+        "$(candidate.orig_var) (lhs=$(lhs)): " *
+        "[$(left_str), $(right_str)], " *
+        "score = $(sc)  <et=$(et)>"
+    )
+    return
+end
+
+function _sb_log_selected(
+    io::IO, candidate::BranchingCandidate, score::Float64
+)
+    sc = @sprintf("%.2f", score)
+    println(io,
+        "  SB selected: $(candidate.orig_var) (score = $(sc))"
+    )
+    return
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # STRONG BRANCHING STRATEGY
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -244,24 +303,35 @@ function select_branching_variable(
         return BranchingResult(c.orig_var, c.value)
     end
 
+    log = space.log_level > 0
+    t0 = time()
+    log && _sb_log_header(stdout)
+
     best_score = -Inf
     best_candidate = first(selected)
 
-    for c in selected
+    for (idx, c) in enumerate(selected)
         probe = run_sb_probe(
             space, c, sb.max_cg_iterations, parent_lp
         )
         if probe.left.is_infeasible && probe.right.is_infeasible
-            @debug "SB: both children infeasible" var=c.orig_var
+            log && println(stdout,
+                "  SB cand. $(lpad(idx, 2)) branch on " *
+                "$(c.orig_var): both infeasible"
+            )
             return BranchingResult(node_infeasible)
         end
         score = sb_score(probe; mu=sb.mu)
-        @debug "SB candidate scored" var=c.orig_var score=score
+        log && _sb_log_candidate(
+            stdout, idx, c, probe, score, t0
+        )
         if score > best_score
             best_score = score
             best_candidate = c
         end
     end
-    @debug "SB selected" var=best_candidate.orig_var score=best_score
-    return BranchingResult(best_candidate.orig_var, best_candidate.value)
+    log && _sb_log_selected(stdout, best_candidate, best_score)
+    return BranchingResult(
+        best_candidate.orig_var, best_candidate.value
+    )
 end
