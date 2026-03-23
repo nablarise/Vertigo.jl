@@ -23,12 +23,11 @@ include("lp_probe.jl")
 include("cg_probe.jl")
 include("pseudocosts.jl")
 include("kernel.jl")
-include("reliability_branching.jl")
 
 # ── Public API ────────────────────────────────────────────────────────────
 export AbstractBranchingPhase, LPProbePhase, CGProbePhase
 export AbstractBranchingStrategy, MostFractionalBranching
-export StrongBranching, ReliabilityBranching, MultiPhaseStrongBranching
+export MultiPhaseStrongBranching
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible
