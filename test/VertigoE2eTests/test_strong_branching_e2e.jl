@@ -6,13 +6,16 @@ function test_strong_branching_e2e()
     filepath = get_gap_instance_path('A', 10, 100)
     inst = parse_gap_file(filepath)
 
-    @testset "[bp][A 10×100] StrongBranching" begin
+    @testset "[bp][A 10×100] MultiPhaseStrongBranching" begin
         ctx = build_gap_context(inst)
         output = run_branch_and_price(
             ctx;
             node_limit=20,
-            branching_strategy=StrongBranching(
-                max_candidates=3, max_cg_iterations=5
+            branching_strategy=MultiPhaseStrongBranching(
+                max_candidates=3,
+                phases=[CGProbePhase(
+                    max_cg_iterations=5, lookahead=0
+                )]
             ),
             log_level=2
         )
@@ -20,9 +23,12 @@ function test_strong_branching_e2e()
         @test output.nodes_explored >= 2
     end
 
-    @testset "[bp][A 10×100] ReliabilityBranching" begin
-        rb = ReliabilityBranching(
-            max_candidates=10, max_cg_iterations=5,
+    @testset "[bp][A 10×100] MultiPhaseStrongBranching with reliability" begin
+        rb = MultiPhaseStrongBranching(
+            max_candidates=10,
+            phases=[CGProbePhase(
+                max_cg_iterations=5, lookahead=8
+            )],
             reliability_threshold=4
         )
         ctx = build_gap_context(inst)

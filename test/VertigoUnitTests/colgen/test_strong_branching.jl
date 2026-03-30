@@ -8,7 +8,7 @@ using Vertigo.Branching: SBProbeResult, SBCandidateResult,
     build_branching_terms, add_branching_constraint!,
     remove_branching_constraint!,
     bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe,
-    StrongBranching, select_branching_variable,
+    MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
     BranchingResult, branching_ok
 using Vertigo.BranchCutPrice: BPSpace
 using Vertigo.ColGen: max_cg_iterations
@@ -144,33 +144,42 @@ function test_strong_branching()
         @test length(bp_branching_constraints(ctx)) == orig_n_bcs
     end
 
-    @testset "[StrongBranching] e2e small GAP finds optimal" begin
+    @testset "[MultiPhaseStrongBranching] e2e small GAP finds optimal" begin
         inst = random_gap_instance(2, 4; seed=10)
         ctx = build_gap_context(inst)
         output = run_branch_and_price(
             ctx;
             node_limit=100,
-            branching_strategy=StrongBranching(
-                max_candidates=3, max_cg_iterations=5
+            branching_strategy=MultiPhaseStrongBranching(
+                max_candidates=3,
+                phases=[CGProbePhase(
+                    max_cg_iterations=5, lookahead=0
+                )]
             )
         )
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
     end
 
-    @testset "[StrongBranching] selects branching variable" begin
+    @testset "[MultiPhaseStrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
         run_column_generation(ctx)
 
+        sb = MultiPhaseStrongBranching(
+            max_candidates=5,
+            phases=[CGProbePhase(
+                max_cg_iterations=10, lookahead=0
+            )]
+        )
         primal = get_primal_solution(bp_master_model(ctx))
         space = BPSpace(
             ctx; node_limit=1,
-            branching_strategy=StrongBranching()
+            branching_strategy=sb
         )
 
         result = select_branching_variable(
-            StrongBranching(), space, nothing, primal
+            sb, space, nothing, primal
         )
         @test result.status == branching_ok
         # Should pick a fractional variable

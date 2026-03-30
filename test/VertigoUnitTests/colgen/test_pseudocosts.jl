@@ -6,7 +6,7 @@ using Vertigo.Branching: PseudocostRecord, PseudocostTracker,
     update_pseudocosts!, estimate_score, is_reliable,
     global_average_pseudocost,
     BranchingCandidate, SBProbeResult, SBCandidateResult,
-    ReliabilityBranching, select_branching_variable,
+    MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
     bp_master_model, branching_ok
 using Vertigo.BranchCutPrice: BPSpace, BPNodeData
 using Vertigo.Reformulation: get_primal_solution
@@ -143,14 +143,17 @@ function test_pseudocosts()
         @test avg_up ≈ 4.0 / 0.7
     end
 
-    @testset "[ReliabilityBranching] selects variable with cg_output" begin
+    @testset "[MultiPhaseStrongBranching] selects variable with cg_output" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
         cg_out = run_column_generation(ctx)
 
         primal = get_primal_solution(bp_master_model(ctx))
-        rb = ReliabilityBranching(
-            max_candidates=10, max_cg_iterations=5,
+        rb = MultiPhaseStrongBranching(
+            max_candidates=10,
+            phases=[CGProbePhase(
+                max_cg_iterations=5, lookahead=8
+            )],
             reliability_threshold=2
         )
         space = BPSpace(
@@ -171,16 +174,19 @@ function test_pseudocosts()
         @test frac < 1.0 - 1e-6
     end
 
-    @testset "[ReliabilityBranching] lookahead stops early" begin
+    @testset "[MultiPhaseStrongBranching] lookahead stops early" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
         cg_out = run_column_generation(ctx)
         primal = get_primal_solution(bp_master_model(ctx))
 
         # lookahead=1, all unreliable -> at most 2 probed
-        rb = ReliabilityBranching(
-            max_candidates=100, max_cg_iterations=5,
-            reliability_threshold=100, lookahead=1
+        rb = MultiPhaseStrongBranching(
+            max_candidates=100,
+            phases=[CGProbePhase(
+                max_cg_iterations=5, lookahead=1
+            )],
+            reliability_threshold=100
         )
         space = BPSpace(
             ctx; node_limit=1, branching_strategy=rb
@@ -199,10 +205,13 @@ function test_pseudocosts()
         @test n_probed <= 2
     end
 
-    @testset "[ReliabilityBranching] e2e small GAP" begin
+    @testset "[MultiPhaseStrongBranching] e2e small GAP" begin
         inst = random_gap_instance(2, 5; seed=10)
-        rb = ReliabilityBranching(
-            max_candidates=10, max_cg_iterations=5,
+        rb = MultiPhaseStrongBranching(
+            max_candidates=10,
+            phases=[CGProbePhase(
+                max_cg_iterations=5, lookahead=8
+            )],
             reliability_threshold=2
         )
         ctx = build_gap_context(inst)
