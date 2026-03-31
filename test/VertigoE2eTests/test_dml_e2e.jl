@@ -45,14 +45,6 @@ function test_dml_gap_basic(; smoothing_alpha=0.0)
             knapsack[k] => subproblem(k)
         end
 
-        # Set optimizer
-        master = Vertigo.Reformulation.master_model(decomp)
-        MOI.set(master, MOI.RawOptimizerAttribute("output_flag"), false)
-        JuMP.set_optimizer(
-            JuMP.unsafe_backend(JuMP.Model(master)),
-            nothing
-        )
-        # Use direct MOI approach
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
         ctx = _build_colgen_context_from_dml(
