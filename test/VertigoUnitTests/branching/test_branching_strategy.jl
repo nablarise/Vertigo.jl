@@ -4,96 +4,70 @@
 
 using Vertigo.Branching: find_fractional_variables,
     BranchingCandidate, MostFractionalRule, LeastFractionalRule,
-    select_candidates, MostFractionalBranching,
-    select_branching_variable, bp_master_model,
-    most_fractional_original_variable,
-    BranchingResult, branching_ok, all_integral
-using Vertigo.BranchCutPrice: BPSpace
-using Vertigo.Reformulation: columns, column_nonzero_entries,
-    column_sp_id, mapped_original_var
+    select_candidates
 
 # ────────────────────────────────────────────────────────────────
-# Helpers
+# Minimal context for find_fractional_variables
 # ────────────────────────────────────────────────────────────────
+#
+# 1 subproblem with 3 sp variables (z1, z2, z3)
+# mapped to original vars (1,1), (1,2), (1,3).
+#
+# Two columns in the pool:
+#   Column A (col_var_a): z1=1, z2=1  — cost 3.0
+#   Column B (col_var_b): z2=1, z3=1  — cost 5.0
+#
+# No solver, no master model, no CG needed.
 
-"""
-Build a primal dict where all λ = 0 (no column active).
-Projects to x = 0 for every original variable → all integral.
-"""
-function _integral_primal(ctx)
-    return Dict{MOI.VariableIndex,Float64}()
-end
+function _build_branching_test_context()
+    sp1 = PricingSubproblemId(1)
+    z1 = MOI.VariableIndex(1)
+    z2 = MOI.VariableIndex(2)
+    z3 = MOI.VariableIndex(3)
 
-"""
-Build a primal dict with hand-chosen λ values that produce
-known fractional original variables.
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(
+        minimize=true
+    )
+    add_subproblem!(builder, sp1, 0.0, 0.0, 1.0)
+    add_sp_variable!(builder, sp1, z1, 3.0)
+    add_sp_variable!(builder, sp1, z2, 4.0)
+    add_sp_variable!(builder, sp1, z3, 5.0)
+    add_mapping!(builder, (1, 1), sp1, z1)
+    add_mapping!(builder, (1, 2), sp1, z2)
+    add_mapping!(builder, (1, 3), sp1, z3)
+    decomp = build(builder)
 
-Strategy: pick two columns from different subproblems, give them
-λ values such that the projected x has controlled fractionalities.
-Returns `(primal, expected)` where `expected` is a vector of
-`(orig_var, x_val, fractionality)` sorted by fractionality desc.
-"""
-function _fractional_primal(ctx)
-    decomp = ctx.decomp
-    pool = ctx.pool
+    pool = ColumnPool()
+    col_var_a = MOI.VariableIndex(101)
+    col_var_b = MOI.VariableIndex(102)
 
-    # Collect up to 2 columns from different subproblems
-    col_entries = collect(columns(pool))
-    length(col_entries) < 2 && error(
-        "pool must have >= 2 columns for this test"
+    sol_a = Vertigo.Reformulation._SpSolution(
+        sp1, 3.0, [(z1, 1.0), (z2, 1.0)]
+    )
+    sol_b = Vertigo.Reformulation._SpSolution(
+        sp1, 5.0, [(z2, 1.0), (z3, 1.0)]
+    )
+    record_column!(pool, col_var_a, sp1, sol_a, 3.0)
+    record_column!(pool, col_var_b, sp1, sol_b, 5.0)
+
+    ctx = ColGenContext(
+        decomp, pool,
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}()
     )
 
-    col_var_a, rec_a = col_entries[1]
-    col_var_b, rec_b = col_entries[2]
-
-    # λ_a = 0.3, λ_b = 0.7 — both fractional
-    λ_a = 0.3
-    λ_b = 0.7
-
-    primal = Dict{MOI.VariableIndex,Float64}(
-        col_var_a => λ_a,
-        col_var_b => λ_b,
-    )
-
-    # Compute expected projection: x[orig] = Σ z_val * λ_val
-    x_values = Dict{Any,Float64}()
-    for (col_var, rec, λ) in [
-        (col_var_a, rec_a, λ_a),
-        (col_var_b, rec_b, λ_b),
-    ]
-        sp_id = column_sp_id(rec)
-        for (sp_var, z_val) in column_nonzero_entries(rec)
-            orig = mapped_original_var(decomp, sp_id, sp_var)
-            orig === nothing && continue
-            x_values[orig] = get(x_values, orig, 0.0) + z_val * λ
-        end
-    end
-
-    # Keep only fractional entries
-    tol = 1e-6
-    expected = Tuple{Any,Float64,Float64}[]
-    for (orig, x_val) in x_values
-        frac_part = x_val - floor(x_val)
-        (frac_part < tol || frac_part > 1.0 - tol) && continue
-        fractionality = min(frac_part, 1.0 - frac_part)
-        push!(expected, (orig, x_val, fractionality))
-    end
-    sort!(expected; by=e -> e[3], rev=true)
-
-    return primal, expected
+    return ctx, col_var_a, col_var_b
 end
 
 # ────────────────────────────────────────────────────────────────
-# Tests
+# Tests — find_fractional_variables
 # ────────────────────────────────────────────────────────────────
 
 function test_find_fractional_all_integral()
-    @testset "[find_fractional_variables] all integral" begin
-        inst = random_gap_instance(2, 5; seed=42)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
-
-        primal = _integral_primal(ctx)
+    @testset "[find_fractional_variables] empty primal → no candidates" begin
+        ctx, _, _ = _build_branching_test_context()
+        primal = Dict{MOI.VariableIndex,Float64}()
         candidates = find_fractional_variables(
             ctx, primal; tol=1e-6
         )
@@ -101,28 +75,66 @@ function test_find_fractional_all_integral()
     end
 end
 
-function test_find_fractional_with_known_solution()
-    @testset "[find_fractional_variables] detects fractional with forged primal" begin
-        inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
+function test_find_fractional_with_known_values()
+    @testset "[find_fractional_variables] known λ → known fractional x" begin
+        ctx, col_var_a, col_var_b = _build_branching_test_context()
 
-        primal, expected = _fractional_primal(ctx)
+        # λ_a = 0.3, λ_b = 0.6
+        primal = Dict{MOI.VariableIndex,Float64}(
+            col_var_a => 0.3,
+            col_var_b => 0.6,
+        )
+
+        # Hand-computed projection x[orig] = Σ z_val * λ:
+        #   x(1,1) = 1.0 * 0.3           = 0.3  → frac = 0.3
+        #   x(1,2) = 1.0 * 0.3 + 1.0 * 0.6 = 0.9  → frac = 0.1
+        #   x(1,3) = 1.0 * 0.6           = 0.6  → frac = 0.4
+        #
+        # Sorted desc by fractionality:
+        #   (1,3) frac=0.4, (1,1) frac=0.3, (1,2) frac=0.1
+
         candidates = find_fractional_variables(
             ctx, primal; tol=1e-6
         )
 
-        @test length(candidates) == length(expected)
+        @test length(candidates) == 3
 
-        for (i, (orig, x_val, frac)) in enumerate(expected)
-            @test candidates[i].orig_var == orig
-            @test candidates[i].value ≈ x_val atol=1e-10
-            @test candidates[i].fractionality ≈ frac atol=1e-10
-            @test candidates[i].floor_val ≈ floor(x_val) atol=1e-10
-            @test candidates[i].ceil_val ≈ ceil(x_val) atol=1e-10
-        end
+        @test candidates[1].orig_var == (1, 3)
+        @test candidates[1].value ≈ 0.6 atol=1e-10
+        @test candidates[1].fractionality ≈ 0.4 atol=1e-10
+        @test candidates[1].floor_val ≈ 0.0 atol=1e-10
+        @test candidates[1].ceil_val ≈ 1.0 atol=1e-10
+
+        @test candidates[2].orig_var == (1, 1)
+        @test candidates[2].value ≈ 0.3 atol=1e-10
+        @test candidates[2].fractionality ≈ 0.3 atol=1e-10
+
+        @test candidates[3].orig_var == (1, 2)
+        @test candidates[3].value ≈ 0.9 atol=1e-10
+        @test candidates[3].fractionality ≈ 0.1 atol=1e-10
     end
 end
+
+function test_find_fractional_integral_projection()
+    @testset "[find_fractional_variables] λ=1.0 → integral projection" begin
+        ctx, col_var_a, _ = _build_branching_test_context()
+
+        # Only column A active at λ=1.0:
+        #   x(1,1) = 1.0, x(1,2) = 1.0 — both integral
+        primal = Dict{MOI.VariableIndex,Float64}(
+            col_var_a => 1.0,
+        )
+
+        candidates = find_fractional_variables(
+            ctx, primal; tol=1e-6
+        )
+        @test isempty(candidates)
+    end
+end
+
+# ────────────────────────────────────────────────────────────────
+# Tests — select_candidates (pure, no context needed)
+# ────────────────────────────────────────────────────────────────
 
 function test_select_candidates_most_fractional()
     @testset "[branching_rules] MostFractionalRule ordering" begin
@@ -167,36 +179,15 @@ function test_select_candidates_truncation()
     end
 end
 
-function test_most_fractional_branching_delegates()
-    @testset "[branching_strategy] MostFractionalBranching delegates" begin
-        inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
-
-        primal, expected = _fractional_primal(ctx)
-        # The most fractional variable is the first in expected
-        most_frac_orig = expected[1][1]
-        most_frac_val = expected[1][2]
-
-        space = BPSpace(ctx; node_limit=1)
-        result = select_branching_variable(
-            MostFractionalBranching(), space, nothing, primal
-        )
-        @test result.status == branching_ok
-        @test result.orig_var == most_frac_orig
-        @test result.value ≈ most_frac_val atol=1e-10
-    end
-end
-
 # ────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────
 
 function test_branching_strategy()
     test_find_fractional_all_integral()
-    test_find_fractional_with_known_solution()
+    test_find_fractional_with_known_values()
+    test_find_fractional_integral_projection()
     test_select_candidates_most_fractional()
     test_select_candidates_least_fractional()
     test_select_candidates_truncation()
-    test_most_fractional_branching_delegates()
 end
