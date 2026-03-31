@@ -157,6 +157,7 @@ function test_ip_project_integral_with_integer_pure_master()
 
         @test !isnothing(result)
         @test cut == false
+        # 5.0 + 3.0 * 2 = 11.0
         @test result.obj_value ≈ 11.0
         @test length(result.non_zero_integral) == 2
     end
@@ -197,6 +198,7 @@ function test_ip_project_with_continuous_pure_master()
 
         @test !isnothing(result)
         @test cut == false
+        # 5.0 + 4.0 * 0.75 = 8.0
         @test result.obj_value ≈ 8.0
         @test length(result.non_zero_continuous) == 1
         @test result.non_zero_continuous[1][1] == pmv_id
@@ -223,6 +225,7 @@ function test_ip_project_mixed_columns_and_pure_master()
 
         @test !isnothing(result)
         @test cut == false
+        # 2.0*1 + 3.0*2 + 7.0*1 + 1.5*0.4 = 15.6
         @test result.obj_value ≈ 15.6
         @test length(result.non_zero_integral) == 3
         @test length(result.non_zero_continuous) == 1

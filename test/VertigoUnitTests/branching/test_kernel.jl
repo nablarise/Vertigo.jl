@@ -66,6 +66,7 @@ function test_kernel()
         right = SBProbeResult(14.0, 14.0, false)
         result = SBCandidateResult(c, 10.0, left, right)
         mu = 1.0 / 6.0
+        # (1 - mu) * min(2.0, 4.0) + mu * max(2.0, 4.0) = 14/6
         @test score_candidate(phase, result; mu=mu) ≈ 14.0 / 6.0 atol=1e-10
     end
 end

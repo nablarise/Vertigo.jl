@@ -30,10 +30,10 @@ function test_pseudocosts()
 
         rec = tracker.records[1]
         # frac_part = 0.3
-        # Δ⁻ = 12.0 - 10.0 = 2.0, unit_down = 2.0 / 0.3
+        # Δ⁻ = 12.0 - 10.0 = 2.0, unit_down = 2.0 / 0.3 ≈ 6.667
         @test rec.count_down == 1
         @test rec.sum_down ≈ 6.666666666666667 atol=1e-10
-        # Δ⁺ = 14.0 - 10.0 = 4.0, unit_up = 4.0 / 0.7
+        # Δ⁺ = 14.0 - 10.0 = 4.0, unit_up = 4.0 / 0.7 ≈ 5.714
         @test rec.count_up == 1
         @test rec.sum_up ≈ 5.714285714285714 atol=1e-10
     end
@@ -87,6 +87,7 @@ function test_pseudocosts()
         # score_down = 6.667 * 0.3 = 2.0
         # score_up = 5.714 * 0.7 = 4.0
         mu = 1.0 / 6.0
+        # (1 - mu) * min(2.0, 4.0) + mu * max(2.0, 4.0) = 14/6
         @test estimate_score(tracker, c) ≈ 14.0 / 6.0 atol=1e-10
     end
 
@@ -138,7 +139,9 @@ function test_pseudocosts()
         update_pseudocosts!(tracker, c, result)
 
         avg_down, avg_up = global_average_pseudocost(tracker)
+        # avg_down = sum_down / count = (2.0/0.3) / 1 ≈ 6.667
         @test avg_down ≈ 6.666666666666667 atol=1e-10
+        # avg_up = sum_up / count = (4.0/0.7) / 1 ≈ 5.714
         @test avg_up ≈ 5.714285714285714 atol=1e-10
     end
 
