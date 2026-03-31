@@ -64,7 +64,7 @@ function _verify_node_state(backend, helper, expected_count, expected_cut_ids, c
         actual_coeff = Dict(t.variable => t.coefficient for t in f.terms)
         for term in cut.terms
             @test haskey(actual_coeff, term.variable)
-            @test actual_coeff[term.variable] ≈ term.coefficient
+            @test actual_coeff[term.variable] ≈ term.coefficient atol=1e-9
         end
     end
 end

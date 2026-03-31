@@ -60,19 +60,19 @@ function test_column_tracker_add_remove_basic()
         obj_f = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
         obj_coeffs = Dict(t.variable => t.coefficient for t in obj_f.terms)
         @test haskey(obj_coeffs, vi_z)
-        @test obj_coeffs[vi_z] ≈ 3.0
+        @test obj_coeffs[vi_z] ≈ 3.0 atol=1e-9
 
         # c1 coefficient for z
         f_c1 = MOI.get(m, MOI.ConstraintFunction(), c1)
         c1_coeffs = Dict(t.variable => t.coefficient for t in f_c1.terms)
         @test haskey(c1_coeffs, vi_z)
-        @test c1_coeffs[vi_z] ≈ 2.0
+        @test c1_coeffs[vi_z] ≈ 2.0 atol=1e-9
 
         # c2 coefficient for z
         f_c2 = MOI.get(m, MOI.ConstraintFunction(), c2)
         c2_coeffs = Dict(t.variable => t.coefficient for t in f_c2.terms)
         @test haskey(c2_coeffs, vi_z)
-        @test c2_coeffs[vi_z] ≈ 1.0
+        @test c2_coeffs[vi_z] ≈ 1.0 atol=1e-9
 
         # Apply backward: remove z
         apply_change!(m, local_bwd, helper)
