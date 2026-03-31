@@ -144,7 +144,7 @@ end
 # ── Wrapper ──────────────────────────────────────────────────────
 
 function test_cut_col_gen_e2e()
-    @testset "Branch-Cut-Price with Fenchel cuts" begin
+    @testset "[bcp+cuts] Fenchel cut integration" begin
         test_fenchel_separation()
         test_fenchel_cut_gap()
     end

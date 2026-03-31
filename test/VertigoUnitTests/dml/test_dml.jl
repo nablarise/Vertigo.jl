@@ -43,9 +43,8 @@ function test_dml_macro_basic_gap()
         @test length(sp_ids) == 2
 
         # Each subproblem has 7 variables
-        for sp_id in sp_ids
-            @test length(subproblem_variables(decomp, sp_id)) == 7
-        end
+        @test length(subproblem_variables(decomp, sp_ids[1])) == 7
+        @test length(subproblem_variables(decomp, sp_ids[2])) == 7
 
         # 7 coupling constraints (assignment)
         @test length(coupling_constraints(decomp)) == 7
@@ -58,11 +57,12 @@ function test_dml_macro_basic_gap()
         @test is_minimization(decomp)
 
         # Convexity bounds (1.0, 1.0)
-        for sp_id in sp_ids
-            lb, ub = convexity_bounds(decomp, sp_id)
-            @test lb == 1.0
-            @test ub == 1.0
-        end
+        lb1, ub1 = convexity_bounds(decomp, sp_ids[1])
+        @test lb1 ≈ 1.0
+        @test ub1 ≈ 1.0
+        lb2, ub2 = convexity_bounds(decomp, sp_ids[2])
+        @test lb2 ≈ 1.0
+        @test ub2 ≈ 1.0
 
         # No pure master variables
         @test isempty(pure_master_variables(decomp))
@@ -82,9 +82,8 @@ function test_dml_annotation_function()
         sp_ids = collect(subproblem_ids(decomp))
         @test length(sp_ids) == 2
 
-        for sp_id in sp_ids
-            @test length(subproblem_variables(decomp, sp_id)) == 7
-        end
+        @test length(subproblem_variables(decomp, sp_ids[1])) == 7
+        @test length(subproblem_variables(decomp, sp_ids[2])) == 7
 
         @test length(coupling_constraints(decomp)) == 7
     end
@@ -131,13 +130,20 @@ function test_dml_pure_master_variables()
         pm_vars = pure_master_variables(decomp)
         @test length(pm_vars) == 7
 
-        for pmv in pm_vars
-            @test pure_master_cost(decomp, pmv) == penalty
+        @test all(
+            pmv -> pure_master_cost(decomp, pmv) ≈ penalty,
+            pm_vars
+        )
+        @test all(pm_vars) do pmv
             lb, ub = pure_master_bounds(decomp, pmv)
-            @test lb == 0.0
-            @test ub == 1.0
-            @test Vertigo.Reformulation.pure_master_is_integer(decomp, pmv)
+            lb ≈ 0.0 && ub ≈ 1.0
         end
+        @test all(
+            pmv -> Vertigo.Reformulation.pure_master_is_integer(
+                decomp, pmv
+            ),
+            pm_vars
+        )
     end
 end
 
