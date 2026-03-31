@@ -137,28 +137,39 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     return ctx
 end
 
+# ColGen
 include("colgen/test_gap.jl")
 include("colgen/ip_management_tests.jl")
-include("colgen/test_branch_and_price.jl")
 include("colgen/test_stabilization.jl")
 include("colgen/test_setup_reformulation.jl")
 include("colgen/test_insert_columns.jl")
 include("colgen/test_build_cut_saf.jl")
 include("colgen/test_column_pool.jl")
+include("colgen/test_max_cg_iterations.jl")
+
+# TreeSearch
 include("treesearch/test_node.jl")
 include("treesearch/test_search_loop.jl")
 include("treesearch/test_strategies.jl")
 include("treesearch/test_tree_search_logger.jl")
-include("test_local_cut_tracker.jl")
-include("test_lp_basis_tracker.jl")
-include("test_column_tracker.jl")
-include("test_cut_pool_tracker.jl")
-include("colgen/test_max_cg_iterations.jl")
-include("colgen/test_branching_strategy.jl")
-include("colgen/test_lp_probe.jl")
-include("colgen/test_strong_branching.jl")
-include("colgen/test_pseudocosts.jl")
-include("colgen/test_kernel.jl")
+
+# MathOptState
+include("mathoptstate/test_local_cut_tracker.jl")
+include("mathoptstate/test_lp_basis_tracker.jl")
+include("mathoptstate/test_column_tracker.jl")
+include("mathoptstate/test_cut_pool_tracker.jl")
+
+# Branching
+include("branching/test_branching_strategy.jl")
+include("branching/test_lp_probe.jl")
+include("branching/test_strong_branching.jl")
+include("branching/test_pseudocosts.jl")
+include("branching/test_kernel.jl")
+
+# BranchCutPrice
+include("branchcutprice/test_branch_and_price.jl")
+
+# DML
 include("dml/test_dml.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
