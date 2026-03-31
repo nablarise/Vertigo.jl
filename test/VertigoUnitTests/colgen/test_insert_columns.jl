@@ -196,11 +196,19 @@ function test_insert_columns_two_columns()
         @test n == 2
         @test length(ctx.pool.by_column_var) == 2
 
-        # Identify columns by cost
-        col_vars = collect(keys(ctx.pool.by_column_var))
-        costs = [_obj_coeff(model, v) for v in col_vars]
-        var_a = col_vars[findfirst(c -> c ≈ 3.0, costs)]
-        var_b = col_vars[findfirst(c -> c ≈ 5.0, costs)]
+        # Identify columns by cost (sort by variable index for stability)
+        col_vars = sort(
+            collect(keys(ctx.pool.by_column_var));
+            by=v -> v.value
+        )
+        cost_a = _obj_coeff(model, col_vars[1])
+        cost_b = _obj_coeff(model, col_vars[2])
+        # Determine which is which based on known costs
+        if cost_a ≈ 3.0
+            var_a, var_b = col_vars[1], col_vars[2]
+        else
+            var_a, var_b = col_vars[2], col_vars[1]
+        end
 
         # Column A (z1=1): c1=2, c2=1, br=1
         @test _constr_coeff(model, refs.c1, var_a) ≈ 2.0

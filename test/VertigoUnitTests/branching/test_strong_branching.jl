@@ -108,10 +108,10 @@ function test_strong_branching()
         result = run_sb_probe(space, candidate, 10, parent_lp)
         @test result isa SBCandidateResult
         @test result.parent_lp_obj ≈ parent_lp
-        # At least one direction should produce a dual bound
-        has_bound = !isnothing(result.left.dual_bound) ||
-                    !isnothing(result.right.dual_bound)
-        @test has_bound || result.left.is_infeasible ||
+        # Each direction should produce a dual bound or be infeasible
+        @test !isnothing(result.left.dual_bound) ||
+              result.left.is_infeasible
+        @test !isnothing(result.right.dual_bound) ||
               result.right.is_infeasible
     end
 

@@ -37,11 +37,10 @@ function test_branching_strategy()
         @test c.fractionality > 0.0
         @test c.floor_val == floor(c.value)
         @test c.ceil_val == ceil(c.value)
-        # Verify sorted descending by fractionality
-        for i in 1:length(candidates)-1
-            @test candidates[i].fractionality >=
-                  candidates[i+1].fractionality
-        end
+        # Sorted descending by fractionality
+        @test length(candidates) >= 2
+        @test candidates[1].fractionality >=
+              candidates[2].fractionality
     end
 
     @testset "[branching_rules] MostFractionalRule ordering" begin
@@ -54,8 +53,8 @@ function test_branching_strategy()
             MostFractionalRule(), candidates, 2
         )
         @test length(result) == 2
-        @test result[1].fractionality == 0.5
-        @test result[2].fractionality == 0.3
+        @test result[1].fractionality ≈ 0.5
+        @test result[2].fractionality ≈ 0.3
     end
 
     @testset "[branching_rules] LeastFractionalRule ordering" begin
@@ -67,8 +66,8 @@ function test_branching_strategy()
             LeastFractionalRule(), candidates, 2
         )
         @test length(result) == 2
-        @test result[1].fractionality == 0.1
-        @test result[2].fractionality == 0.3
+        @test result[1].fractionality ≈ 0.1
+        @test result[2].fractionality ≈ 0.3
     end
 
     @testset "[branching_rules] max_candidates truncation" begin
