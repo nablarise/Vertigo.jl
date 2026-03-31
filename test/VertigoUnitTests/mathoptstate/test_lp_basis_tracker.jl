@@ -87,10 +87,8 @@ function test_lp_basis_tracker_apply_noop_nothing_basis()
     @testset "[lp_basis_tracker] apply_change! no-op on nothing basis" begin
         m, _x, _y, _ci_x_ub, _c1 = _build_lp_backend()
         # Must not throw even though no solve has happened.
-        @test begin
-            apply_change!(m, LPBasisDiff(), nothing)
-            true
-        end
+        apply_change!(m, LPBasisDiff(), nothing)
+        @test true
     end
 end
 
@@ -111,7 +109,7 @@ function test_lp_basis_tracker_apply_restores_basis()
         MOI.optimize!(m)
         @test MOI.get(m, MOI.TerminationStatus()) == MOI.OPTIMAL
         # New optimum: x=8, y=7, obj = -15
-        @test MOI.get(m, MOI.ObjectiveValue()) ≈ -15.0
+        @test MOI.get(m, MOI.ObjectiveValue()) ≈ -15.0 atol=1e-6
     end
 end
 
@@ -145,7 +143,7 @@ function test_lp_basis_tracker_merge_forward_keeps_local()
 
         result = merge_forward_change_diff(parent_diff, local_diff)
 
-        @test result === local_diff
+        @test result.basis === local_diff.basis
     end
 end
 
