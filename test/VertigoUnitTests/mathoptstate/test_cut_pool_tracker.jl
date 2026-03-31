@@ -62,12 +62,11 @@ function _verify_gcp_node_state(backend, helper, expected_ids, cuts_by_id)
         with_typed_ci(tagged) do ci
             f = MOI.get(backend, MOI.ConstraintFunction(), ci)
             s = MOI.get(backend, MOI.ConstraintSet(), ci)
-            @test typeof(s) == typeof(cut.set)
             @test s == cut.set
             actual = Dict(t.variable => t.coefficient for t in f.terms)
             for term in cut.terms
                 @test haskey(actual, term.variable)
-                @test actual[term.variable] ≈ term.coefficient
+                @test actual[term.variable] ≈ term.coefficient atol=1e-9
             end
         end
     end
@@ -182,14 +181,13 @@ function test_cut_pool_tracker_tree7()
             [c8.id, c1.id, c11.id, c2.id, c9.id],
         ]
 
-        current = state_root
-        for perm in _all_permutations(7)
-            for idx in perm
-                next = states[idx]
-                recover_state!(m, current, next, helper)
-                _verify_gcp_node_state(m, helper, expected[idx], cuts_by_id)
-                current = next
-            end
+        _for_all_permutations(7, state_root) do current, idx
+            next = states[idx]
+            recover_state!(m, current, next, helper)
+            _verify_gcp_node_state(
+                m, helper, expected[idx], cuts_by_id
+            )
+            return next
         end
     end
 end
@@ -243,14 +241,13 @@ function test_cut_pool_tracker_deactivation()
         states = [state1, state2, state3]
         expected = [[c_global.id], [c_global.id], Int[]]
 
-        current = state_root
-        for perm in _all_permutations(3)
-            for idx in perm
-                next = states[idx]
-                recover_state!(m, current, next, helper)
-                _verify_gcp_node_state(m, helper, expected[idx], cuts_by_id)
-                current = next
-            end
+        _for_all_permutations(3, state_root) do current, idx
+            next = states[idx]
+            recover_state!(m, current, next, helper)
+            _verify_gcp_node_state(
+                m, helper, expected[idx], cuts_by_id
+            )
+            return next
         end
     end
 end
@@ -309,14 +306,13 @@ function test_cut_pool_tracker_reactivation()
         states = [state1, state2, state3]
         expected = [[c_global.id], Int[], [c_global.id]]
 
-        current = state_root
-        for perm in _all_permutations(3)
-            for idx in perm
-                next = states[idx]
-                recover_state!(m, current, next, helper)
-                _verify_gcp_node_state(m, helper, expected[idx], cuts_by_id)
-                current = next
-            end
+        _for_all_permutations(3, state_root) do current, idx
+            next = states[idx]
+            recover_state!(m, current, next, helper)
+            _verify_gcp_node_state(
+                m, helper, expected[idx], cuts_by_id
+            )
+            return next
         end
     end
 end

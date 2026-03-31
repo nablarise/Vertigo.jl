@@ -60,19 +60,19 @@ function test_column_tracker_add_remove_basic()
         obj_f = MOI.get(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
         obj_coeffs = Dict(t.variable => t.coefficient for t in obj_f.terms)
         @test haskey(obj_coeffs, vi_z)
-        @test obj_coeffs[vi_z] ≈ 3.0
+        @test obj_coeffs[vi_z] ≈ 3.0 atol=1e-9
 
         # c1 coefficient for z
         f_c1 = MOI.get(m, MOI.ConstraintFunction(), c1)
         c1_coeffs = Dict(t.variable => t.coefficient for t in f_c1.terms)
         @test haskey(c1_coeffs, vi_z)
-        @test c1_coeffs[vi_z] ≈ 2.0
+        @test c1_coeffs[vi_z] ≈ 2.0 atol=1e-9
 
         # c2 coefficient for z
         f_c2 = MOI.get(m, MOI.ConstraintFunction(), c2)
         c2_coeffs = Dict(t.variable => t.coefficient for t in f_c2.terms)
         @test haskey(c2_coeffs, vi_z)
-        @test c2_coeffs[vi_z] ≈ 1.0
+        @test c2_coeffs[vi_z] ≈ 1.0 atol=1e-9
 
         # Apply backward: remove z
         apply_change!(m, local_bwd, helper)
@@ -169,16 +169,13 @@ function test_column_tracker_mixed_constraints()
         # (expected active_columns count, expected var count in model)
         expected = [(0, 1), (1, 2), (1, 2)]
 
-        current_state = state1
-        for perm in _all_permutations(3)
-            for idx in perm
-                next = states[idx]
-                recover_state!(m, current_state, next, helper)
-                (exp_cols, exp_vars) = expected[idx]
-                @test length(helper.active_columns) == exp_cols
-                @test MOI.get(m, MOI.NumberOfVariables()) == exp_vars
-                current_state = next
-            end
+        _for_all_permutations(3, state1) do current_state, idx
+            next = states[idx]
+            recover_state!(m, current_state, next, helper)
+            (exp_cols, exp_vars) = expected[idx]
+            @test length(helper.active_columns) == exp_cols
+            @test MOI.get(m, MOI.NumberOfVariables()) == exp_vars
+            return next
         end
     end
 end
@@ -243,14 +240,11 @@ function test_column_tracker_deep_tree()
         states = [state1, state2, state3, state4]
         expected_vars = [1, 2, 3, 3]
 
-        current_state = state1
-        for perm in _all_permutations(4)
-            for idx in perm
-                next = states[idx]
-                recover_state!(m, current_state, next, helper)
-                @test MOI.get(m, MOI.NumberOfVariables()) == expected_vars[idx]
-                current_state = next
-            end
+        _for_all_permutations(4, state1) do current_state, idx
+            next = states[idx]
+            recover_state!(m, current_state, next, helper)
+            @test MOI.get(m, MOI.NumberOfVariables()) == expected_vars[idx]
+            return next
         end
     end
 end

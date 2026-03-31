@@ -64,7 +64,7 @@ function _verify_node_state(backend, helper, expected_count, expected_cut_ids, c
         actual_coeff = Dict(t.variable => t.coefficient for t in f.terms)
         for term in cut.terms
             @test haskey(actual_coeff, term.variable)
-            @test actual_coeff[term.variable] ≈ term.coefficient
+            @test actual_coeff[term.variable] ≈ term.coefficient atol=1e-9
         end
     end
 end
@@ -208,16 +208,14 @@ function test_local_cut_tracker_permutations_4()
             (2, [c1.id, c3.id]),
         ]
 
-        # Track the actual current model state across all permutations
-        current_state = state1
-        for perm in _all_permutations(4)
-            for idx in perm
-                next = states[idx]
-                recover_state!(backend, current_state, next, helper)
-                (exp_count, exp_ids) = expected[idx]
-                _verify_node_state(backend, helper, exp_count, exp_ids, cuts_by_id)
-                current_state = next
-            end
+        _for_all_permutations(4, state1) do current_state, idx
+            next = states[idx]
+            recover_state!(backend, current_state, next, helper)
+            (exp_count, exp_ids) = expected[idx]
+            _verify_node_state(
+                backend, helper, exp_count, exp_ids, cuts_by_id
+            )
+            return next
         end
     end
 end
@@ -309,16 +307,14 @@ function test_local_cut_tracker_deeper_tree()
             (3, [c1.id, c2.id, c4.id]),
         ]
 
-        # Track the actual current model state across all permutations
-        current_state = state1
-        for perm in _all_permutations(5)
-            for idx in perm
-                next = states[idx]
-                recover_state!(backend, current_state, next, helper)
-                (exp_count, exp_ids) = expected[idx]
-                _verify_node_state(backend, helper, exp_count, exp_ids, cuts_by_id)
-                current_state = next
-            end
+        _for_all_permutations(5, state1) do current_state, idx
+            next = states[idx]
+            recover_state!(backend, current_state, next, helper)
+            (exp_count, exp_ids) = expected[idx]
+            _verify_node_state(
+                backend, helper, exp_count, exp_ids, cuts_by_id
+            )
+            return next
         end
     end
 end
