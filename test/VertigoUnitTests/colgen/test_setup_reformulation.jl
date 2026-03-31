@@ -170,9 +170,7 @@ function test_setup_reformulation_phase0_relaxes_integrality()
 
         # Artificial variables were created for c1 (EqualTo)
         # and convexity constraints.
-        @test !isempty(ctx.eq_art_vars) ||
-              !isempty(ctx.leq_art_vars) ||
-              !isempty(ctx.geq_art_vars)
+        @test !isempty(ctx.eq_art_vars)
     end
 end
 
@@ -270,10 +268,7 @@ function test_setup_reformulation_full_sequence()
         # Model should still solve.
         MOI.optimize!(model)
         status = MOI.get(model, MOI.TerminationStatus())
-        @test status in (
-            MOI.OPTIMAL, MOI.DUAL_INFEASIBLE,
-            MOI.INFEASIBLE_OR_UNBOUNDED
-        )
+        @test status == MOI.OPTIMAL
 
         # All costs intact after full roundtrip.
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
