@@ -342,6 +342,8 @@ function test_decrease_alpha()
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
     @test stab.smooth_dual_sol_coeff < old_alpha
+    # α = max(0.0, 0.5 - 0.1) = 0.4
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
 end
 
 function test_increase_alpha()
@@ -370,4 +372,6 @@ function test_increase_alpha()
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
     @test stab.smooth_dual_sol_coeff > old_alpha
+    # α = 0.5 + (1.0 - 0.5) * 0.1 = 0.55
+    @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end

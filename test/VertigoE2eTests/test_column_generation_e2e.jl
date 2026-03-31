@@ -117,8 +117,8 @@ function test_gap_column_generation_converges(; smoothing_alpha=0.0)
         ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -129,8 +129,8 @@ function test_gap_column_generation_converges2(; smoothing_alpha=0.0)
         ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -144,8 +144,8 @@ function test_gap_benchmark_instances(; smoothing_alpha=0.0)
 
             output = run_column_generation(ctx)
 
-            @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-            @test abs(output.incumbent_dual_bound - expected_bound) <= 1.0
+            @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+            @test output.incumbent_dual_bound ≈ expected_bound atol=1.0
         end
     end
 end
@@ -175,7 +175,7 @@ function test_gap_maximization(; smoothing_alpha=0.0)
         ctx = build_gap_context_max(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
     end
 end
 
@@ -186,8 +186,8 @@ function test_gap_two_identical_machines(; smoothing_alpha=0.0)
         ctx = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -198,8 +198,8 @@ function test_gap_identical_machines(; smoothing_alpha=0.0)
         ctx = build_gap_identical_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -210,8 +210,8 @@ function test_gap_shifted_bounds(; smoothing_alpha=0.0)
         shifted_ctx = build_gap_shifted_context(inst; smoothing_alpha)
         shifted_out = run_column_generation(shifted_ctx)
         @test shifted_out.status == optimal
-        @test abs(shifted_out.master_lp_obj - shifted_out.incumbent_dual_bound) <= 1e-4
-        @test abs(shifted_out.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test shifted_out.master_lp_obj ≈ shifted_out.incumbent_dual_bound atol=1e-4
+        @test shifted_out.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -223,9 +223,9 @@ function test_gap_with_penalty(; smoothing_alpha=0.0)
         ctx = build_gap_with_penalty_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
         expected_root_dual_bound = 51.0
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -237,9 +237,9 @@ function test_gap_with_penalty_cardinality(; smoothing_alpha=0.0)
         ctx = build_gap_with_penalty_card_context(inst; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
         expected_root_dual_bound = 37.0
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -250,9 +250,9 @@ function test_gap_fixed_master_cost(; smoothing_alpha=0.0)
         ctx = build_gap_context_with_fixed_cost(inst, fixed_cost; smoothing_alpha)
         output = run_column_generation(ctx)
         @test output.status == optimal
-        @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
-        expected_root_dual_bound = 63.0 + fixed_cost
-        @test abs(output.incumbent_dual_bound - expected_root_dual_bound) <= 1e-4
+        @test output.master_lp_obj ≈ output.incumbent_dual_bound atol=1e-4
+        expected_root_dual_bound = 163.0
+        @test output.incumbent_dual_bound ≈ expected_root_dual_bound atol=1e-4
     end
 end
 
@@ -261,6 +261,7 @@ function test_gap_ip_pruned()
         inst = gap_small_feasible2()
         ctx = build_gap_context(inst)
         # Set IP cutoff below LP relaxation (≈70.33)
+        # Direct field access: no public API to set IP cutoff.
         raw = ctx.inner
         raw.ip_primal_bound = 60.0
         output = run_column_generation(ctx)

@@ -62,12 +62,11 @@ function _verify_gcp_node_state(backend, helper, expected_ids, cuts_by_id)
         with_typed_ci(tagged) do ci
             f = MOI.get(backend, MOI.ConstraintFunction(), ci)
             s = MOI.get(backend, MOI.ConstraintSet(), ci)
-            @test typeof(s) == typeof(cut.set)
             @test s == cut.set
             actual = Dict(t.variable => t.coefficient for t in f.terms)
             for term in cut.terms
                 @test haskey(actual, term.variable)
-                @test actual[term.variable] ≈ term.coefficient
+                @test actual[term.variable] ≈ term.coefficient atol=1e-9
             end
         end
     end
