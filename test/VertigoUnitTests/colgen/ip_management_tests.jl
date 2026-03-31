@@ -157,7 +157,8 @@ function test_ip_project_integral_with_integer_pure_master()
 
         @test !isnothing(result)
         @test cut == false
-        @test result.obj_value ≈ 5.0 + 3.0 * 2
+        # 5.0 + 3.0 * 2 = 11.0
+        @test result.obj_value ≈ 11.0
         @test length(result.non_zero_integral) == 2
     end
 end
@@ -197,7 +198,8 @@ function test_ip_project_with_continuous_pure_master()
 
         @test !isnothing(result)
         @test cut == false
-        @test result.obj_value ≈ 5.0 + 4.0 * 0.75
+        # 5.0 + 4.0 * 0.75 = 8.0
+        @test result.obj_value ≈ 8.0
         @test length(result.non_zero_continuous) == 1
         @test result.non_zero_continuous[1][1] == pmv_id
         @test result.non_zero_continuous[1][2] ≈ 0.75
@@ -223,8 +225,8 @@ function test_ip_project_mixed_columns_and_pure_master()
 
         @test !isnothing(result)
         @test cut == false
-        expected_obj = 2.0 * 1 + 3.0 * 2 + 7.0 * 1 + 1.5 * 0.4
-        @test result.obj_value ≈ expected_obj
+        # 2.0*1 + 3.0*2 + 7.0*1 + 1.5*0.4 = 15.6
+        @test result.obj_value ≈ 15.6
         @test length(result.non_zero_integral) == 3
         @test length(result.non_zero_continuous) == 1
     end
@@ -401,7 +403,7 @@ function test_ip_update_incumbent_worse_rejected_min()
 end
 
 function test_ip_is_strictly_better_max()
-    @testset "[ip_management] _is_strictly_better maximization sense" begin
+    @testset "[ip_management] _is_strictly_better minimization sense" begin
         # Use a max context: build it then verify sense
         inst = random_gap_instance(1, 1; seed=17)
         ctx = build_gap_context(inst)  # GAP is minimization
