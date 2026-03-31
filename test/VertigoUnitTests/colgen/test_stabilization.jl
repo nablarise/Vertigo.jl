@@ -28,7 +28,7 @@ end
 
 """Build a minimal ColGenContext with smoothing_alpha for testing."""
 function _build_stab_ctx(; alpha=0.5)
-    inst = random_gap_instance(2, 4)
+    inst = random_gap_instance(2, 4; seed=42)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 

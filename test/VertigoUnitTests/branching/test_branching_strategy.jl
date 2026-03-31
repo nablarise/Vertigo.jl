@@ -12,7 +12,7 @@ using Vertigo.BranchCutPrice: BPSpace
 
 function test_branching_strategy()
     @testset "[find_fractional_variables] all integral" begin
-        inst = random_gap_instance(2, 5)
+        inst = random_gap_instance(2, 5; seed=42)
         ctx = build_gap_context(inst)
         run_column_generation(ctx)
         primal = Dict{MOI.VariableIndex,Float64}()

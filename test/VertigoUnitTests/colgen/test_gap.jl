@@ -4,7 +4,7 @@
 
 function test_gap_decomposition_builder()
     @testset "[gap] decomposition builder" begin
-        inst = random_gap_instance(2, 4)
+        inst = random_gap_instance(2, 4; seed=42)
         ctx = build_gap_context(inst)
 
         @test length(collect(subproblem_ids(ctx.decomp))) == 2
@@ -24,7 +24,7 @@ end
 
 function test_gap_column_pool_populated()
     @testset "[gap] column pool is populated after CG" begin
-        inst = random_gap_instance(2, 5)
+        inst = random_gap_instance(2, 5; seed=42)
         ctx = build_gap_context(inst)
 
         run_column_generation(ctx)
@@ -36,7 +36,7 @@ end
 
 function test_gap_lp_dual_bound_matches_primal()
     @testset "[gap] LP dual bound approximately equals primal at convergence" begin
-        inst = random_gap_instance(2, 7)
+        inst = random_gap_instance(2, 7; seed=42)
         ctx = build_gap_context(inst)
 
         output = run_column_generation(ctx)

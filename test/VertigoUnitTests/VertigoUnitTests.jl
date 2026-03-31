@@ -154,6 +154,7 @@ include("treesearch/test_strategies.jl")
 include("treesearch/test_tree_search_logger.jl")
 
 # MathOptState
+include("mathoptstate/test_helpers.jl")
 include("mathoptstate/test_local_cut_tracker.jl")
 include("mathoptstate/test_lp_basis_tracker.jl")
 include("mathoptstate/test_column_tracker.jl")

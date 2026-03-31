@@ -8,7 +8,7 @@ using Vertigo.ColGen: ColGenLoggerContext, max_cg_iterations,
 
 function test_max_cg_iterations()
     @testset "[max_cg_iterations] stop_colgen_phase respects limit" begin
-        inst = random_gap_instance(2, 5)
+        inst = random_gap_instance(2, 5; seed=42)
         ctx = build_gap_context(inst; max_cg_iterations=5)
 
         # Fake iteration output: columns added, no gap closed
@@ -31,7 +31,7 @@ function test_max_cg_iterations()
     end
 
     @testset "[max_cg_iterations] Phase1 ignores limit" begin
-        inst = random_gap_instance(2, 5)
+        inst = random_gap_instance(2, 5; seed=42)
         ctx = build_gap_context(inst; max_cg_iterations=5)
 
         # Phase1 iter output: columns still being added
@@ -44,7 +44,7 @@ function test_max_cg_iterations()
     end
 
     @testset "[max_cg_iterations] ColGenLoggerContext forwarding" begin
-        inst = random_gap_instance(2, 5)
+        inst = random_gap_instance(2, 5; seed=42)
         ctx = build_gap_context(inst; max_cg_iterations=42)
         lctx = ColGenLoggerContext(ctx; log_level=0)
         @test max_cg_iterations(lctx) == 42
