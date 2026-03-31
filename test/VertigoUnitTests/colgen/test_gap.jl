@@ -8,15 +8,20 @@ function test_gap_decomposition_builder()
         ctx = build_gap_context(inst)
 
         @test length(collect(subproblem_ids(ctx.decomp))) == 2
-        for k in 1:2
-            sp_id = PricingSubproblemId(k)
-            vars = subproblem_variables(ctx.decomp, sp_id)
-            @test length(vars) == 4
-            lb, ub = convexity_bounds(ctx.decomp, sp_id)
-            @test lb ≈ 0.0
-            @test ub ≈ 1.0
-            @test subproblem_fixed_cost(ctx.decomp, sp_id) ≈ 0.0
-        end
+
+        sp1 = PricingSubproblemId(1)
+        @test length(subproblem_variables(ctx.decomp, sp1)) == 4
+        lb1, ub1 = convexity_bounds(ctx.decomp, sp1)
+        @test lb1 ≈ 0.0
+        @test ub1 ≈ 1.0
+        @test subproblem_fixed_cost(ctx.decomp, sp1) ≈ 0.0
+
+        sp2 = PricingSubproblemId(2)
+        @test length(subproblem_variables(ctx.decomp, sp2)) == 4
+        lb2, ub2 = convexity_bounds(ctx.decomp, sp2)
+        @test lb2 ≈ 0.0
+        @test ub2 ≈ 1.0
+        @test subproblem_fixed_cost(ctx.decomp, sp2) ≈ 0.0
         @test length(coupling_constraints(ctx.decomp)) == 4
         @test is_minimization(ctx.decomp)
     end
@@ -41,6 +46,7 @@ function test_gap_lp_dual_bound_matches_primal()
 
         output = run_column_generation(ctx)
 
+        @test output.status == Vertigo.ColGen.optimal
         @test !isnothing(output.incumbent_dual_bound)
         @test !isnothing(output.master_lp_obj)
 
