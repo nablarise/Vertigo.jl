@@ -14,7 +14,7 @@ using Vertigo.BranchCutPrice: BPSpace
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 
-function test_strong_branching()
+function test_sb_score_both_feasible()
     @testset "[sb_score] both children feasible" begin
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         left = SBProbeResult(12.0, 12.0, false)
@@ -27,7 +27,9 @@ function test_strong_branching()
         expected = (1 - mu) * 2.0 + mu * 4.0
         @test sb_score(result) ≈ expected
     end
+end
 
+function test_sb_score_one_infeasible()
     @testset "[sb_score] one child infeasible" begin
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         left = SBProbeResult(12.0, 12.0, false)
@@ -37,7 +39,9 @@ function test_strong_branching()
         # score = (5/6) * 2.0 + (1/6) * Inf = Inf
         @test sb_score(result) == Inf
     end
+end
 
+function test_sb_score_both_infeasible()
     @testset "[sb_score] both children infeasible" begin
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         left = SBProbeResult(nothing, nothing, true)
@@ -45,7 +49,9 @@ function test_strong_branching()
         result = SBCandidateResult(c, 10.0, left, right)
         @test sb_score(result) == Inf
     end
+end
 
+function test_sb_score_custom_mu()
     @testset "[sb_score] custom mu" begin
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         left = SBProbeResult(12.0, 12.0, false)
@@ -55,7 +61,9 @@ function test_strong_branching()
         expected = (1 - mu) * 2.0 + mu * 4.0
         @test sb_score(result; mu=mu) ≈ expected
     end
+end
 
+function test_branching_constraint_add_remove()
     @testset "[branching_constraint] add and remove" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
@@ -65,7 +73,6 @@ function test_strong_branching()
         bcs = bp_branching_constraints(ctx)
         @test isempty(bcs)
 
-        # Build terms for a branching constraint
         pool = bp_pool(ctx)
         decomp = bp_decomp(ctx)
         primal = get_primal_solution(backend)
@@ -90,7 +97,9 @@ function test_strong_branching()
         @test isempty(bcs)
         @test !MOI.is_valid(backend, ci)
     end
+end
 
+function test_run_sb_probe_returns_dual_bounds()
     @testset "[run_sb_probe] returns dual bounds" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
@@ -108,13 +117,15 @@ function test_strong_branching()
         result = run_sb_probe(space, candidate, 10, parent_lp)
         @test result isa SBCandidateResult
         @test result.parent_lp_obj ≈ parent_lp
-        # At least one direction should produce a dual bound
-        has_bound = !isnothing(result.left.dual_bound) ||
-                    !isnothing(result.right.dual_bound)
-        @test has_bound || result.left.is_infeasible ||
+        # Each direction should produce a dual bound or be infeasible
+        @test !isnothing(result.left.dual_bound) ||
+              result.left.is_infeasible
+        @test !isnothing(result.right.dual_bound) ||
               result.right.is_infeasible
     end
+end
 
+function test_run_sb_probe_restores_state()
     @testset "[run_sb_probe] restores context state" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
@@ -143,7 +154,9 @@ function test_strong_branching()
         @test bp_ip_primal_bound(ctx) === orig_ip_bound
         @test length(bp_branching_constraints(ctx)) == orig_n_bcs
     end
+end
 
+function test_multi_phase_sb_e2e()
     @testset "[MultiPhaseStrongBranching] e2e small GAP finds optimal" begin
         inst = random_gap_instance(2, 4; seed=10)
         ctx = build_gap_context(inst)
@@ -160,7 +173,9 @@ function test_strong_branching()
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
     end
+end
 
+function test_multi_phase_sb_selects_variable()
     @testset "[MultiPhaseStrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
         ctx = build_gap_context(inst)
@@ -187,4 +202,20 @@ function test_strong_branching()
         @test frac > 1e-6
         @test frac < 1.0 - 1e-6
     end
+end
+
+# ────────────────────────────────────────────────────────────────
+# Entry point
+# ────────────────────────────────────────────────────────────────
+
+function test_strong_branching()
+    test_sb_score_both_feasible()
+    test_sb_score_one_infeasible()
+    test_sb_score_both_infeasible()
+    test_sb_score_custom_mu()
+    test_branching_constraint_add_remove()
+    test_run_sb_probe_returns_dual_bounds()
+    test_run_sb_probe_restores_state()
+    test_multi_phase_sb_e2e()
+    test_multi_phase_sb_selects_variable()
 end
