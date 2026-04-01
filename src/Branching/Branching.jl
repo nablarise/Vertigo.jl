@@ -22,6 +22,7 @@ include("strong_branching.jl")
 include("lp_probe.jl")
 include("cg_probe.jl")
 include("pseudocosts.jl")
+include("context.jl")
 include("kernel.jl")
 
 # ── Public API ────────────────────────────────────────────────────────────
@@ -33,5 +34,6 @@ export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible
 export BranchingDirection, branch_down, branch_up
 export select_branching_variable, on_node_evaluated
+export BranchingContext, DefaultBranchingContext
 
 end # module Branching
