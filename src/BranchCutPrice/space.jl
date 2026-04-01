@@ -168,7 +168,6 @@ function TreeSearch.branch!(space::BPSpace, node)
     if result.status == all_integral
         return typeof(node)[]
     elseif result.status == node_infeasible
-        @debug "branch!: node infeasible (detected by strategy)"
         return typeof(node)[]
     end
     orig_var = result.orig_var
