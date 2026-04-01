@@ -7,6 +7,8 @@ module Branching
 using MathOptInterface
 const MOI = MathOptInterface
 
+using Printf
+
 using ..Reformulation
 using ..ColGen
 using ..MathOptState
@@ -23,6 +25,7 @@ include("lp_probe.jl")
 include("cg_probe.jl")
 include("pseudocosts.jl")
 include("kernel.jl")
+include("logger.jl")
 
 # ── Public API ────────────────────────────────────────────────────────────
 export AbstractBranchingPhase, LPProbePhase, CGProbePhase
@@ -33,6 +36,6 @@ export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible
 export BranchingDirection, branch_down, branch_up
 export select_branching_variable, on_node_evaluated
-export BranchingContext, DefaultBranchingContext
+export BranchingContext, DefaultBranchingContext, BranchingLoggerContext
 
 end # module Branching
