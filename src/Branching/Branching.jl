@@ -6,7 +6,6 @@ module Branching
 
 using MathOptInterface
 const MOI = MathOptInterface
-using Printf
 
 using ..Reformulation
 using ..ColGen
@@ -18,11 +17,11 @@ include("branching_candidates.jl")
 include("branching_rules.jl")
 include("branching_strategy.jl")
 include("phases.jl")
+include("context.jl")
 include("strong_branching.jl")
 include("lp_probe.jl")
 include("cg_probe.jl")
 include("pseudocosts.jl")
-include("context.jl")
 include("kernel.jl")
 
 # ── Public API ────────────────────────────────────────────────────────────

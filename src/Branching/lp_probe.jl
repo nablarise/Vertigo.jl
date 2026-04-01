@@ -52,26 +52,30 @@ function _run_one_lp_direction(space, candidate, set)
 end
 
 """
-    probe_candidate(::LPProbePhase, space, candidate, parent_lp)
+    probe_candidate(bctx, ::LPProbePhase, space, candidate, parent_lp)
 
 LP probe: solve master LP only (no CG) in both directions.
 Uses same state capture/restore as CG probes.
 """
 function probe_candidate(
-    ::LPProbePhase, space,
+    bctx::BranchingContext, ::LPProbePhase, space,
     candidate::BranchingCandidate, parent_lp::Float64
 )
     snapshot = _capture_probe_state(space.ctx, space)
     try
+        before_probe(bctx, nothing, candidate, :left)
         left = _run_one_lp_direction(
             space, candidate,
             MOI.LessThan(candidate.floor_val)
         )
+        after_probe(bctx, nothing, candidate, :left, left)
         _restore_probe_state!(space.ctx, space, snapshot)
+        before_probe(bctx, nothing, candidate, :right)
         right = _run_one_lp_direction(
             space, candidate,
             MOI.GreaterThan(candidate.ceil_val)
         )
+        after_probe(bctx, nothing, candidate, :right, right)
         return SBCandidateResult(
             candidate, parent_lp, left, right
         )
