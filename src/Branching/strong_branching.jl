@@ -25,10 +25,7 @@ end
 
 function _sb_delta(probe::SBProbeResult, parent_lp_obj::Float64)
     probe.is_infeasible && return Inf
-    if isnothing(probe.dual_bound)
-        @warn "SB probe returned no dual bound; scoring as Δ=0"
-        return 0.0
-    end
+    isnothing(probe.dual_bound) && return 0.0
     return max(0.0, probe.dual_bound - parent_lp_obj)
 end
 
@@ -172,7 +169,7 @@ function _run_one_direction(space, candidate, set, max_cg_iter)
 end
 
 """
-    run_sb_probe(space, candidate, max_cg_iterations, parent_lp_obj)
+    run_sb_probe(bctx, space, candidate, max_cg_iterations, parent_lp_obj)
 
 Run strong branching probes in both directions (floor/ceil) for
 the given candidate. Captures and restores context state (iteration
@@ -180,71 +177,32 @@ limit, IP incumbent, primal bound, branching constraints, LP basis)
 around both probes. Returns `SBCandidateResult`.
 """
 function run_sb_probe(
-    space, candidate::BranchingCandidate,
+    bctx::BranchingContext, space,
+    candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
     snapshot = _capture_probe_state(space.ctx, space)
     try
+        before_probe(bctx, nothing, candidate, :left)
         left = _run_one_direction(
             space, candidate,
             MOI.LessThan(candidate.floor_val),
             max_cg_iterations
         )
+        after_probe(bctx, nothing, candidate, :left, left)
         _restore_probe_state!(space.ctx, space, snapshot)
+        before_probe(bctx, nothing, candidate, :right)
         right = _run_one_direction(
             space, candidate,
             MOI.GreaterThan(candidate.ceil_val),
             max_cg_iterations
         )
-        @debug "SB probe" candidate.orig_var left right
+        after_probe(bctx, nothing, candidate, :right, right)
         return SBCandidateResult(
             candidate, parent_lp_obj, left, right
         )
     finally
         _restore_probe_state!(space.ctx, space, snapshot)
     end
-end
-
-# ────────────────────────────────────────────────────────────────────────────────────────
-# STRONG BRANCHING LOGGING
-# ────────────────────────────────────────────────────────────────────────────────────────
-
-function _sb_log_header(io::IO)
-    println(io, "**** Strong branching ****")
-    return
-end
-
-function _sb_fmt_bound(probe::SBProbeResult)
-    probe.is_infeasible && return "infeasible"
-    isnothing(probe.dual_bound) && return "N/A"
-    return @sprintf("%.4f", probe.dual_bound)
-end
-
-function _sb_log_candidate(
-    io::IO, idx::Int, candidate::BranchingCandidate,
-    result::SBCandidateResult, score::Float64, t0::Float64
-)
-    lhs = @sprintf("%.4f", candidate.value)
-    left_str = _sb_fmt_bound(result.left)
-    right_str = _sb_fmt_bound(result.right)
-    et = @sprintf("%.2f", time() - t0)
-    sc = @sprintf("%.2f", score)
-    println(io,
-        "  SB cand. $(lpad(idx, 2)) branch on " *
-        "$(candidate.orig_var) (lhs=$(lhs)): " *
-        "[$(left_str), $(right_str)], " *
-        "score = $(sc)  <et=$(et)>"
-    )
-    return
-end
-
-function _sb_log_selected(
-    io::IO, candidate::BranchingCandidate, score::Float64
-)
-    sc = @sprintf("%.2f", score)
-    println(io,
-        "  SB selected: $(candidate.orig_var) (score = $(sc))"
-    )
-    return
 end
 
