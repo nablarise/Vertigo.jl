@@ -338,6 +338,24 @@ function run_branch_and_price(
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
 )
+    branching_ctx = if log_level > 0
+        BranchingLoggerContext(; log_level=log_level)
+    else
+        DefaultBranchingContext()
+    end
+
+    effective_strategy = if branching_strategy isa MultiPhaseStrongBranching
+        MultiPhaseStrongBranching(;
+            max_candidates=branching_strategy.max_candidates,
+            mu=branching_strategy.mu,
+            phases=branching_strategy.phases,
+            reliability_threshold=branching_strategy.pseudocosts.reliability_threshold,
+            branching_ctx=branching_ctx
+        )
+    else
+        branching_strategy
+    end
+
     space = BPSpace(
         ctx;
         node_limit = node_limit,
@@ -347,7 +365,7 @@ function run_branch_and_price(
         separator = separator,
         max_cut_rounds = max_cut_rounds,
         min_gap_improvement = min_gap_improvement,
-        branching_strategy = branching_strategy,
+        branching_strategy = effective_strategy,
         log_level = log_level
     )
     evaluator = BPEvaluator()
