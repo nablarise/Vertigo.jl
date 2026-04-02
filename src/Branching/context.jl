@@ -38,9 +38,16 @@ function after_probe(
     return
 end
 
-function after_candidate_eval(
+function after_reliability_skip(
     ::BranchingContext, phase, idx::Int, candidate,
-    score::Float64, detail
+    score::Float64
+)
+    return
+end
+
+function after_candidate_probed(
+    ::BranchingContext, phase, idx::Int, candidate,
+    score::Float64, result
 )
     return
 end

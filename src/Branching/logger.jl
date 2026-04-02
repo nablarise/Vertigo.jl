@@ -66,32 +66,39 @@ function after_probe(
     return
 end
 
-function after_candidate_eval(
+function after_reliability_skip(
     lctx::BranchingLoggerContext, phase, idx::Int,
-    candidate, score::Float64, detail
+    candidate, score::Float64
 )
     label = phase_label(phase)
     et = @sprintf("%.2f", time() - lctx.t0)
     lhs = @sprintf("%.4f", candidate.value)
     sc = @sprintf("%.2f", score)
+    println(lctx.io,
+        "  [$(label)] cand. $(lpad(idx, 2))" *
+        " branch on $(candidate.orig_var)" *
+        " (lhs=$(lhs)): reliable," *
+        " score = $(sc)  <et=$(et)>"
+    )
+    return
+end
 
-    if detail === :reliable
-        println(lctx.io,
-            "  [$(label)] cand. $(lpad(idx, 2))" *
-            " branch on $(candidate.orig_var)" *
-            " (lhs=$(lhs)): reliable," *
-            " score = $(sc)  <et=$(et)>"
-        )
-    else
-        left_str = _sb_fmt_bound(detail.left)
-        right_str = _sb_fmt_bound(detail.right)
-        println(lctx.io,
-            "  SB cand. $(lpad(idx, 2)) branch on " *
-            "$(candidate.orig_var) (lhs=$(lhs)): " *
-            "[$(left_str), $(right_str)], " *
-            "score = $(sc)  <et=$(et)>"
-        )
-    end
+function after_candidate_probed(
+    lctx::BranchingLoggerContext, phase, idx::Int,
+    candidate, score::Float64, result::SBCandidateResult
+)
+    label = phase_label(phase)
+    et = @sprintf("%.2f", time() - lctx.t0)
+    lhs = @sprintf("%.4f", candidate.value)
+    sc = @sprintf("%.2f", score)
+    left_str = _sb_fmt_bound(result.left)
+    right_str = _sb_fmt_bound(result.right)
+    println(lctx.io,
+        "  SB cand. $(lpad(idx, 2)) branch on " *
+        "$(candidate.orig_var) (lhs=$(lhs)): " *
+        "[$(left_str), $(right_str)], " *
+        "score = $(sc)  <et=$(et)>"
+    )
     return
 end
 

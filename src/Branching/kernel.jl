@@ -201,8 +201,8 @@ function _eval_candidate(
     if phase isa CGProbePhase &&
        is_reliable(pseudocosts, c)
         score = estimate_score(pseudocosts, c; mu=mu)
-        after_candidate_eval(
-            bctx, phase, idx, c, score, :reliable
+        after_reliability_skip(
+            bctx, phase, idx, c, score
         )
         return score
     end
@@ -218,7 +218,7 @@ function _eval_candidate(
     score = score_candidate(phase, result; mu=mu)
     update_pseudocosts!(pseudocosts, c, result)
 
-    after_candidate_eval(
+    after_candidate_probed(
         bctx, phase, idx, c, score, result
     )
     return score
