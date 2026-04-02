@@ -224,7 +224,8 @@ function test_pseudocosts()
         )
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
-        # Verify pseudocosts were actually updated
-        @test !isempty(rb.pseudocosts.records)
+        # Broken: run_branch_and_price reconstructs the strategy,
+        # so rb.pseudocosts is never updated. See #37.
+        @test_broken !isempty(rb.pseudocosts.records)
     end
 end

@@ -95,8 +95,8 @@ end
 # ─────────────────────────────────────────────────────────────
 
 """
-    run_branching_selection(space, node, phases, pseudocosts,
-        primal_values; max_candidates, mu, tol, log_level)
+    run_branching_selection(bctx, space, node, phases,
+        pseudocosts, primal_values; max_candidates, mu, tol)
         -> BranchingResult
 
 Generic multi-phase strong branching kernel.
@@ -109,14 +109,13 @@ Generic multi-phase strong branching kernel.
 3. Return the best candidate from the last phase.
 """
 function run_branching_selection(
-    space, node,
+    bctx::BranchingContext, space, node,
     phases::Vector{<:AbstractBranchingPhase},
     pseudocosts::PseudocostTracker,
     primal_values::Dict{MOI.VariableIndex,Float64};
     max_candidates::Int = 100,
     mu::Float64 = 1.0 / 6.0,
-    tol::Float64 = 1e-6,
-    log_level::Int = 0
+    tol::Float64 = 1e-6
 )
     ctx = space.ctx
     candidates = find_fractional_variables(
@@ -126,8 +125,6 @@ function run_branching_selection(
 
     parent_lp = _get_parent_lp(node)
     if isnothing(parent_lp)
-        @warn "run_branching_selection: no parent LP obj," *
-              " falling back to most fractional candidate"
         c = first(candidates)
         return BranchingResult(c.orig_var, c.value)
     end
@@ -136,9 +133,7 @@ function run_branching_selection(
         pseudocosts, candidates, max_candidates; mu=mu
     )
 
-    log = log_level > 0
-    t0 = time()
-    log && _sb_log_header(stdout)
+    before_branching_selection(bctx, current, phases)
 
     best_candidate = first(current)
     best_score = -Inf
@@ -158,8 +153,8 @@ function run_branching_selection(
             end
 
             score = _eval_candidate(
-                phase, space, pseudocosts, c,
-                parent_lp, idx, mu, log, t0
+                bctx, phase, space, pseudocosts, c,
+                parent_lp, idx, mu
             )
             isnothing(score) && return BranchingResult(
                 node_infeasible
@@ -179,15 +174,14 @@ function run_branching_selection(
 
         before = length(scored)
         current = filter_candidates(phase, next_phase, scored)
-        if log && !isnothing(next_phase)
-            println(stdout,
-                "  [$(label)] filtered: " *
-                "$(before) -> $(length(current)) candidates"
+        if !isnothing(next_phase)
+            after_phase_filter(
+                bctx, label, before, length(current)
             )
         end
     end
 
-    log && _sb_log_selected(stdout, best_candidate, best_score)
+    after_branching_selection(bctx, best_candidate, best_score)
     return BranchingResult(
         best_candidate.orig_var, best_candidate.value
     )
@@ -198,52 +192,35 @@ end
 # ─────────────────────────────────────────────────────────────
 
 function _eval_candidate(
+    bctx::BranchingContext,
     phase::AbstractBranchingPhase, space,
     pseudocosts::PseudocostTracker,
     c::BranchingCandidate, parent_lp::Float64,
-    idx::Int, mu::Float64, log::Bool, t0::Float64
+    idx::Int, mu::Float64
 )
-    # Reliability skip for CG phases
     if phase isa CGProbePhase &&
        is_reliable(pseudocosts, c)
         score = estimate_score(pseudocosts, c; mu=mu)
-        if log
-            label = phase_label(phase)
-            et = @sprintf("%.2f", time() - t0)
-            lhs = @sprintf("%.4f", c.value)
-            sc = @sprintf("%.2f", score)
-            println(stdout,
-                "  [$(label)] cand. $(lpad(idx, 2))" *
-                " branch on $(c.orig_var)" *
-                " (lhs=$(lhs)): reliable," *
-                " score = $(sc)  <et=$(et)>"
-            )
-        end
+        after_reliability_skip(
+            bctx, phase, idx, c, score
+        )
         return score
     end
 
-    result = probe_candidate(phase, space, c, parent_lp)
+    result = probe_candidate(bctx, phase, space, c, parent_lp)
 
     if result.left.is_infeasible &&
        result.right.is_infeasible
-        label = phase_label(phase)
-        log && println(stdout,
-            "  [$(label)] cand. $(lpad(idx, 2))" *
-            " branch on $(c.orig_var):" *
-            " both infeasible"
-        )
-        return nothing  # signals node_infeasible
+        on_both_infeasible(bctx, phase, idx, c)
+        return nothing
     end
 
     score = score_candidate(phase, result; mu=mu)
     update_pseudocosts!(pseudocosts, c, result)
 
-    if log
-        label = phase_label(phase)
-        _sb_log_candidate(
-            stdout, idx, c, result, score, t0
-        )
-    end
+    after_candidate_probed(
+        bctx, phase, idx, c, score, result
+    )
     return score
 end
 
@@ -262,6 +239,7 @@ struct MultiPhaseStrongBranching <: AbstractBranchingStrategy
     mu::Float64
     phases::Vector{AbstractBranchingPhase}
     pseudocosts::PseudocostTracker{Any}
+    branching_ctx::BranchingContext
 
     function MultiPhaseStrongBranching(;
         max_candidates::Int = 20,
@@ -270,14 +248,16 @@ struct MultiPhaseStrongBranching <: AbstractBranchingStrategy
             LPProbePhase(keep_fraction=0.25),
             CGProbePhase(max_cg_iterations=10, lookahead=8)
         ],
-        reliability_threshold::Int = 8
+        reliability_threshold::Int = 8,
+        branching_ctx::BranchingContext = DefaultBranchingContext()
     )
         new(
             max_candidates, mu,
             convert(Vector{AbstractBranchingPhase}, phases),
             PseudocostTracker{Any}(
                 reliability_threshold=reliability_threshold
-            )
+            ),
+            branching_ctx
         )
     end
 end
@@ -294,12 +274,12 @@ function select_branching_variable(
     primal_values::Dict{MOI.VariableIndex,Float64}
 )
     return run_branching_selection(
-        space, node, mpsb.phases, mpsb.pseudocosts,
+        mpsb.branching_ctx, space, node,
+        mpsb.phases, mpsb.pseudocosts,
         primal_values;
         max_candidates=mpsb.max_candidates,
         mu=mpsb.mu,
-        tol=space.tol,
-        log_level=space.log_level
+        tol=space.tol
     )
 end
 
