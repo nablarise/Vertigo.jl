@@ -5,8 +5,17 @@
 """
     BranchingContext
 
-Abstract type for branching contexts. All hook functions
-dispatch on this type — default implementations are no-ops.
+Abstract type for branching contexts. Subtype to override
+any of the following hooks (all default to no-ops):
+
+- `before_branching_selection(ctx, candidates, phases)`
+- `before_probe(ctx, phase, candidate, direction)`
+- `after_probe(ctx, phase, candidate, direction, result)`
+- `after_reliability_skip(ctx, phase, idx, candidate, score)`
+- `after_candidate_probed(ctx, phase, idx, candidate, score, result)`
+- `on_both_infeasible(ctx, phase, idx, candidate)`
+- `after_phase_filter(ctx, label, before, after)`
+- `after_branching_selection(ctx, candidate, score)`
 """
 abstract type BranchingContext end
 
