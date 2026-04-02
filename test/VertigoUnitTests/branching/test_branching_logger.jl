@@ -46,7 +46,7 @@ function test_logger_after_candidate_probed()
         after_candidate_probed(lctx, LPProbePhase(), 1, c, 3.2, result)
         output = String(take!(buf))
         @test occursin(
-            r"^  SB cand\.  1 branch on 1 \(lhs=2\.3000\): \[12\.0000, 14\.0000\], score = 3\.20  <et=\d+\.\d+>$"m,
+            r"^  \[LP\] cand\.  1 branch on 1 \(lhs=2\.3000\): \[12\.0000, 14\.0000\], score = 3\.20  <et=\d+\.\d+>$"m,
             output
         )
     end
@@ -64,7 +64,7 @@ function test_logger_after_candidate_probed_infeasible_child()
         after_candidate_probed(lctx, CGProbePhase(), 3, c, Inf, result)
         output = String(take!(buf))
         @test occursin(
-            r"^  SB cand\.  3 branch on 1 \(lhs=2\.3000\): \[12\.0000, infeasible\], score = Inf  <et=\d+\.\d+>$"m,
+            r"^  \[CG\] cand\.  3 branch on 1 \(lhs=2\.3000\): \[12\.0000, infeasible\], score = Inf  <et=\d+\.\d+>$"m,
             output
         )
     end

@@ -115,7 +115,7 @@ function test_run_sb_probe_returns_dual_bounds()
         space = BPSpace(ctx; node_limit=1)
         candidate = first(candidates)
 
-        result = run_sb_probe(DefaultBranchingContext(), space, candidate, 10, parent_lp)
+        result = run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
         @test result isa SBCandidateResult
         @test result.parent_lp_obj ≈ parent_lp
         # Each direction should produce a dual bound or be infeasible
@@ -147,7 +147,7 @@ function test_run_sb_probe_restores_state()
         orig_ip_bound = bp_ip_primal_bound(ctx)
         orig_n_bcs = length(bp_branching_constraints(ctx))
 
-        run_sb_probe(DefaultBranchingContext(), space, candidate, 10, parent_lp)
+        run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
 
         # State must be restored
         @test max_cg_iterations(ctx) == orig_max_iter

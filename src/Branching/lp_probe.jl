@@ -58,24 +58,25 @@ LP probe: solve master LP only (no CG) in both directions.
 Uses same state capture/restore as CG probes.
 """
 function probe_candidate(
-    bctx::BranchingContext, ::LPProbePhase, space,
+    bctx::BranchingContext, phase::LPProbePhase, space,
     candidate::BranchingCandidate, parent_lp::Float64
 )
     snapshot = _capture_probe_state(space.ctx, space)
     try
-        before_probe(bctx, nothing, candidate, :left)
+        before_probe(bctx, phase, candidate, :left)
         left = _run_one_lp_direction(
             space, candidate,
             MOI.LessThan(candidate.floor_val)
         )
-        after_probe(bctx, nothing, candidate, :left, left)
+        after_probe(bctx, phase, candidate, :left, left)
+        # Restore state so the right probe starts clean.
         _restore_probe_state!(space.ctx, space, snapshot)
-        before_probe(bctx, nothing, candidate, :right)
+        before_probe(bctx, phase, candidate, :right)
         right = _run_one_lp_direction(
             space, candidate,
             MOI.GreaterThan(candidate.ceil_val)
         )
-        after_probe(bctx, nothing, candidate, :right, right)
+        after_probe(bctx, phase, candidate, :right, right)
         return SBCandidateResult(
             candidate, parent_lp, left, right
         )

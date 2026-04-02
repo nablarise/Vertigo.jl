@@ -40,11 +40,12 @@ function before_branching_selection(
 end
 
 function before_probe(
-    lctx::BranchingLoggerContext, phase,
+    lctx::BranchingLoggerContext,
+    phase::AbstractBranchingPhase,
     candidate, direction::Symbol
 )
     lctx.log_level < 2 && return
-    label = isnothing(phase) ? "SB" : phase_label(phase)
+    label = phase_label(phase)
     println(lctx.io,
         "  [$(label)] probing $(candidate.orig_var)" *
         " direction=$(direction)"
@@ -53,11 +54,12 @@ function before_probe(
 end
 
 function after_probe(
-    lctx::BranchingLoggerContext, phase,
+    lctx::BranchingLoggerContext,
+    phase::AbstractBranchingPhase,
     candidate, direction::Symbol, result
 )
     lctx.log_level < 2 && return
-    label = isnothing(phase) ? "SB" : phase_label(phase)
+    label = phase_label(phase)
     bound_str = _sb_fmt_bound(result)
     println(lctx.io,
         "  [$(label)] probe $(direction)" *
@@ -94,7 +96,7 @@ function after_candidate_probed(
     left_str = _sb_fmt_bound(result.left)
     right_str = _sb_fmt_bound(result.right)
     println(lctx.io,
-        "  SB cand. $(lpad(idx, 2)) branch on " *
+        "  [$(label)] cand. $(lpad(idx, 2)) branch on " *
         "$(candidate.orig_var) (lhs=$(lhs)): " *
         "[$(left_str), $(right_str)], " *
         "score = $(sc)  <et=$(et)>"

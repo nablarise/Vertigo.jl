@@ -13,7 +13,7 @@ function probe_candidate(
     candidate::BranchingCandidate, parent_lp::Float64
 )
     return run_sb_probe(
-        bctx, space, candidate,
+        bctx, phase, space, candidate,
         phase.max_cg_iterations, parent_lp
     )
 end

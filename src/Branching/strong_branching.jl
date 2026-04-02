@@ -169,7 +169,7 @@ function _run_one_direction(space, candidate, set, max_cg_iter)
 end
 
 """
-    run_sb_probe(bctx, space, candidate, max_cg_iterations, parent_lp_obj)
+    run_sb_probe(bctx, phase, space, candidate, max_cg_iterations, parent_lp_obj)
 
 Run strong branching probes in both directions (floor/ceil) for
 the given candidate. Captures and restores context state (iteration
@@ -177,27 +177,29 @@ limit, IP incumbent, primal bound, branching constraints, LP basis)
 around both probes. Returns `SBCandidateResult`.
 """
 function run_sb_probe(
-    bctx::BranchingContext, space,
+    bctx::BranchingContext,
+    phase::AbstractBranchingPhase, space,
     candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
     snapshot = _capture_probe_state(space.ctx, space)
     try
-        before_probe(bctx, nothing, candidate, :left)
+        before_probe(bctx, phase, candidate, :left)
         left = _run_one_direction(
             space, candidate,
             MOI.LessThan(candidate.floor_val),
             max_cg_iterations
         )
-        after_probe(bctx, nothing, candidate, :left, left)
+        after_probe(bctx, phase, candidate, :left, left)
+        # Restore state so the right probe starts clean.
         _restore_probe_state!(space.ctx, space, snapshot)
-        before_probe(bctx, nothing, candidate, :right)
+        before_probe(bctx, phase, candidate, :right)
         right = _run_one_direction(
             space, candidate,
             MOI.GreaterThan(candidate.ceil_val),
             max_cg_iterations
         )
-        after_probe(bctx, nothing, candidate, :right, right)
+        after_probe(bctx, phase, candidate, :right, right)
         return SBCandidateResult(
             candidate, parent_lp_obj, left, right
         )
