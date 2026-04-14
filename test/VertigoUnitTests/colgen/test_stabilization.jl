@@ -10,7 +10,7 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     MasterDualSolution, DualMoiSolution, GeneratedColumns,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
-    Phase0, Phase1, Phase2, TaggedCI
+    Phase0, Phase1, Phase2, TaggedCI, MAX_MISPRICE_ITERATIONS
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -124,6 +124,7 @@ function test_stabilization()
     @testset "[stabilization] misprice" begin
         test_misprice_inactive()
         test_misprice_deterministic_schedule()
+        test_misprice_hard_cap()
     end
     @testset "[stabilization] iter_update" begin
         test_decrease_alpha()
@@ -313,6 +314,25 @@ function test_misprice_deterministic_schedule()
     update_stabilization_after_misprice!(stab, nothing)
     @test stab.cur_smooth_dual_sol_coeff ≈ 0.0
     @test stab.nb_misprices == 3
+end
+
+function test_misprice_hard_cap()
+    ctx = _build_stab_ctx(alpha=0.99)
+    master = get_master(ctx)
+    stab = setup_stabilization!(ctx, master)
+    stab.smooth_dual_sol_coeff = 0.99
+
+    for i in 1:(MAX_MISPRICE_ITERATIONS - 1)
+        update_stabilization_after_misprice!(stab, nothing)
+        @test stab.nb_misprices == i
+    end
+    # Before cap: α may still be > 0 for high initial α
+    alpha_before_cap = stab.cur_smooth_dual_sol_coeff
+
+    # At the cap: α must be forced to 0
+    update_stabilization_after_misprice!(stab, nothing)
+    @test stab.nb_misprices == MAX_MISPRICE_ITERATIONS
+    @test stab.cur_smooth_dual_sol_coeff == 0.0
 end
 
 function test_decrease_alpha()

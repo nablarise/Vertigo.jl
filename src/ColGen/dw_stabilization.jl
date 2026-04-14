@@ -195,9 +195,14 @@ function update_stabilization_after_misprice!(
     stab::WentgesSmoothing, _mast_dual_sol
 )
     stab.nb_misprices += 1
-    stab.cur_smooth_dual_sol_coeff = max(
-        0.0, 1.0 - stab.nb_misprices * (1.0 - stab.smooth_dual_sol_coeff)
-    )
+    if stab.nb_misprices >= MAX_MISPRICE_ITERATIONS
+        stab.cur_smooth_dual_sol_coeff = 0.0
+    else
+        stab.cur_smooth_dual_sol_coeff = max(
+            0.0,
+            1.0 - stab.nb_misprices * (1.0 - stab.smooth_dual_sol_coeff)
+        )
+    end
     return nothing
 end
 
