@@ -326,9 +326,6 @@ function test_misprice_hard_cap()
         update_stabilization_after_misprice!(stab, nothing)
         @test stab.nb_misprices == i
     end
-    # Before cap: α may still be > 0 for high initial α
-    alpha_before_cap = stab.cur_smooth_dual_sol_coeff
-
     # At the cap: α must be forced to 0
     update_stabilization_after_misprice!(stab, nothing)
     @test stab.nb_misprices == MAX_MISPRICE_ITERATIONS
