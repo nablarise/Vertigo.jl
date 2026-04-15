@@ -229,19 +229,21 @@ end
 # ─────────────────────────────────────────────────────────────
 
 """
-    MultiPhaseStrongBranching <: AbstractBranchingStrategy
+    MultiPhaseStrongBranching{X} <: AbstractBranchingStrategy
 
 Multi-phase strong branching with configurable phases and
 pseudocost-based candidate selection with reliability skip.
+Parameterized on the variable key type `X` used by the
+pseudocost tracker (defaults to `MOI.VariableIndex`).
 """
-struct MultiPhaseStrongBranching <: AbstractBranchingStrategy
+struct MultiPhaseStrongBranching{X} <: AbstractBranchingStrategy
     max_candidates::Int
     mu::Float64
     phases::Vector{AbstractBranchingPhase}
-    pseudocosts::PseudocostTracker{Any}
+    pseudocosts::PseudocostTracker{X}
     branching_ctx::BranchingContext
 
-    function MultiPhaseStrongBranching(;
+    function MultiPhaseStrongBranching{X}(;
         max_candidates::Int = 20,
         mu::Float64 = 1.0 / 6.0,
         phases::Vector{<:AbstractBranchingPhase} = AbstractBranchingPhase[
@@ -250,16 +252,22 @@ struct MultiPhaseStrongBranching <: AbstractBranchingStrategy
         ],
         reliability_threshold::Int = 8,
         branching_ctx::BranchingContext = DefaultBranchingContext()
-    )
-        new(
+    ) where {X}
+        new{X}(
             max_candidates, mu,
             convert(Vector{AbstractBranchingPhase}, phases),
-            PseudocostTracker{Any}(
+            PseudocostTracker{X}(
                 reliability_threshold=reliability_threshold
             ),
             branching_ctx
         )
     end
+end
+
+function MultiPhaseStrongBranching(; kwargs...)
+    return MultiPhaseStrongBranching{MOI.VariableIndex}(;
+        kwargs...
+    )
 end
 
 """

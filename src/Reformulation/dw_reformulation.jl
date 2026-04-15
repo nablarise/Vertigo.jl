@@ -23,6 +23,8 @@ mutable struct DWReformulation{X,M<:AbstractVariableMapping{X}} <: AbstractDecom
     convexity_lb::Dict{PricingSubproblemId,TaggedCI}
 end
 
+orig_var_type(::DWReformulation{X}) where {X} = X
+
 # M⁻¹ hot path
 @inline function original_cost(d::DWReformulation, sp_id, sp_var)
     return d.subproblems[sp_id].original_costs[sp_var]

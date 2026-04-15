@@ -81,6 +81,13 @@ function BPSpace(
     cut_helper = MathOptState.transform_model!(
         cut_tracker, master
     )
+    effective_strategy = if branching_strategy isa MultiPhaseStrongBranching
+        X = orig_var_type(bp_decomp(ctx))
+        _rebuild_mpsb(branching_strategy, X)
+    else
+        branching_strategy
+    end
+
     return BPSpace(
         ctx, master, domain_helper,
         cut_tracker, cut_helper,
@@ -93,7 +100,7 @@ function BPSpace(
         rmp_heuristic, separator,
         CutColGenContext(max_cut_rounds, min_gap_improvement),
         0,
-        branching_strategy,
+        effective_strategy,
         log_level
     )
 end
@@ -324,6 +331,19 @@ node and most-fractional branching on original variables.
 - `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
   (default: `nothing` — no dot file written).
 """
+function _rebuild_mpsb(
+    mpsb::MultiPhaseStrongBranching, ::Type{X};
+    branching_ctx::BranchingContext = mpsb.branching_ctx
+) where {X}
+    return MultiPhaseStrongBranching{X}(;
+        max_candidates=mpsb.max_candidates,
+        mu=mpsb.mu,
+        phases=mpsb.phases,
+        reliability_threshold=mpsb.pseudocosts.reliability_threshold,
+        branching_ctx=branching_ctx
+    )
+end
+
 function run_branch_and_price(
     ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
     strategy = TreeSearch.DepthFirstStrategy(),
@@ -345,11 +365,9 @@ function run_branch_and_price(
     end
 
     effective_strategy = if branching_strategy isa MultiPhaseStrongBranching
-        MultiPhaseStrongBranching(;
-            max_candidates=branching_strategy.max_candidates,
-            mu=branching_strategy.mu,
-            phases=branching_strategy.phases,
-            reliability_threshold=branching_strategy.pseudocosts.reliability_threshold,
+        X = orig_var_type(bp_decomp(ctx))
+        _rebuild_mpsb(
+            branching_strategy, X;
             branching_ctx=branching_ctx
         )
     else

@@ -6,6 +6,9 @@ abstract type AbstractDecomposition end
 abstract type AbstractSubproblemSolution end
 abstract type AbstractColumnPool end
 
+# ── Variable key type ────────────────────────────────────────────────────────
+function orig_var_type end
+
 # ── M⁻¹ direction (z → x): hot path ──────────────────────────────────────────
 function original_cost end
 function coupling_coefficients end

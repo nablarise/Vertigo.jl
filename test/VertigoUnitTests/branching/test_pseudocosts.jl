@@ -168,7 +168,7 @@ function test_pseudocosts()
         mock_node = (user_data=node_data,)
 
         result = select_branching_variable(
-            rb, space, mock_node, primal
+            space.branching_strategy, space, mock_node, primal
         )
         @test result.status == branching_ok
         frac = result.value - floor(result.value)
@@ -193,17 +193,18 @@ function test_pseudocosts()
         space = BPSpace(
             ctx; node_limit=1, branching_strategy=rb
         )
+        strategy = space.branching_strategy
         node_data = BPNodeData()
         node_data.cg_output = cg_out
         mock_node = (user_data=node_data,)
 
         result = select_branching_variable(
-            rb, space, mock_node, primal
+            strategy, space, mock_node, primal
         )
         @test result.status == branching_ok
 
         # Verify lookahead actually cut the loop
-        n_probed = length(rb.pseudocosts.records)
+        n_probed = length(strategy.pseudocosts.records)
         @test n_probed <= 2
     end
 

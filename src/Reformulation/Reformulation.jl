@@ -55,7 +55,7 @@ export add_coupling_constraint!, build
 export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 # Interface functions
-export original_cost, coupling_coefficients
+export orig_var_type, original_cost, coupling_coefficients
 export mapped_original_var, mapped_subproblem_var, original_variables
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost
 export convexity_bounds, nb_subproblem_multiplicity
