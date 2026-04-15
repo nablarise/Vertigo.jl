@@ -56,7 +56,7 @@ function _insert_column!(
         coeff = 0.0
         for (sp_var_inner, val_inner) in nonzero_entries(sol)
             ov = mapped_original_var(decomp, sp_id, sp_var_inner)
-            ov === nothing && continue
+            isnothing(ov) && continue
             c = get(cut.coefficients, ov, 0.0)
             if !iszero(c)
                 coeff += c * val_inner
@@ -92,7 +92,7 @@ function insert_columns!(
     cols_inserted = 0
     for pricing_sol in columns.collection
         col_var = _insert_column!(ctx, phase, pricing_sol)
-        if col_var !== nothing
+        if !isnothing(col_var)
             cols_inserted += 1
         end
     end
