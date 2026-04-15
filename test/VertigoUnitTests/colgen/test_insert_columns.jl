@@ -308,10 +308,81 @@ function test_insert_columns_empty_set()
 end
 
 # ──────────────────────────────────────────────────────────────────
+# _insert_column! tests
+# ──────────────────────────────────────────────────────────────────
+
+function test_insert_column_returns_var()
+    @testset "[_insert_column] returns variable and correct coefficients" begin
+        ctx, refs = build_insert_columns_context()
+        model = master_model(ctx.decomp)
+
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
+        pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
+            PricingSubproblemId(1), sol, true
+        )
+
+        col_var = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+
+        @test col_var isa MOI.VariableIndex
+        @test length(ctx.pool.by_column_var) == 1
+        @test _obj_coeff(model, col_var) ≈ 3.0
+        @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
+        @test _constr_coeff(model, refs.c2, col_var) ≈ 1.0
+        @test _constr_coeff(model, refs.conv_ub, col_var) ≈ 1.0
+        @test _constr_coeff(model, refs.conv_lb, col_var) ≈ 1.0
+        @test _constr_coeff(model, refs.br, col_var) ≈ 1.0
+    end
+end
+
+function test_insert_column_duplicate_returns_nothing()
+    @testset "[_insert_column] duplicate returns nothing" begin
+        ctx, refs = build_insert_columns_context()
+
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
+        pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
+            PricingSubproblemId(1), sol, true
+        )
+
+        col_var1 = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+        @test col_var1 isa MOI.VariableIndex
+
+        col_var2 = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+        @test col_var2 === nothing
+        @test length(ctx.pool.by_column_var) == 1
+    end
+end
+
+function test_insert_column_phase1_zero_cost()
+    @testset "[_insert_column] phase 1 sets zero objective cost" begin
+        ctx, refs = build_insert_columns_context()
+        model = master_model(ctx.decomp)
+
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
+        pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
+            PricingSubproblemId(1), sol, true
+        )
+
+        col_var = Vertigo.ColGen._insert_column!(ctx, Phase1(), pricing_sol)
+
+        @test col_var isa MOI.VariableIndex
+        @test _obj_coeff(model, col_var) ≈ 0.0
+    end
+end
+
+# ──────────────────────────────────────────────────────────────────
 # Entry point
 # ──────────────────────────────────────────────────────────────────
 
 function test_insert_columns()
+    test_insert_column_returns_var()
+    test_insert_column_duplicate_returns_nothing()
+    test_insert_column_phase1_zero_cost()
     test_insert_columns_single_column()
     test_insert_columns_two_columns()
     test_insert_columns_duplicate_skipped()
