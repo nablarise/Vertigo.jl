@@ -1,22 +1,17 @@
 # Vertigo.jl
 
-A Julia sandbox for branch-cut-and-price algorithms — and an experiment in AI-assisted code generation.
+A Julia framework for branch-cut-and-price, built with autonomous AI agents.
 
 ## Features
 
 - **Declarative Dantzig-Wolfe decomposition** via the `@dantzig_wolfe` macro: pattern-based assignment of variables and constraints to master/subproblems
-- **Column generation** with configurable iteration limits, dual bound tracking, and support for minimization and maximization
-- **Wentges smoothing stabilization** for dual solutions during column generation
-- **Branch-and-price** with pluggable branching strategies:
-  - Most/least fractional branching rules
-  - Multi-phase strong branching (LP probe, CG probe)
-  - Pseudocost branching with persistence across the tree
-- **Tree search** with multiple strategies: depth-first, breadth-first, best-first (dual bound), beam search, limited discrepancy
+- **Column generation**
+- **Branch-and-price**
+- **Tree search** with multiple strategies
 - **Robust cut separation** with user-defined cut callbacks
 - **Restricted master IP heuristic** for finding integer-feasible solutions
-- **MOI model state tracking** (column/cut/basis/bounds/integrality state) for efficient node transitions
-- **Pure master variables** and fixed master costs in the decomposition
-- Built on [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) and [JuMP](https://github.com/jump-dev/JuMP.jl)
+
+Built on [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) and [JuMP](https://github.com/jump-dev/JuMP.jl).
 
 ## Example
 
@@ -49,15 +44,28 @@ decomp, sp_map = @dantzig_wolfe model begin
 end
 
 # Solve via column generation
-ctx = ColGenLoggerContext(ColGenContext(decomp, ColumnPool()))
+pool = ColumnPool()
+no_art = Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}()
+no_leq = Dict{TaggedCI,MOI.VariableIndex}()
+no_geq = Dict{TaggedCI,MOI.VariableIndex}()
+ctx = ColGenLoggerContext(
+    ColGenContext(decomp, pool, no_art, no_leq, no_geq)
+)
 output = run_column_generation(ctx)
 
 println("Status: ", output.status)           # optimal
 println("Dual bound: ", output.incumbent_dual_bound)  # 63.0
 ```
 
+## Agent-driven development
+
+Development is driven by autonomous AI agents running
+[Claude Code](https://docs.anthropic.com/en/docs/claude-code) in Docker
+containers. The agents automate the full GitHub workflow — from issue to
+merged PR.
+
+Agents never auto-merge. A human reviews and merges approved PRs.
+
 ## Status
 
 Experimental — under active development.
-
-Vertigo.jl is also an experiment in AI-assisted development. Most of the code in this repository was written collaboratively between a human and GenAI tools. Browse the git history for insight into what that workflow looks like in practice.
