@@ -44,13 +44,9 @@ decomp, sp_map = @dantzig_wolfe model begin
 end
 
 # Solve via column generation
-pool = ColumnPool()
-no_art = Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}()
-no_leq = Dict{TaggedCI,MOI.VariableIndex}()
-no_geq = Dict{TaggedCI,MOI.VariableIndex}()
-ctx = ColGenLoggerContext(
-    ColGenContext(decomp, pool, no_art, no_leq, no_geq)
-)
+config = ColGenConfig()
+workspace = ColGenWorkspace(decomp, config)
+ctx = ColGenLoggerContext(workspace)
 output = run_column_generation(ctx)
 
 println("Status: ", output.status)           # optimal

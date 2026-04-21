@@ -36,7 +36,7 @@ get_dual_sol(sol::MasterSolution) = sol.dual_sol
 
 is_better_primal_sol(::MasterPrimalSolution, ::Nothing) = true
 
-function optimize_master_lp_problem!(master, ::ColGenContext)
+function optimize_master_lp_problem!(master, ::ColGenWorkspace)
     MOI.optimize!(moi_master(master))
 
     obj_value = MOI.get(moi_master(master), MOI.ObjectiveValue())
@@ -59,6 +59,6 @@ function optimize_master_lp_problem!(master, ::ColGenContext)
     )
 end
 
-function update_master_constrs_dual_vals!(::ColGenContext, ::MasterDualSolution)
+function update_master_constrs_dual_vals!(::ColGenWorkspace, ::MasterDualSolution)
     return nothing
 end

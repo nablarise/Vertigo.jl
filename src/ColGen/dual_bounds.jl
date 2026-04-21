@@ -24,7 +24,7 @@ function _recompute_cost(dual_sol::DualMoiSolution, model)::Float64
 end
 
 function compute_dual_bound(
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     ::CGPhase,
     sps_db,
     mast_dual_sol::MasterDualSolution

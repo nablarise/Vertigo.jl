@@ -50,11 +50,12 @@ function _build_branching_test_context()
     record_column!(pool, col_var_a, sp1, sol_a, 3.0)
     record_column!(pool, col_var_b, sp1, sol_b, 5.0)
 
-    ctx = ColGenContext(
-        decomp, pool,
+    config = ColGenConfig()
+    ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}()
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
 
     return ctx, col_var_a, col_var_b

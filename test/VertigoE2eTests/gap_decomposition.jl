@@ -87,7 +87,7 @@ function get_gap_instance_path(class::Char, agents::Int, jobs::Int)::String
 end
 
 # ──────────────────────────────────────────────────────────────────────
-# Build ColGenContext for a GAP instance
+# Build ColGenWorkspace for a GAP instance
 # ──────────────────────────────────────────────────────────────────────
 
 function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
@@ -157,13 +157,12 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -252,13 +251,12 @@ function build_gap_context_with_fixed_cost(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -266,7 +264,7 @@ function build_gap_context_with_fixed_cost(
 end
 
 # ──────────────────────────────────────────────────────────────────────
-# Build ColGenContext for a shifted GAP (z ∈ {1,2} instead of x ∈ {0,1})
+# Build ColGenWorkspace for a shifted GAP (z ∈ {1,2} instead of x ∈ {0,1})
 # ──────────────────────────────────────────────────────────────────────
 
 function build_gap_shifted_context(
@@ -351,13 +349,12 @@ function build_gap_shifted_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -492,13 +489,12 @@ function build_gap_identical_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -592,13 +588,12 @@ function build_gap_with_penalty_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -721,13 +716,12 @@ function build_gap_with_penalty_card_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -844,13 +838,12 @@ function build_gap_with_pure_master_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -1007,15 +1000,14 @@ function build_gap_fenchel_context(
     )
 
     # ── Build context ─────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{
             MOI.VariableIndex,MOI.VariableIndex
         }}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 
@@ -1091,13 +1083,12 @@ function build_gap_context_max(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    inner_ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     ctx = ColGenLoggerContext(inner_ctx)
 

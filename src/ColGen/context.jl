@@ -94,14 +94,39 @@ struct ActiveRobustCut{X}
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
-# COLGEN CONTEXT
+# COLGEN CONFIG
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    ColGenContext{D}
+    ColGenConfig
 
-Column generation context. Bundles all static data (decomposition),
-and runtime structures (column pool, artificial variable tracking).
+Plain data holder for user-defined column generation parameters.
+Cheap to construct, copy, and compare.
+
+# Fields
+- `smoothing_alpha`: Wentges smoothing coefficient (0.0 = no smoothing).
+- `max_cg_iterations`: hard limit on CG iterations per phase.
+"""
+struct ColGenConfig
+    smoothing_alpha::Float64
+    max_cg_iterations::Int
+    function ColGenConfig(;
+        smoothing_alpha::Float64 = 0.0,
+        max_cg_iterations::Int = 1000
+    )
+        new(smoothing_alpha, max_cg_iterations)
+    end
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
+# COLGEN WORKSPACE
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+"""
+    ColGenWorkspace{D}
+
+Column generation workspace. Owns the decomposition, column pool,
+artificial variable tracking, and mutable runtime state.
 
 MOI models and convexity constraint indices are owned by `decomp`
 (`DWReformulation`), not by this struct.
@@ -109,7 +134,7 @@ MOI models and convexity constraint indices are owned by `decomp`
 Type parameters:
   - D: AbstractDecomposition implementation
 """
-mutable struct ColGenContext{D<:AbstractDecomposition}
+mutable struct ColGenWorkspace{D<:AbstractDecomposition}
     decomp::D
     pool::ColumnPool
     # TODO: support non-robust cuts
@@ -122,33 +147,56 @@ mutable struct ColGenContext{D<:AbstractDecomposition}
     robust_cuts::Vector{ActiveRobustCut}
     smoothing_alpha::Float64
     max_cg_iterations::Int
+end
 
-    function ColGenContext(
-        decomp, pool,
-        eq_art_vars, leq_art_vars, geq_art_vars;
-        smoothing_alpha::Float64 = 0.0,
-        max_cg_iterations::Int = 1000
+"""
+    ColGenWorkspace(decomp, config::ColGenConfig)
+
+Convenience constructor that creates a workspace with an empty column
+pool and empty artificial variable dictionaries.
+"""
+function ColGenWorkspace(decomp, config::ColGenConfig)
+    return ColGenWorkspace(
+        decomp,
+        ColumnPool(),
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
-        new{typeof(decomp)}(
-            decomp, pool,
-            eq_art_vars, leq_art_vars, geq_art_vars, nothing,
-            nothing, ActiveBranchingConstraint[],
-            ActiveRobustCut[], smoothing_alpha, max_cg_iterations
-        )
-    end
+end
+
+"""
+    ColGenWorkspace(decomp, pool, eq, leq, geq, config::ColGenConfig)
+
+Explicit constructor for callers that need to seed the workspace
+with an existing column pool or artificial variables.
+"""
+function ColGenWorkspace(
+    decomp, pool,
+    eq_art_vars, leq_art_vars, geq_art_vars,
+    config::ColGenConfig
+)
+    return ColGenWorkspace(
+        decomp, pool,
+        eq_art_vars, leq_art_vars, geq_art_vars,
+        nothing, nothing,
+        ActiveBranchingConstraint[], ActiveRobustCut[],
+        config.smoothing_alpha, config.max_cg_iterations
+    )
 end
 
 # Core accessors
-is_minimization(ctx::ColGenContext) = is_minimization(ctx.decomp)
+is_minimization(ctx::ColGenWorkspace) = is_minimization(ctx.decomp)
 
-max_cg_iterations(ctx::ColGenContext) = ctx.max_cg_iterations
+max_cg_iterations(ctx::ColGenWorkspace) = ctx.max_cg_iterations
 
-function set_max_cg_iterations!(ctx::ColGenContext, n::Int)
+function set_max_cg_iterations!(ctx::ColGenWorkspace, n::Int)
     ctx.max_cg_iterations = n
     return
 end
 
-function get_master(ctx::ColGenContext)
+function get_master(ctx::ColGenWorkspace)
     cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ctx.decomp)]
     return Master(
         master_model(ctx.decomp),
@@ -161,14 +209,14 @@ function get_master(ctx::ColGenContext)
     )
 end
 
-function get_pricing_subprobs(ctx::ColGenContext)
+function get_pricing_subprobs(ctx::ColGenWorkspace)
     return Dict{PricingSubproblemId,Any}(
         sp_id => PricingSubproblem(sp_model(ctx.decomp, sp_id))
         for sp_id in subproblem_ids(ctx.decomp)
     )
 end
 
-get_reform(ctx::ColGenContext) = ctx
+get_reform(ctx::ColGenWorkspace) = ctx
 
 function _dual_bound_dominated(ctx, dual_bound, ip_bound)
     isnothing(ip_bound) && return false
@@ -204,20 +252,20 @@ struct NoStabilization end
 
 @enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit ip_pruned
 
-new_phase_iterator(::ColGenContext) = ColGenPhaseIterator()
+new_phase_iterator(::ColGenWorkspace) = ColGenPhaseIterator()
 initial_phase(::ColGenPhaseIterator) = Phase0()
-new_stage_iterator(::ColGenContext) = ColGenStageIterator()
+new_stage_iterator(::ColGenWorkspace) = ColGenStageIterator()
 initial_stage(::ColGenStageIterator) = ExactStage()
 
-stop_colgen(::ColGenContext, ::Nothing) = false
-stop_colgen(::ColGenContext, _) = false
+stop_colgen(::ColGenWorkspace, ::Nothing) = false
+stop_colgen(::ColGenWorkspace, _) = false
 
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
+function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
     model = master_model(ctx.decomp)
     sense = is_minimization(ctx.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
@@ -311,7 +359,7 @@ function setup_reformulation!(ctx::ColGenContext, phase::Phase0)
     return nothing
 end
 
-function setup_reformulation!(ctx::ColGenContext, ::Phase1)
+function setup_reformulation!(ctx::ColGenWorkspace, ::Phase1)
     model = master_model(ctx.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
     sense = is_minimization(ctx.decomp) ? 1.0 : -1.0
@@ -335,7 +383,7 @@ function setup_reformulation!(ctx::ColGenContext, ::Phase1)
     return nothing
 end
 
-function setup_reformulation!(ctx::ColGenContext, ::Phase2)
+function setup_reformulation!(ctx::ColGenWorkspace, ::Phase2)
     model = master_model(ctx.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
 
@@ -378,12 +426,12 @@ struct ColGenIterationOutput
     subproblem_infeasible::Bool
 end
 
-colgen_iteration_output_type(::ColGenContext) = ColGenIterationOutput
+colgen_iteration_output_type(::ColGenWorkspace) = ColGenIterationOutput
 
-stop_colgen_phase(::ColGenContext, _, ::Nothing, _, _, _) = false
+stop_colgen_phase(::ColGenWorkspace, _, ::Nothing, _, _, _) = false
 
 function stop_colgen_phase(
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     ::Union{Phase0,Phase2},
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
@@ -406,7 +454,7 @@ function stop_colgen_phase(
 end
 
 function stop_colgen_phase(
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     ::Phase1,
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
@@ -460,9 +508,9 @@ struct ColGenPhaseOutput
     ip_pruned::Bool
 end
 
-colgen_phase_output_type(::ColGenContext) = ColGenPhaseOutput
+colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
 
-function has_artificial_vars_in_solution(ctx::ColGenContext, tol=RC_IMPROVING_TOL)::Bool
+function has_artificial_vars_in_solution(ctx::ColGenWorkspace, tol=RC_IMPROVING_TOL)::Bool
     model = master_model(ctx.decomp)
     for (_, (s_pos, s_neg)) in ctx.eq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
@@ -479,7 +527,7 @@ end
 
 function new_phase_output(
     ::Type{<:ColGenPhaseOutput},
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     min_sense,
     phase,
     stage,
@@ -538,10 +586,10 @@ struct ColGenOutput
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
 end
 
-colgen_output_type(::ColGenContext) = ColGenOutput
+colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
 function new_output(
-    ::Type{ColGenOutput}, ctx::ColGenContext, p::ColGenPhaseOutput
+    ::Type{ColGenOutput}, ctx::ColGenWorkspace, p::ColGenPhaseOutput
 )
     ip = ctx.ip_incumbent
     if p.subproblem_infeasible
@@ -576,7 +624,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function after_colgen_iteration(
-    ::ColGenContext,
+    ::ColGenWorkspace,
     ::CGPhase,
     ::ExactStage,
     colgen_iterations::Int64,
@@ -588,26 +636,43 @@ function after_colgen_iteration(
     # do nothing
 end
 
-function is_better_dual_bound(ctx::ColGenContext, dual_bound::Float64, incumbent::Float64)
+function is_better_dual_bound(ctx::ColGenWorkspace, dual_bound::Float64, incumbent::Float64)
     sense = is_minimization(ctx) ? 1 : -1
     return sense * dual_bound > sense * incumbent
 end
 
 
 # ────────────────────────────────────────────────────────────────────────────────────────
-# RUN COLUMN GENERATION ENTRY POINT
+# RUN COLUMN GENERATION ENTRY POINTS
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    run_column_generation(ctx::ColGenContext) -> ColGenOutput
+    run_col_gen(decomp, config::ColGenConfig) -> ColGenOutput
 
-Run the column generation algorithm on the given context.
-
-# Examples
-```jldoctest
-julia> # (see test for a full example)
-```
+Public entry point. Builds a [`ColGenWorkspace`](@ref) from `decomp`
+and `config`, then dispatches to [`_run_col_gen`](@ref).
 """
-function run_column_generation(ctx::ColGenContext)
+function run_col_gen(decomp, config::ColGenConfig)
+    workspace = ColGenWorkspace(decomp, config)
+    return _run_col_gen(decomp, config, workspace)
+end
+
+"""
+    _run_col_gen(decomp, config::ColGenConfig, workspace::ColGenWorkspace) -> ColGenOutput
+
+Internal entry point. Runs the column generation algorithm on an
+already-constructed workspace. Useful for reuse across solves or
+testing.
+"""
+function _run_col_gen(decomp, config::ColGenConfig, workspace::ColGenWorkspace)
+    return ColGen.run!(workspace, nothing)
+end
+
+"""
+    run_column_generation(ctx::ColGenWorkspace) -> ColGenOutput
+
+Run the column generation algorithm on the given workspace.
+"""
+function run_column_generation(ctx::ColGenWorkspace)
     return ColGen.run!(ctx, nothing)
 end

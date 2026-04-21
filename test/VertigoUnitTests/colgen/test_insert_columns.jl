@@ -14,7 +14,7 @@ end
 """
     build_insert_columns_context()
 
-Build a minimal ColGenContext for testing `insert_columns!` (Phase 0).
+Build a minimal ColGenWorkspace for testing `insert_columns!` (Phase 0).
 
 Master (MOI, minimization):
   min  0
@@ -123,12 +123,12 @@ function build_insert_columns_context()
 
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub_map, conv_lb_map)
 
-    ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig()
+    ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}()
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
 
     # Active branching constraint on x₁ = (1, 1)

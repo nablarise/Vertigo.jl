@@ -20,7 +20,7 @@ Insert a single column into the master. Returns the new column variable
 index, or `nothing` if the column was already in the pool.
 """
 function _insert_column!(
-    ctx::ColGenContext, phase::CGPhase,
+    ctx::ColGenWorkspace, phase::CGPhase,
     pricing_sol::PricingPrimalSolution
 )
     decomp = ctx.decomp
@@ -86,7 +86,7 @@ function _insert_column!(
 end
 
 function insert_columns!(
-    ctx::ColGenContext, phase::CGPhase,
+    ctx::ColGenWorkspace, phase::CGPhase,
     columns::GeneratedColumns
 )
     cols_inserted = 0
