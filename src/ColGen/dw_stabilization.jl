@@ -15,7 +15,7 @@ end
 get_stab_dual_sol(::NoStabilization, phase, dual_sol::MasterDualSolution) = dual_sol
 
 function update_stabilization_after_pricing_optim!(
-    ::NoStabilization, ::ColGenContext, _, _, _, _
+    ::NoStabilization, ::ColGenWorkspace, _, _, _, _
 )
     return nothing
 end
@@ -40,7 +40,7 @@ lies between a stability center (π^in) and the LP dual (π^out), reducing
 oscillation and accelerating convergence.
 """
 mutable struct WentgesSmoothing
-    ctx::ColGenContext
+    ctx::ColGenWorkspace
     smooth_dual_sol_coeff::Float64
     cur_smooth_dual_sol_coeff::Float64
     stab_center::Union{Nothing,MasterDualSolution}
@@ -53,7 +53,7 @@ end
 
 # ── Setup ────────────────────────────────────────────────────────────────────
 
-function setup_stabilization!(ctx::ColGenContext, _master)
+function setup_stabilization!(ctx::ColGenWorkspace, _master)
     if ctx.smoothing_alpha > 0.0
         init_lb = is_minimization(ctx) ? -Inf : Inf
         return WentgesSmoothing(
@@ -132,7 +132,7 @@ end
 
 function update_stabilization_after_pricing_optim!(
     stab::WentgesSmoothing,
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     generated_columns,
     _master,
     pseudo_db,
@@ -266,7 +266,7 @@ end
 # ── Iteration logging dispatch ───────────────────────────────────────────────
 
 function after_colgen_iteration(
-    ::ColGenContext,
+    ::ColGenWorkspace,
     ::CGPhase,
     ::ExactStage,
     ::Int64,

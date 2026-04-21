@@ -61,7 +61,7 @@ Create a branch-and-price search space from a column generation
 context. Registers existing variable bound constraints for tracking.
 """
 function BPSpace(
-    ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
+    ctx::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerContext};
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,
     rmp_time_limit::Float64 = 60.0,
@@ -306,7 +306,7 @@ Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on original variables.
 
 # Arguments
-- `ctx`: Column generation context (`ColGenContext` or `ColGenLoggerContext`).
+- `ctx`: Column generation context (`ColGenWorkspace` or `ColGenLoggerContext`).
 - `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
 - `node_limit::Int`: Maximum nodes to explore (default: 10000).
 - `tol::Float64`: Numerical tolerance (default: 1e-6).
@@ -325,7 +325,7 @@ node and most-fractional branching on original variables.
   (default: `nothing` — no dot file written).
 """
 function run_branch_and_price(
-    ctx::Union{ColGen.ColGenContext,ColGen.ColGenLoggerContext};
+    ctx::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerContext};
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,

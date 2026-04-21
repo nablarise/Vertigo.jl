@@ -17,7 +17,7 @@ end
 """
     build_phase_test_context()
 
-Build a minimal ColGenContext for testing phase transitions.
+Build a minimal ColGenWorkspace for testing phase transitions.
 
 Master (MOI, minimization):
   min  5 λ₁ + 8 λ₂ + 3.5 y_cont + 7 y_int
@@ -136,12 +136,12 @@ function build_phase_test_context()
 
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub, conv_lb)
 
-    ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig()
+    ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}()
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
 
     return ctx, (λ1=λ1, λ2=λ2, y_cont=y_cont, y_int=y_int)

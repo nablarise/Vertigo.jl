@@ -8,7 +8,7 @@ struct DefaultPricingStrategy{I}
     pricing_sps::I
 end
 
-function get_pricing_strategy(ctx::ColGenContext, ::CGPhase)
+function get_pricing_strategy(ctx::ColGenWorkspace, ::CGPhase)
     return DefaultPricingStrategy(get_pricing_subprobs(ctx))
 end
 
@@ -105,7 +105,7 @@ struct GeneratedColumns
     collection::Vector{PricingPrimalSolution}
 end
 
-function set_of_columns(::ColGenContext)
+function set_of_columns(::ColGenWorkspace)
     return GeneratedColumns(PricingPrimalSolution[])
 end
 
@@ -141,7 +141,7 @@ end
 # ── optimize_pricing_problem! ─────────────────────────────────────────────────
 
 function optimize_pricing_problem!(
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     sp_id,
     pricing_sp::PricingSubproblem,
     ::SubproblemMoiOptimizer,

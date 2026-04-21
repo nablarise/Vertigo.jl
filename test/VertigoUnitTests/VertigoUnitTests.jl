@@ -44,13 +44,13 @@ function random_gap_instance(n_machines, n_tasks; seed=42)
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
-# Build ColGenContext for a GAP instance
+# Build ColGenWorkspace for a GAP instance
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_context(inst) -> ColGenContext
+    build_gap_context(inst) -> ColGenWorkspace
 
-Build a column generation context for the given GAP instance.
+Build a column generation workspace for the given GAP instance.
 
 The master model contains:
   - Assignment coupling constraints: Σₖ xₖₜ = 1 for each task t (EqualTo)
@@ -125,13 +125,12 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────────────
-    ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(max_cg_iterations=max_cg_iterations)
+    ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        max_cg_iterations=max_cg_iterations
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
 
     return ctx

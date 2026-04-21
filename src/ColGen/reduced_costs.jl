@@ -65,7 +65,7 @@ end
 
 # Hot path: sorted duals built once, shared across subproblems.
 function _compute_sp_reduced_costs(
-    ctx::ColGenContext, mast_dual_sol::MasterDualSolution,
+    ctx::ColGenWorkspace, mast_dual_sol::MasterDualSolution,
     sorted_duals::SortedDualVector, sp_id; zero_cost=false
 )
     decomp = ctx.decomp
@@ -101,7 +101,7 @@ end
 
 # Fallback: builds sorted duals per call (used by dw_stabilization.jl).
 function _compute_sp_reduced_costs(
-    ctx::ColGenContext, mast_dual_sol::MasterDualSolution, sp_id;
+    ctx::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id;
     zero_cost=false
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
@@ -111,7 +111,7 @@ function _compute_sp_reduced_costs(
 end
 
 function compute_reduced_costs!(
-    ctx::ColGenContext, ::Union{Phase0,Phase2},
+    ctx::ColGenWorkspace, ::Union{Phase0,Phase2},
     mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
@@ -124,7 +124,7 @@ function compute_reduced_costs!(
 end
 
 function compute_reduced_costs!(
-    ctx::ColGenContext, ::Phase1, mast_dual_sol::MasterDualSolution
+    ctx::ColGenWorkspace, ::Phase1, mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
     return ReducedCosts(Dict(
@@ -135,7 +135,7 @@ function compute_reduced_costs!(
     ))
 end
 
-function update_reduced_costs!(ctx::ColGenContext, ::CGPhase, red_costs::ReducedCosts)
+function update_reduced_costs!(ctx::ColGenWorkspace, ::CGPhase, red_costs::ReducedCosts)
     for (sp_id, sp_rc) in red_costs.values
         spm = sp_model(ctx.decomp, sp_id)
         for (var_index, rc_value) in sp_rc
@@ -149,5 +149,5 @@ function update_reduced_costs!(ctx::ColGenContext, ::CGPhase, red_costs::Reduced
     return nothing
 end
 
-compute_sp_init_db(ctx::ColGenContext, _) = is_minimization(ctx) ? -Inf : Inf
-compute_sp_init_pb(ctx::ColGenContext, _) = is_minimization(ctx) ? Inf : -Inf
+compute_sp_init_db(ctx::ColGenWorkspace, _) = is_minimization(ctx) ? -Inf : Inf
+compute_sp_init_pb(ctx::ColGenWorkspace, _) = is_minimization(ctx) ? Inf : -Inf

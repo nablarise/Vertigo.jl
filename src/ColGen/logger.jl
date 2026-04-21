@@ -4,19 +4,19 @@
 
 # ──────────────────────────────────────────────────────────────────────
 # VERTIGO LOGGER CONTEXT
-# A thin wrapper around ColGenContext that overrides the two logging
+# A thin wrapper around ColGenWorkspace that overrides the two logging
 # hooks to emit compact, tag-based terminal output.
 # ──────────────────────────────────────────────────────────────────────
 
 mutable struct ColGenLoggerContext
-    inner::ColGenContext
+    inner::ColGenWorkspace
     cg_start_time::Float64
     log_level::Int
     log_frequency::Int
     master_time::Float64
     pricing_time::Float64
     function ColGenLoggerContext(
-        ctx::ColGenContext;
+        ctx::ColGenWorkspace;
         log_level::Int=1,
         log_frequency::Int=1
     )

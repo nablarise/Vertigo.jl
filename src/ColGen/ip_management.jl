@@ -66,7 +66,7 @@ end
 
 function check_primal_ip_feasibility!(
     mast_primal_sol::MasterPrimalSolution,
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     ::CGPhase
 )
     _has_artificial_vars_in_solution(ctx, mast_primal_sol) && return nothing, false
@@ -74,7 +74,7 @@ function check_primal_ip_feasibility!(
 end
 
 function _is_strictly_better(
-    ctx::ColGenContext,
+    ctx::ColGenWorkspace,
     candidate::MasterIpPrimalSol,
     incumbent::MasterIpPrimalSol
 )
@@ -83,7 +83,7 @@ function _is_strictly_better(
 end
 
 function update_inc_primal_sol!(
-    ctx::ColGenContext, ::Nothing, new_sol::MasterIpPrimalSol
+    ctx::ColGenWorkspace, ::Nothing, new_sol::MasterIpPrimalSol
 )
     current = ctx.ip_incumbent
     if isnothing(current) || _is_strictly_better(ctx, new_sol, current)

@@ -26,7 +26,7 @@ function _make_dual_sol(
     )
 end
 
-"""Build a minimal ColGenContext with smoothing_alpha for testing."""
+"""Build a minimal ColGenWorkspace with smoothing_alpha for testing."""
 function _build_stab_ctx(; alpha=0.5)
     inst = random_gap_instance(2, 4; seed=42)
     K = 1:inst.n_machines
@@ -88,13 +88,12 @@ function _build_stab_ctx(; alpha=0.5)
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
-    ctx = ColGenContext(
-        decomp,
-        pool,
+    config = ColGenConfig(smoothing_alpha=alpha)
+    ctx = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=alpha
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config
     )
     return ctx
 end

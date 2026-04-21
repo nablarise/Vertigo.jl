@@ -6,19 +6,9 @@ function _build_colgen_context_from_dml(
     decomp, sp_map;
     smoothing_alpha::Float64=0.0
 )
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-    pool = ColumnPool()
-    inner_ctx = ColGenContext(
-        decomp,
-        pool,
-        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
-        Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}();
-        smoothing_alpha=smoothing_alpha
-    )
-    return ColGenLoggerContext(inner_ctx)
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    workspace = ColGenWorkspace(decomp, config)
+    return ColGenLoggerContext(workspace)
 end
 
 function test_dml_gap_basic(; smoothing_alpha=0.0)
