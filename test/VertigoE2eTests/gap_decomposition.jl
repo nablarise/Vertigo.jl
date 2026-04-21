@@ -164,7 +164,7 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -258,7 +258,7 @@ function build_gap_context_with_fixed_cost(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -356,7 +356,7 @@ function build_gap_shifted_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -496,7 +496,7 @@ function build_gap_identical_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -595,7 +595,7 @@ function build_gap_with_penalty_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -723,13 +723,13 @@ function build_gap_with_penalty_card_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
 
 """
-    build_gap_with_pure_master_context(inst) -> ColGenLoggerContext
+    build_gap_with_pure_master_context(inst) -> ColGenLoggerWorkspace
 
 Like `build_gap_context` but adds one continuous pure master variable `y`
 with cost 2.0, bounds [0, 1], and coupling coefficient 1.0 in the first
@@ -845,7 +845,7 @@ function build_gap_with_pure_master_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -1009,7 +1009,7 @@ function build_gap_fenchel_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end
@@ -1090,7 +1090,7 @@ function build_gap_context_max(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerContext(inner_ctx)
+    ctx = ColGenLoggerWorkspace(inner_ctx)
 
     return ctx
 end

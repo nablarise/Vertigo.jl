@@ -8,7 +8,7 @@ function _build_colgen_context_from_dml(
 )
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
     workspace = ColGenWorkspace(decomp, config)
-    return ColGenLoggerContext(workspace)
+    return ColGenLoggerWorkspace(workspace)
 end
 
 function test_dml_gap_basic(; smoothing_alpha=0.0)

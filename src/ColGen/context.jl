@@ -94,31 +94,6 @@ struct ActiveRobustCut{X}
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
-# COLGEN CONFIG
-# ────────────────────────────────────────────────────────────────────────────────────────
-
-"""
-    ColGenConfig
-
-Plain data holder for user-defined column generation parameters.
-Cheap to construct, copy, and compare.
-
-# Fields
-- `smoothing_alpha`: Wentges smoothing coefficient (0.0 = no smoothing).
-- `max_cg_iterations`: hard limit on CG iterations per phase.
-"""
-struct ColGenConfig
-    smoothing_alpha::Float64
-    max_cg_iterations::Int
-    function ColGenConfig(;
-        smoothing_alpha::Float64 = 0.0,
-        max_cg_iterations::Int = 1000
-    )
-        new(smoothing_alpha, max_cg_iterations)
-    end
-end
-
-# ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN WORKSPACE
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -654,7 +629,10 @@ and `config`, then runs column generation.
 """
 function run_col_gen(decomp, config::ColGenConfig)
     workspace = ColGenWorkspace(decomp, config)
-    return ColGen.run!(workspace, nothing)
+    if config.silent
+        return ColGen.run!(workspace, nothing)
+    end
+    return run_column_generation(ColGenLoggerWorkspace(workspace))
 end
 
 """

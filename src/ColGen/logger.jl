@@ -3,19 +3,19 @@
 # SPDX-License-Identifier: Proprietary
 
 # ──────────────────────────────────────────────────────────────────────
-# VERTIGO LOGGER CONTEXT
+# VERTIGO LOGGER WORKSPACE
 # A thin wrapper around ColGenWorkspace that overrides the two logging
 # hooks to emit compact, tag-based terminal output.
 # ──────────────────────────────────────────────────────────────────────
 
-mutable struct ColGenLoggerContext
+mutable struct ColGenLoggerWorkspace
     inner::ColGenWorkspace
     cg_start_time::Float64
     log_level::Int
     log_frequency::Int
     master_time::Float64
     pricing_time::Float64
-    function ColGenLoggerContext(
+    function ColGenLoggerWorkspace(
         ctx::ColGenWorkspace;
         log_level::Int=1,
         log_frequency::Int=1
@@ -37,52 +37,52 @@ end
 
 # ── Protocol delegation (context as arg 1) ───────────────────────────
 
-new_phase_iterator(lctx::ColGenLoggerContext)                        = new_phase_iterator(lctx.inner)
-new_stage_iterator(lctx::ColGenLoggerContext)                        = new_stage_iterator(lctx.inner)
-setup_stabilization!(lctx::ColGenLoggerContext, master)              = setup_stabilization!(lctx.inner, master)
-stop_colgen(lctx::ColGenLoggerContext, args...)                      = stop_colgen(lctx.inner, args...)
-colgen_output_type(lctx::ColGenLoggerContext)                        = colgen_output_type(lctx.inner)
-new_output(O, lctx::ColGenLoggerContext, args...)                    = new_output(O, lctx.inner, args...)
-stop_colgen_phase(lctx::ColGenLoggerContext, args...)                = stop_colgen_phase(lctx.inner, args...)
-is_better_dual_bound(lctx::ColGenLoggerContext, args...)             = is_better_dual_bound(lctx.inner, args...)
-colgen_phase_output_type(lctx::ColGenLoggerContext)                  = colgen_phase_output_type(lctx.inner)
-new_phase_output(O, lctx::ColGenLoggerContext, args...)              = new_phase_output(O, lctx.inner, args...)
-is_minimization(lctx::ColGenLoggerContext)                           = is_minimization(lctx.inner)
-get_master(lctx::ColGenLoggerContext)                                = get_master(lctx.inner)
-get_reform(lctx::ColGenLoggerContext)                                = get_reform(lctx.inner)
-colgen_iteration_output_type(lctx::ColGenLoggerContext)              = colgen_iteration_output_type(lctx.inner)
-update_inc_primal_sol!(lctx::ColGenLoggerContext, args...)           = update_inc_primal_sol!(lctx.inner, args...)
-update_master_constrs_dual_vals!(lctx::ColGenLoggerContext, args...) = update_master_constrs_dual_vals!(lctx.inner, args...)
-compute_reduced_costs!(lctx::ColGenLoggerContext, args...)           = compute_reduced_costs!(lctx.inner, args...)
-update_reduced_costs!(lctx::ColGenLoggerContext, args...)            = update_reduced_costs!(lctx.inner, args...)
-set_of_columns(lctx::ColGenLoggerContext)                            = set_of_columns(lctx.inner)
-get_pricing_strategy(lctx::ColGenLoggerContext, args...)             = get_pricing_strategy(lctx.inner, args...)
-get_pricing_subprobs(lctx::ColGenLoggerContext)                      = get_pricing_subprobs(lctx.inner)
-insert_columns!(lctx::ColGenLoggerContext, args...)                  = insert_columns!(lctx.inner, args...)
-compute_dual_bound(lctx::ColGenLoggerContext, args...)               = compute_dual_bound(lctx.inner, args...)
-compute_sp_init_db(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_db(lctx.inner, sp)
-compute_sp_init_pb(lctx::ColGenLoggerContext, sp)                    = compute_sp_init_pb(lctx.inner, sp)
-max_cg_iterations(lctx::ColGenLoggerContext)                         = max_cg_iterations(lctx.inner)
-set_max_cg_iterations!(lctx::ColGenLoggerContext, n::Int)            = set_max_cg_iterations!(lctx.inner, n)
+new_phase_iterator(lctx::ColGenLoggerWorkspace)                        = new_phase_iterator(lctx.inner)
+new_stage_iterator(lctx::ColGenLoggerWorkspace)                        = new_stage_iterator(lctx.inner)
+setup_stabilization!(lctx::ColGenLoggerWorkspace, master)              = setup_stabilization!(lctx.inner, master)
+stop_colgen(lctx::ColGenLoggerWorkspace, args...)                      = stop_colgen(lctx.inner, args...)
+colgen_output_type(lctx::ColGenLoggerWorkspace)                        = colgen_output_type(lctx.inner)
+new_output(O, lctx::ColGenLoggerWorkspace, args...)                    = new_output(O, lctx.inner, args...)
+stop_colgen_phase(lctx::ColGenLoggerWorkspace, args...)                = stop_colgen_phase(lctx.inner, args...)
+is_better_dual_bound(lctx::ColGenLoggerWorkspace, args...)             = is_better_dual_bound(lctx.inner, args...)
+colgen_phase_output_type(lctx::ColGenLoggerWorkspace)                  = colgen_phase_output_type(lctx.inner)
+new_phase_output(O, lctx::ColGenLoggerWorkspace, args...)              = new_phase_output(O, lctx.inner, args...)
+is_minimization(lctx::ColGenLoggerWorkspace)                           = is_minimization(lctx.inner)
+get_master(lctx::ColGenLoggerWorkspace)                                = get_master(lctx.inner)
+get_reform(lctx::ColGenLoggerWorkspace)                                = get_reform(lctx.inner)
+colgen_iteration_output_type(lctx::ColGenLoggerWorkspace)              = colgen_iteration_output_type(lctx.inner)
+update_inc_primal_sol!(lctx::ColGenLoggerWorkspace, args...)           = update_inc_primal_sol!(lctx.inner, args...)
+update_master_constrs_dual_vals!(lctx::ColGenLoggerWorkspace, args...) = update_master_constrs_dual_vals!(lctx.inner, args...)
+compute_reduced_costs!(lctx::ColGenLoggerWorkspace, args...)           = compute_reduced_costs!(lctx.inner, args...)
+update_reduced_costs!(lctx::ColGenLoggerWorkspace, args...)            = update_reduced_costs!(lctx.inner, args...)
+set_of_columns(lctx::ColGenLoggerWorkspace)                            = set_of_columns(lctx.inner)
+get_pricing_strategy(lctx::ColGenLoggerWorkspace, args...)             = get_pricing_strategy(lctx.inner, args...)
+get_pricing_subprobs(lctx::ColGenLoggerWorkspace)                      = get_pricing_subprobs(lctx.inner)
+insert_columns!(lctx::ColGenLoggerWorkspace, args...)                  = insert_columns!(lctx.inner, args...)
+compute_dual_bound(lctx::ColGenLoggerWorkspace, args...)               = compute_dual_bound(lctx.inner, args...)
+compute_sp_init_db(lctx::ColGenLoggerWorkspace, sp)                    = compute_sp_init_db(lctx.inner, sp)
+compute_sp_init_pb(lctx::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lctx.inner, sp)
+max_cg_iterations(lctx::ColGenLoggerWorkspace)                         = max_cg_iterations(lctx.inner)
+set_max_cg_iterations!(lctx::ColGenLoggerWorkspace, n::Int)            = set_max_cg_iterations!(lctx.inner, n)
 
 # ── Protocol delegation (context as arg 2) ───────────────────────────
 
-update_stabilization_after_pricing_optim!(stab, lctx::ColGenLoggerContext, args...) =
+update_stabilization_after_pricing_optim!(stab, lctx::ColGenLoggerWorkspace, args...) =
     update_stabilization_after_pricing_optim!(stab, lctx.inner, args...)
 
-check_primal_ip_feasibility!(sol, lctx::ColGenLoggerContext, phase) =
+check_primal_ip_feasibility!(sol, lctx::ColGenLoggerWorkspace, phase) =
     check_primal_ip_feasibility!(sol, lctx.inner, phase)
 
 # ── Timing wrappers ──────────────────────────────────────────────────
 
-function optimize_master_lp_problem!(master, lctx::ColGenLoggerContext)
+function optimize_master_lp_problem!(master, lctx::ColGenLoggerWorkspace)
     t0 = time()
     result = optimize_master_lp_problem!(master, lctx.inner)
     lctx.master_time += time() - t0
     return result
 end
 
-function optimize_pricing_problem!(lctx::ColGenLoggerContext, args...)
+function optimize_pricing_problem!(lctx::ColGenLoggerWorkspace, args...)
     t0 = time()
     result = optimize_pricing_problem!(lctx.inner, args...)
     lctx.pricing_time += time() - t0
@@ -91,14 +91,14 @@ end
 
 # ── Logging overrides ────────────────────────────────────────────────
 
-function setup_reformulation!(lctx::ColGenLoggerContext, phase)
+function setup_reformulation!(lctx::ColGenLoggerWorkspace, phase)
     lctx.master_time = 0.0
     lctx.pricing_time = 0.0
     setup_reformulation!(lctx.inner, phase)
 end
 
 function after_colgen_iteration(
-    lctx::ColGenLoggerContext, phase, _stage,
+    lctx::ColGenLoggerWorkspace, phase, _stage,
     colgen_iterations, stab, out,
     incumbent_dual_bound, _ip_primal_sol
 )
@@ -149,7 +149,7 @@ end
 # ── Entry point ──────────────────────────────────────────────────────
 
 """
-    run_column_generation(lctx::ColGenLoggerContext) -> ColGenOutput
+    run_column_generation(lctx::ColGenLoggerWorkspace) -> ColGenOutput
 
 Run column generation with compact, tag-based terminal logging.
 
@@ -158,7 +158,7 @@ Run column generation with compact, tag-based terminal logging.
 julia> # (see test for a full example)
 ```
 """
-function run_column_generation(lctx::ColGenLoggerContext)
+function run_column_generation(lctx::ColGenLoggerWorkspace)
     lctx.cg_start_time = time()
     output = ColGen.run!(lctx, nothing)
     _print_cg_footer(lctx, output)
@@ -166,7 +166,7 @@ function run_column_generation(lctx::ColGenLoggerContext)
 end
 
 function _print_cg_footer(
-    lctx::ColGenLoggerContext, output::ColGenOutput
+    lctx::ColGenLoggerWorkspace, output::ColGenOutput
 )
     lctx.log_level == 0 && return
     println()

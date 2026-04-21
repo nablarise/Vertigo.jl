@@ -46,7 +46,7 @@ end
 # Solve via column generation
 config = ColGenConfig()
 workspace = ColGenWorkspace(decomp, config)
-ctx = ColGenLoggerContext(workspace)
+ctx = ColGenLoggerWorkspace(workspace)
 output = run_column_generation(ctx)
 
 println("Status: ", output.status)           # optimal
