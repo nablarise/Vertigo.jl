@@ -158,15 +158,15 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 function build_gap_context_with_fixed_cost(
@@ -252,15 +252,15 @@ function build_gap_context_with_fixed_cost(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 # ──────────────────────────────────────────────────────────────────────
@@ -350,15 +350,15 @@ function build_gap_shifted_context(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 struct GAPInstanceWithIdenticalMachines
@@ -490,15 +490,15 @@ function build_gap_identical_context(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 struct GAPWithPenaltyInstance
@@ -589,15 +589,15 @@ function build_gap_with_penalty_context(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 function build_gap_with_penalty_card_context(
@@ -717,15 +717,15 @@ function build_gap_with_penalty_card_context(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 """
@@ -839,15 +839,15 @@ function build_gap_with_pure_master_context(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 struct GAPInstanceWithOpeningCosts
@@ -1001,7 +1001,7 @@ function build_gap_fenchel_context(
 
     # ── Build context ─────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{
             MOI.VariableIndex,MOI.VariableIndex
         }}(),
@@ -1009,9 +1009,9 @@ function build_gap_fenchel_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end
 
 function build_gap_context_max(
@@ -1084,13 +1084,13 @@ function build_gap_context_max(
 
     # ── Build context ─────────────────────────────────────────────────
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ctx = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ctx = ColGenLoggerWorkspace(inner_ctx)
+    ws = ColGenLoggerWorkspace(inner_ws)
 
-    return ctx
+    return ws
 end

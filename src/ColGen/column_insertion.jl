@@ -14,22 +14,22 @@ _objective_cost(::Union{Phase0,Phase2}, col_cost::Float64) = col_cost
 _objective_cost(::Phase1, ::Float64) = 0.0
 
 """
-    _insert_column!(ctx, phase, pricing_sol) → Union{MOI.VariableIndex, Nothing}
+    _insert_column!(ws, phase, pricing_sol) → Union{MOI.VariableIndex, Nothing}
 
 Insert a single column into the master. Returns the new column variable
 index, or `nothing` if the column was already in the pool.
 """
 function _insert_column!(
-    ctx::ColGenWorkspace, phase::CGPhase,
+    ws::ColGenWorkspace, phase::CGPhase,
     pricing_sol::PricingPrimalSolution
 )
-    decomp = ctx.decomp
+    decomp = ws.decomp
     model = master_model(decomp)
 
     sp_id = pricing_sol.sp_id
     sol = pricing_sol.solution
 
-    has_column(ctx.pool, sp_id, sol) && return nothing
+    has_column(ws.pool, sp_id, sol) && return nothing
 
     col_cost = compute_column_original_cost(decomp, sp_id, sol)
 
@@ -43,7 +43,7 @@ function _insert_column!(
         all_coeffs[tagged_ci] = v
     end
 
-    for bc in ctx.branching_constraints
+    for bc in ws.branching_constraints
         coeff = compute_branching_column_coefficient(
             decomp, bc.orig_var, sp_id, sol
         )
@@ -52,7 +52,7 @@ function _insert_column!(
         end
     end
 
-    for cut in ctx.robust_cuts
+    for cut in ws.robust_cuts
         coeff = 0.0
         for (sp_var_inner, val_inner) in nonzero_entries(sol)
             ov = mapped_original_var(decomp, sp_id, sp_var_inner)
@@ -80,18 +80,18 @@ function _insert_column!(
         constraint_coeffs = all_coeffs,
         objective_coeff = obj_coeff
     )
-    record_column!(ctx.pool, col_var, sp_id, sol, col_cost)
+    record_column!(ws.pool, col_var, sp_id, sol, col_cost)
 
     return col_var
 end
 
 function insert_columns!(
-    ctx::ColGenWorkspace, phase::CGPhase,
+    ws::ColGenWorkspace, phase::CGPhase,
     columns::GeneratedColumns
 )
     cols_inserted = 0
     for pricing_sol in columns.collection
-        col_var = _insert_column!(ctx, phase, pricing_sol)
+        col_var = _insert_column!(ws, phase, pricing_sol)
         if !isnothing(col_var)
             cols_inserted += 1
         end

@@ -40,7 +40,7 @@ lies between a stability center (π^in) and the LP dual (π^out), reducing
 oscillation and accelerating convergence.
 """
 mutable struct WentgesSmoothing
-    ctx::ColGenWorkspace
+    ws::ColGenWorkspace
     smooth_dual_sol_coeff::Float64
     cur_smooth_dual_sol_coeff::Float64
     stab_center::Union{Nothing,MasterDualSolution}
@@ -53,11 +53,11 @@ end
 
 # ── Setup ────────────────────────────────────────────────────────────────────
 
-function setup_stabilization!(ctx::ColGenWorkspace, _master)
-    if ctx.smoothing_alpha > 0.0
-        init_lb = is_minimization(ctx) ? -Inf : Inf
+function setup_stabilization!(ws::ColGenWorkspace, _master)
+    if ws.smoothing_alpha > 0.0
+        init_lb = is_minimization(ws) ? -Inf : Inf
         return WentgesSmoothing(
-            ctx, ctx.smoothing_alpha, ctx.smoothing_alpha,
+            ws, ws.smoothing_alpha, ws.smoothing_alpha,
             nothing, init_lb, 0, nothing, nothing, nothing
         )
     end
@@ -72,7 +72,7 @@ function update_stabilization_after_master_optim!(
     # Phase change: reset center and best bound
     if phase != stab.last_phase
         stab.stab_center = nothing
-        stab.best_lagrangian_bound = is_minimization(stab.ctx) ? -Inf : Inf
+        stab.best_lagrangian_bound = is_minimization(stab.ws) ? -Inf : Inf
         stab.last_phase = phase
     end
 
@@ -132,7 +132,7 @@ end
 
 function update_stabilization_after_pricing_optim!(
     stab::WentgesSmoothing,
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     generated_columns,
     _master,
     pseudo_db,
@@ -141,7 +141,7 @@ function update_stabilization_after_pricing_optim!(
     stab.last_generated_columns = generated_columns
     stab.last_sep_dual_sol = sep_mast_dual_sol
 
-    if is_minimization(ctx)
+    if is_minimization(ws)
         if pseudo_db > stab.best_lagrangian_bound
             stab.best_lagrangian_bound = pseudo_db
             stab.stab_center = sep_mast_dual_sol
@@ -164,15 +164,15 @@ function check_misprice(
 )
     stab.cur_smooth_dual_sol_coeff <= 0.0 && return false
 
-    ctx = stab.ctx
-    decomp = ctx.decomp
+    ws = stab.ws
+    decomp = ws.decomp
 
     for pricing_sol in generated_columns.collection
         sp_id = pricing_sol.sp_id
         sol = pricing_sol.solution
 
         # Compute RC at π^out (the original LP dual, not the smoothed one)
-        sp_rc_at_out = _compute_sp_reduced_costs(ctx, mast_dual_sol, sp_id)
+        sp_rc_at_out = _compute_sp_reduced_costs(ws, mast_dual_sol, sp_id)
 
         ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id)
         ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
@@ -182,7 +182,7 @@ function check_misprice(
         )
 
         # If any column improves at π^out, no misprice
-        is_imp = is_minimization(ctx) ? (rc < -RC_IMPROVING_TOL) : (rc > RC_IMPROVING_TOL)
+        is_imp = is_minimization(ws) ? (rc < -RC_IMPROVING_TOL) : (rc > RC_IMPROVING_TOL)
         is_imp && return false
     end
 
@@ -210,8 +210,8 @@ function update_stabilization_after_iter!(
     isnothing(stab.last_generated_columns) && return nothing
     isnothing(stab.last_sep_dual_sol) && return nothing
 
-    ctx = stab.ctx
-    decomp = ctx.decomp
+    ws = stab.ws
+    decomp = ws.decomp
     center = stab.stab_center
     out = mast_dual_sol
 
@@ -227,7 +227,7 @@ function update_stabilization_after_iter!(
         sol = pricing_sol.solution
 
         # Multiplicity: use convexity bound based on RC sign
-        sense = is_minimization(ctx) ? 1 : -1
+        sense = is_minimization(ws) ? 1 : -1
         rc = sol.obj_value
         conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
         mult = (sense * rc < 0) ? conv_ub : conv_lb

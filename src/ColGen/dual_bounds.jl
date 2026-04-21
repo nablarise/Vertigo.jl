@@ -24,12 +24,12 @@ function _recompute_cost(dual_sol::DualMoiSolution, model)::Float64
 end
 
 function compute_dual_bound(
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     ::CGPhase,
     sps_db,
     mast_dual_sol::MasterDualSolution
 )
-    decomp = ctx.decomp
+    decomp = ws.decomp
     dual_values(cstr) = _dual_value(mast_dual_sol, cstr)
 
     # Verify dual solution consistency

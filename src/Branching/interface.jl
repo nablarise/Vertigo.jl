@@ -5,37 +5,37 @@
 # Accessors that dispatch on both ColGenWorkspace and ColGenLoggerWorkspace,
 # so BranchCutPrice works with either type.
 
-bp_master_model(ctx::ColGen.ColGenWorkspace) = master_model(ctx.decomp)
-bp_master_model(ctx::ColGen.ColGenLoggerWorkspace) = master_model(ctx.inner.decomp)
+bp_master_model(ws::ColGen.ColGenWorkspace) = master_model(ws.decomp)
+bp_master_model(ws::ColGen.ColGenLoggerWorkspace) = master_model(ws.inner.decomp)
 
-bp_ip_incumbent(ctx::ColGen.ColGenWorkspace) = ctx.ip_incumbent
-bp_ip_incumbent(ctx::ColGen.ColGenLoggerWorkspace) = ctx.inner.ip_incumbent
+bp_ip_incumbent(ws::ColGen.ColGenWorkspace) = ws.ip_incumbent
+bp_ip_incumbent(ws::ColGen.ColGenLoggerWorkspace) = ws.inner.ip_incumbent
 
-bp_set_ip_incumbent!(ctx::ColGen.ColGenWorkspace, val) =
-    ctx.ip_incumbent = val
-bp_set_ip_incumbent!(ctx::ColGen.ColGenLoggerWorkspace, val) =
-    ctx.inner.ip_incumbent = val
+bp_set_ip_incumbent!(ws::ColGen.ColGenWorkspace, val) =
+    ws.ip_incumbent = val
+bp_set_ip_incumbent!(ws::ColGen.ColGenLoggerWorkspace, val) =
+    ws.inner.ip_incumbent = val
 
-bp_pool(ctx::ColGen.ColGenWorkspace) = ctx.pool
-bp_pool(ctx::ColGen.ColGenLoggerWorkspace) = ctx.inner.pool
+bp_pool(ws::ColGen.ColGenWorkspace) = ws.pool
+bp_pool(ws::ColGen.ColGenLoggerWorkspace) = ws.inner.pool
 
-bp_decomp(ctx::ColGen.ColGenWorkspace) = ctx.decomp
-bp_decomp(ctx::ColGen.ColGenLoggerWorkspace) = ctx.inner.decomp
+bp_decomp(ws::ColGen.ColGenWorkspace) = ws.decomp
+bp_decomp(ws::ColGen.ColGenLoggerWorkspace) = ws.inner.decomp
 
-bp_branching_constraints(ctx::ColGen.ColGenWorkspace) =
-    ctx.branching_constraints
-bp_branching_constraints(ctx::ColGen.ColGenLoggerWorkspace) =
-    ctx.inner.branching_constraints
+bp_branching_constraints(ws::ColGen.ColGenWorkspace) =
+    ws.branching_constraints
+bp_branching_constraints(ws::ColGen.ColGenLoggerWorkspace) =
+    ws.inner.branching_constraints
 
-bp_robust_cuts(ctx::ColGen.ColGenWorkspace) = ctx.robust_cuts
-bp_robust_cuts(ctx::ColGen.ColGenLoggerWorkspace) =
-    ctx.inner.robust_cuts
+bp_robust_cuts(ws::ColGen.ColGenWorkspace) = ws.robust_cuts
+bp_robust_cuts(ws::ColGen.ColGenLoggerWorkspace) =
+    ws.inner.robust_cuts
 
-bp_ip_primal_bound(ctx::ColGen.ColGenWorkspace) = ctx.ip_primal_bound
-bp_ip_primal_bound(ctx::ColGen.ColGenLoggerWorkspace) =
-    ctx.inner.ip_primal_bound
+bp_ip_primal_bound(ws::ColGen.ColGenWorkspace) = ws.ip_primal_bound
+bp_ip_primal_bound(ws::ColGen.ColGenLoggerWorkspace) =
+    ws.inner.ip_primal_bound
 
-bp_set_ip_primal_bound!(ctx::ColGen.ColGenWorkspace, val) =
-    ctx.ip_primal_bound = val
-bp_set_ip_primal_bound!(ctx::ColGen.ColGenLoggerWorkspace, val) =
-    ctx.inner.ip_primal_bound = val
+bp_set_ip_primal_bound!(ws::ColGen.ColGenWorkspace, val) =
+    ws.ip_primal_bound = val
+bp_set_ip_primal_bound!(ws::ColGen.ColGenLoggerWorkspace, val) =
+    ws.inner.ip_primal_bound = val

@@ -16,19 +16,19 @@ struct BranchingCandidate{X}
 end
 
 """
-    find_fractional_variables(ctx, primal_values; tol=1e-6)
+    find_fractional_variables(ws, primal_values; tol=1e-6)
 
 Project master LP solution to original-variable space and return
 all fractional variables as `BranchingCandidate`s, sorted by
 fractionality descending (most fractional first).
 """
 function find_fractional_variables(
-    ctx,
+    ws,
     primal_values::Dict{MOI.VariableIndex,Float64};
     tol::Float64 = 1e-6
 )
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
+    decomp = bp_decomp(ws)
+    pool = bp_pool(ws)
     x_values = project_to_original(
         decomp, pool, v -> get(primal_values, v, 0.0)
     )

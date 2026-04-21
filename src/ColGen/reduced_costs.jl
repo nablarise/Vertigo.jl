@@ -65,10 +65,10 @@ end
 
 # Hot path: sorted duals built once, shared across subproblems.
 function _compute_sp_reduced_costs(
-    ctx::ColGenWorkspace, mast_dual_sol::MasterDualSolution,
+    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution,
     sorted_duals::SortedDualVector, sp_id; zero_cost=false
 )
-    decomp = ctx.decomp
+    decomp = ws.decomp
     sp_rc = Dict{MOI.VariableIndex,Float64}()
     for sp_var in subproblem_variables(decomp, sp_id)
         rc = zero_cost ? 0.0 : original_cost(decomp, sp_id, sp_var)
@@ -76,14 +76,14 @@ function _compute_sp_reduced_costs(
             coupling_coefficients(decomp, sp_id, sp_var), sorted_duals
         )
         # TODO: adjust reduced costs for non-robust cut duals
-        for bc in ctx.branching_constraints
+        for bc in ws.branching_constraints
             σ = _dual_value(mast_dual_sol, bc.constraint_index)
             iszero(σ) && continue
             if mapped_original_var(decomp, sp_id, sp_var) == bc.orig_var
                 rc -= σ
             end
         end
-        for cut in ctx.robust_cuts
+        for cut in ws.robust_cuts
             σ = _dual_value(mast_dual_sol, cut.constraint_index)
             iszero(σ) && continue
             ov = mapped_original_var(decomp, sp_id, sp_var)
@@ -101,43 +101,43 @@ end
 
 # Fallback: builds sorted duals per call (used by dw_stabilization.jl).
 function _compute_sp_reduced_costs(
-    ctx::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id;
+    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id;
     zero_cost=false
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
     return _compute_sp_reduced_costs(
-        ctx, mast_dual_sol, sorted_duals, sp_id; zero_cost=zero_cost
+        ws, mast_dual_sol, sorted_duals, sp_id; zero_cost=zero_cost
     )
 end
 
 function compute_reduced_costs!(
-    ctx::ColGenWorkspace, ::Union{Phase0,Phase2},
+    ws::ColGenWorkspace, ::Union{Phase0,Phase2},
     mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
     return ReducedCosts(Dict(
         sp_id => _compute_sp_reduced_costs(
-            ctx, mast_dual_sol, sorted_duals, sp_id
+            ws, mast_dual_sol, sorted_duals, sp_id
         )
-        for sp_id in subproblem_ids(ctx.decomp)
+        for sp_id in subproblem_ids(ws.decomp)
     ))
 end
 
 function compute_reduced_costs!(
-    ctx::ColGenWorkspace, ::Phase1, mast_dual_sol::MasterDualSolution
+    ws::ColGenWorkspace, ::Phase1, mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
     return ReducedCosts(Dict(
         sp_id => _compute_sp_reduced_costs(
-            ctx, mast_dual_sol, sorted_duals, sp_id; zero_cost=true
+            ws, mast_dual_sol, sorted_duals, sp_id; zero_cost=true
         )
-        for sp_id in subproblem_ids(ctx.decomp)
+        for sp_id in subproblem_ids(ws.decomp)
     ))
 end
 
-function update_reduced_costs!(ctx::ColGenWorkspace, ::CGPhase, red_costs::ReducedCosts)
+function update_reduced_costs!(ws::ColGenWorkspace, ::CGPhase, red_costs::ReducedCosts)
     for (sp_id, sp_rc) in red_costs.values
-        spm = sp_model(ctx.decomp, sp_id)
+        spm = sp_model(ws.decomp, sp_id)
         for (var_index, rc_value) in sp_rc
             MOI.modify(
                 spm,
@@ -149,5 +149,5 @@ function update_reduced_costs!(ctx::ColGenWorkspace, ::CGPhase, red_costs::Reduc
     return nothing
 end
 
-compute_sp_init_db(ctx::ColGenWorkspace, _) = is_minimization(ctx) ? -Inf : Inf
-compute_sp_init_pb(ctx::ColGenWorkspace, _) = is_minimization(ctx) ? Inf : -Inf
+compute_sp_init_db(ws::ColGenWorkspace, _) = is_minimization(ws) ? -Inf : Inf
+compute_sp_init_pb(ws::ColGenWorkspace, _) = is_minimization(ws) ? Inf : -Inf

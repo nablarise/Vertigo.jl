@@ -24,8 +24,8 @@ function solve_restricted_master_ip!(
     end
 
     backend = space.backend
-    pool = bp_pool(space.ctx)
-    decomp = bp_decomp(space.ctx)
+    pool = bp_pool(space.ws)
+    decomp = bp_decomp(space.ws)
 
     # Add integrality constraints to column variables and integer
     # pure master variables.

@@ -25,11 +25,11 @@ BPNodeData() = BPNodeData(nothing, nothing, nothing, nothing, nothing)
 """
     BPSpace <: TreeSearch.AbstractSearchSpace
 
-Search space for branch-and-price. Wraps the CG context, the MOI
+Search space for branch-and-price. Wraps the CG workspace, the MOI
 backend, domain/cut tracking, and branching metadata.
 """
-mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearch.AbstractSearchSpace
-    ctx::Ctx
+mutable struct BPSpace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearch.AbstractSearchSpace
+    ws::Ws
     backend::B
     domain_helper::MathOptState.DomainChangeTrackerHelper
     cut_tracker::MathOptState.LocalCutTracker
@@ -53,15 +53,15 @@ mutable struct BPSpace{Ctx,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSear
 end
 
 """
-    BPSpace(ctx; node_limit=10_000, tol=1e-6, rmp_time_limit=60.0,
+    BPSpace(ws; node_limit=10_000, tol=1e-6, rmp_time_limit=60.0,
             rmp_heuristic=true, separator=nothing,
             max_cut_rounds=0, min_gap_improvement=0.01)
 
 Create a branch-and-price search space from a column generation
-context. Registers existing variable bound constraints for tracking.
+workspace. Registers existing variable bound constraints for tracking.
 """
 function BPSpace(
-    ctx::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
+    ws::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,
     rmp_time_limit::Float64 = 60.0,
@@ -72,7 +72,7 @@ function BPSpace(
     branching_strategy::AbstractBranchingStrategy = MostFractionalBranching(),
     log_level::Int = 0
 )
-    master = bp_master_model(ctx)
+    master = bp_master_model(ws)
     tracker = MathOptState.DomainChangeTracker()
     domain_helper = MathOptState.transform_model!(
         tracker, master
@@ -82,12 +82,12 @@ function BPSpace(
         cut_tracker, master
     )
     return BPSpace(
-        ctx, master, domain_helper,
+        ws, master, domain_helper,
         cut_tracker, cut_helper,
         Dict{Int,Any}(),
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
-        is_minimization(ctx) ? -Inf : Inf,
+        is_minimization(ws) ? -Inf : Inf,
         Dict{Int,Float64}(),
         0, node_limit, tol, rmp_time_limit,
         rmp_heuristic, separator,
@@ -150,11 +150,11 @@ end
 function _recompute_global_dual_bound!(space::BPSpace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        space.best_dual_bound = is_minimization(space.ctx) ?
+        space.best_dual_bound = is_minimization(space.ws) ?
             -Inf : Inf
         return
     end
-    space.best_dual_bound = is_minimization(space.ctx) ?
+    space.best_dual_bound = is_minimization(space.ws) ?
         minimum(values(bounds)) : maximum(values(bounds))
     return
 end
@@ -191,7 +191,7 @@ function TreeSearch.branch!(space::BPSpace, node)
 
     children, cut_info = create_branching_children(
         space.id_counter, node, orig_var, x_val,
-        space.ctx, db, space.cut_tracker
+        space.ws, db, space.cut_tracker
     )
     for (cut_id, ov) in cut_info
         space.branching_cut_info[cut_id] = ov
@@ -229,7 +229,7 @@ function TreeSearch.ts_best_dual_bound(s::BPSpace)
 end
 
 function TreeSearch.ts_is_minimization(s::BPSpace)
-    return is_minimization(s.ctx)
+    return is_minimization(s.ws)
 end
 
 function TreeSearch.ts_nodes_explored(s::BPSpace)
@@ -256,11 +256,11 @@ function TreeSearch.ts_open_node_count(s::BPSpace)
 end
 
 function TreeSearch.ts_total_columns(s::BPSpace)
-    return length(bp_pool(s.ctx).by_column_var)
+    return length(bp_pool(s.ws).by_column_var)
 end
 
 function TreeSearch.ts_active_columns(s::BPSpace)
-    pool = bp_pool(s.ctx)
+    pool = bp_pool(s.ws)
     master = s.backend
     count = 0
     for cv in keys(pool.by_column_var)
@@ -297,7 +297,7 @@ end
 # ── Entry point ──────────────────────────────────────────────────────────
 
 """
-    run_branch_and_price(ctx; strategy, node_limit, tol,
+    run_branch_and_price(ws; strategy, node_limit, tol,
                          rmp_time_limit, rmp_heuristic,
                          separator, max_cut_rounds,
                          log_level, dot_file) -> BPOutput
@@ -306,7 +306,7 @@ Run the branch-and-price algorithm using column generation at each
 node and most-fractional branching on original variables.
 
 # Arguments
-- `ctx`: Column generation context (`ColGenWorkspace` or `ColGenLoggerWorkspace`).
+- `ws`: Column generation workspace (`ColGenWorkspace` or `ColGenLoggerWorkspace`).
 - `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
 - `node_limit::Int`: Maximum nodes to explore (default: 10000).
 - `tol::Float64`: Numerical tolerance (default: 1e-6).
@@ -325,7 +325,7 @@ node and most-fractional branching on original variables.
   (default: `nothing` — no dot file written).
 """
 function run_branch_and_price(
-    ctx::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
+    ws::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
     tol::Float64 = 1e-6,
@@ -357,7 +357,7 @@ function run_branch_and_price(
     end
 
     space = BPSpace(
-        ctx;
+        ws;
         node_limit = node_limit,
         tol = tol,
         rmp_time_limit = rmp_time_limit,

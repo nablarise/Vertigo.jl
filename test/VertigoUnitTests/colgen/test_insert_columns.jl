@@ -124,7 +124,7 @@ function build_insert_columns_context()
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub_map, conv_lb_map)
 
     config = ColGenConfig()
-    ctx = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
@@ -132,11 +132,11 @@ function build_insert_columns_context()
     )
 
     # Active branching constraint on x₁ = (1, 1)
-    push!(ctx.branching_constraints,
+    push!(ws.branching_constraints,
         Vertigo.ColGen.ActiveBranchingConstraint(TaggedCI(br), (1, 1))
     )
 
-    return ctx, (
+    return ws, (
         c1=c1, c2=c2, conv_ub=conv_ub, conv_lb=conv_lb,
         br=br, z1=z1, z2=z2
     )
@@ -146,8 +146,8 @@ end
 
 function test_insert_columns_single_column()
     @testset "[insert_columns] single column" begin
-        ctx, refs = build_insert_columns_context()
-        model = master_model(ctx.decomp)
+        ws, refs = build_insert_columns_context()
+        model = master_model(ws.decomp)
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
@@ -157,12 +157,12 @@ function test_insert_columns_single_column()
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
-        n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
+        n = Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
 
         @test n == 1
-        @test length(ctx.pool.by_column_var) == 1
+        @test length(ws.pool.by_column_var) == 1
 
-        col_var = first(keys(ctx.pool.by_column_var))
+        col_var = first(keys(ws.pool.by_column_var))
 
         @test _obj_coeff(model, col_var) ≈ 3.0
         @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
@@ -175,8 +175,8 @@ end
 
 function test_insert_columns_two_columns()
     @testset "[insert_columns] two columns" begin
-        ctx, refs = build_insert_columns_context()
-        model = master_model(ctx.decomp)
+        ws, refs = build_insert_columns_context()
+        model = master_model(ws.decomp)
 
         sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)])
@@ -191,13 +191,13 @@ function test_insert_columns_two_columns()
             [pricing_a, pricing_b]
         )
 
-        n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
+        n = Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
 
         @test n == 2
-        @test length(ctx.pool.by_column_var) == 2
+        @test length(ws.pool.by_column_var) == 2
 
         # Identify columns by cost
-        col_vars = collect(keys(ctx.pool.by_column_var))
+        col_vars = collect(keys(ws.pool.by_column_var))
         costs = [_obj_coeff(model, v) for v in col_vars]
         var_a = col_vars[findfirst(c -> c ≈ 3.0, costs)]
         var_b = col_vars[findfirst(c -> c ≈ 5.0, costs)]
@@ -222,7 +222,7 @@ end
 
 function test_insert_columns_duplicate_skipped()
     @testset "[insert_columns] duplicate column skipped" begin
-        ctx, refs = build_insert_columns_context()
+        ws, refs = build_insert_columns_context()
 
         sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -230,24 +230,24 @@ function test_insert_columns_duplicate_skipped()
         )
 
         n1 = Vertigo.ColGen.insert_columns!(
-            ctx, Phase0(),
+            ws, Phase0(),
             Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n1 == 1
 
         n2 = Vertigo.ColGen.insert_columns!(
-            ctx, Phase0(),
+            ws, Phase0(),
             Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n2 == 0
-        @test length(ctx.pool.by_column_var) == 1
+        @test length(ws.pool.by_column_var) == 1
     end
 end
 
 function test_insert_columns_mixed_sp_variables()
     @testset "[insert_columns] column with two SP variables" begin
-        ctx, refs = build_insert_columns_context()
-        model = master_model(ctx.decomp)
+        ws, refs = build_insert_columns_context()
+        model = master_model(ws.decomp)
 
         # Column: z1=1, z2=2
         # cost = 3*1 + 5*2 = 13
@@ -261,10 +261,10 @@ function test_insert_columns_mixed_sp_variables()
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
-        n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
+        n = Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
         @test n == 1
 
-        col_var = first(keys(ctx.pool.by_column_var))
+        col_var = first(keys(ws.pool.by_column_var))
 
         @test _obj_coeff(model, col_var) ≈ 13.0
         @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
@@ -277,7 +277,7 @@ end
 
 function test_insert_columns_pool_records_original_cost()
     @testset "[insert_columns] pool records original cost" begin
-        ctx, refs = build_insert_columns_context()
+        ws, refs = build_insert_columns_context()
 
         sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -285,10 +285,10 @@ function test_insert_columns_pool_records_original_cost()
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
-        Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
+        Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
 
-        col_var = first(keys(ctx.pool.by_column_var))
-        entry = ctx.pool.by_column_var[col_var]
+        col_var = first(keys(ws.pool.by_column_var))
+        entry = ws.pool.by_column_var[col_var]
 
         @test column_original_cost(entry) ≈ 3.0
         @test column_sp_id(entry) == PricingSubproblemId(1)
@@ -297,13 +297,13 @@ end
 
 function test_insert_columns_empty_set()
     @testset "[insert_columns] empty column set" begin
-        ctx, _ = build_insert_columns_context()
+        ws, _ = build_insert_columns_context()
 
         columns = Vertigo.ColGen.GeneratedColumns(Vertigo.ColGen.PricingPrimalSolution[])
-        n = Vertigo.ColGen.insert_columns!(ctx, Phase0(), columns)
+        n = Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
 
         @test n == 0
-        @test isempty(ctx.pool.by_column_var)
+        @test isempty(ws.pool.by_column_var)
     end
 end
 
@@ -313,8 +313,8 @@ end
 
 function test_insert_column_returns_var()
     @testset "[_insert_column] returns variable and correct coefficients" begin
-        ctx, refs = build_insert_columns_context()
-        model = master_model(ctx.decomp)
+        ws, refs = build_insert_columns_context()
+        model = master_model(ws.decomp)
 
         sol = Vertigo.Reformulation._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
@@ -323,10 +323,10 @@ function test_insert_column_returns_var()
             PricingSubproblemId(1), sol, true
         )
 
-        col_var = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+        col_var = Vertigo.ColGen._insert_column!(ws, Phase0(), pricing_sol)
 
         @test col_var isa MOI.VariableIndex
-        @test length(ctx.pool.by_column_var) == 1
+        @test length(ws.pool.by_column_var) == 1
         @test _obj_coeff(model, col_var) ≈ 3.0
         @test _constr_coeff(model, refs.c1, col_var) ≈ 2.0
         @test _constr_coeff(model, refs.c2, col_var) ≈ 1.0
@@ -338,7 +338,7 @@ end
 
 function test_insert_column_duplicate_returns_nothing()
     @testset "[_insert_column] duplicate returns nothing" begin
-        ctx, refs = build_insert_columns_context()
+        ws, refs = build_insert_columns_context()
 
         sol = Vertigo.Reformulation._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
@@ -347,19 +347,19 @@ function test_insert_column_duplicate_returns_nothing()
             PricingSubproblemId(1), sol, true
         )
 
-        col_var1 = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+        col_var1 = Vertigo.ColGen._insert_column!(ws, Phase0(), pricing_sol)
         @test col_var1 isa MOI.VariableIndex
 
-        col_var2 = Vertigo.ColGen._insert_column!(ctx, Phase0(), pricing_sol)
+        col_var2 = Vertigo.ColGen._insert_column!(ws, Phase0(), pricing_sol)
         @test col_var2 === nothing
-        @test length(ctx.pool.by_column_var) == 1
+        @test length(ws.pool.by_column_var) == 1
     end
 end
 
 function test_insert_column_phase1_zero_cost()
     @testset "[_insert_column] phase 1 sets zero objective cost" begin
-        ctx, refs = build_insert_columns_context()
-        model = master_model(ctx.decomp)
+        ws, refs = build_insert_columns_context()
+        model = master_model(ws.decomp)
 
         sol = Vertigo.Reformulation._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
@@ -368,7 +368,7 @@ function test_insert_column_phase1_zero_cost()
             PricingSubproblemId(1), sol, true
         )
 
-        col_var = Vertigo.ColGen._insert_column!(ctx, Phase1(), pricing_sol)
+        col_var = Vertigo.ColGen._insert_column!(ws, Phase1(), pricing_sol)
 
         @test col_var isa MOI.VariableIndex
         @test _obj_coeff(model, col_var) ≈ 0.0

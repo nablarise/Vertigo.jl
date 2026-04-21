@@ -162,41 +162,41 @@ function ColGenWorkspace(
 end
 
 # Core accessors
-is_minimization(ctx::ColGenWorkspace) = is_minimization(ctx.decomp)
+is_minimization(ws::ColGenWorkspace) = is_minimization(ws.decomp)
 
-max_cg_iterations(ctx::ColGenWorkspace) = ctx.max_cg_iterations
+max_cg_iterations(ws::ColGenWorkspace) = ws.max_cg_iterations
 
-function set_max_cg_iterations!(ctx::ColGenWorkspace, n::Int)
-    ctx.max_cg_iterations = n
+function set_max_cg_iterations!(ws::ColGenWorkspace, n::Int)
+    ws.max_cg_iterations = n
     return
 end
 
-function get_master(ctx::ColGenWorkspace)
-    cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ctx.decomp)]
+function get_master(ws::ColGenWorkspace)
+    cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ws.decomp)]
     return Master(
-        master_model(ctx.decomp),
-        convexity_ub_pairs(ctx.decomp),
-        convexity_lb_pairs(ctx.decomp),
-        ctx.eq_art_vars,
-        ctx.leq_art_vars,
-        ctx.geq_art_vars,
+        master_model(ws.decomp),
+        convexity_ub_pairs(ws.decomp),
+        convexity_lb_pairs(ws.decomp),
+        ws.eq_art_vars,
+        ws.leq_art_vars,
+        ws.geq_art_vars,
         cc_ids
     )
 end
 
-function get_pricing_subprobs(ctx::ColGenWorkspace)
+function get_pricing_subprobs(ws::ColGenWorkspace)
     return Dict{PricingSubproblemId,Any}(
-        sp_id => PricingSubproblem(sp_model(ctx.decomp, sp_id))
-        for sp_id in subproblem_ids(ctx.decomp)
+        sp_id => PricingSubproblem(sp_model(ws.decomp, sp_id))
+        for sp_id in subproblem_ids(ws.decomp)
     )
 end
 
-get_reform(ctx::ColGenWorkspace) = ctx
+get_reform(ws::ColGenWorkspace) = ws
 
-function _dual_bound_dominated(ctx, dual_bound, ip_bound)
+function _dual_bound_dominated(ws, dual_bound, ip_bound)
     isnothing(ip_bound) && return false
     isnothing(dual_bound) && return false
-    if is_minimization(ctx)
+    if is_minimization(ws)
         return dual_bound >= ip_bound - RC_IMPROVING_TOL
     else
         return dual_bound <= ip_bound + RC_IMPROVING_TOL
@@ -240,14 +240,14 @@ stop_colgen(::ColGenWorkspace, _) = false
 # SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
-    model = master_model(ctx.decomp)
-    sense = is_minimization(ctx.decomp) ? 1 : -1
+function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
+    model = master_model(ws.decomp)
+    sense = is_minimization(ws.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
     convexity_cost = sense * phase.convexity_artificial_var_cost
 
     # Artificial variables for coupling constraints
-    for (cstr_id, _rhs) in coupling_constraints(ctx.decomp)
+    for (cstr_id, _rhs) in coupling_constraints(ws.decomp)
         kind = cstr_id.kind
         if kind == SAF_EQ || kind == VI_EQ
             s_pos = add_variable!(model;
@@ -262,7 +262,7 @@ function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
                 objective_coeff = cost,
                 name = "s_neg[$(cstr_id.value)]"
             )
-            ctx.eq_art_vars[cstr_id] = (s_pos, s_neg)
+            ws.eq_art_vars[cstr_id] = (s_pos, s_neg)
         elseif kind == SAF_GEQ || kind == VI_GEQ
             s_pos = add_variable!(model;
                 lower_bound = 0.0,
@@ -270,7 +270,7 @@ function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
                 objective_coeff = cost,
                 name = "s_geq[$(cstr_id.value)]"
             )
-            ctx.geq_art_vars[cstr_id] = s_pos
+            ws.geq_art_vars[cstr_id] = s_pos
         else  # LEQ
             s_neg = add_variable!(model;
                 lower_bound = 0.0,
@@ -278,30 +278,30 @@ function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
                 objective_coeff = cost,
                 name = "s_leq[$(cstr_id.value)]"
             )
-            ctx.leq_art_vars[cstr_id] = s_neg
+            ws.leq_art_vars[cstr_id] = s_neg
         end
     end
 
     # Artificial variables for convexity constraints (LessThan UB)
-    for (sp_id, cstr_idx) in convexity_ub_pairs(ctx.decomp)
+    for (sp_id, cstr_idx) in convexity_ub_pairs(ws.decomp)
         s_neg = add_variable!(model;
             lower_bound = 0.0,
             constraint_coeffs = Dict(cstr_idx => -1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_ub[$(sp_id)]"
         )
-        ctx.leq_art_vars[cstr_idx] = s_neg
+        ws.leq_art_vars[cstr_idx] = s_neg
     end
 
     # Artificial variables for convexity constraints (GreaterThan LB)
-    for (sp_id, cstr_idx) in convexity_lb_pairs(ctx.decomp)
+    for (sp_id, cstr_idx) in convexity_lb_pairs(ws.decomp)
         s_pos = add_variable!(model;
             lower_bound = 0.0,
             constraint_coeffs = Dict(cstr_idx => 1.0),
             objective_coeff = convexity_cost,
             name = "s_conv_lb[$(sp_id)]"
         )
-        ctx.geq_art_vars[cstr_idx] = s_pos
+        ws.geq_art_vars[cstr_idx] = s_pos
     end
 
     # Relax integrality: delete Integer constraints
@@ -334,54 +334,54 @@ function setup_reformulation!(ctx::ColGenWorkspace, phase::Phase0)
     return nothing
 end
 
-function setup_reformulation!(ctx::ColGenWorkspace, ::Phase1)
-    model = master_model(ctx.decomp)
+function setup_reformulation!(ws::ColGenWorkspace, ::Phase1)
+    model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    sense = is_minimization(ctx.decomp) ? 1.0 : -1.0
+    sense = is_minimization(ws.decomp) ? 1.0 : -1.0
 
-    for (col_var, _) in columns(ctx.pool)
+    for (col_var, _) in columns(ws.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, 0.0))
     end
-    for pmv in pure_master_variables(ctx.decomp)
+    for pmv in pure_master_variables(ws.decomp)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(pmv.id, 0.0))
     end
-    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_pos, sense))
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_neg, sense))
     end
-    for (_, s) in ctx.leq_art_vars
+    for (_, s) in ws.leq_art_vars
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
     end
-    for (_, s) in ctx.geq_art_vars
+    for (_, s) in ws.geq_art_vars
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
     end
     return nothing
 end
 
-function setup_reformulation!(ctx::ColGenWorkspace, ::Phase2)
-    model = master_model(ctx.decomp)
+function setup_reformulation!(ws::ColGenWorkspace, ::Phase2)
+    model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
 
-    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
         MOI.delete(model, s_pos)
         MOI.delete(model, s_neg)
     end
-    for (_, s) in ctx.leq_art_vars
+    for (_, s) in ws.leq_art_vars
         MOI.delete(model, s)
     end
-    for (_, s) in ctx.geq_art_vars
+    for (_, s) in ws.geq_art_vars
         MOI.delete(model, s)
     end
-    empty!(ctx.eq_art_vars)
-    empty!(ctx.leq_art_vars)
-    empty!(ctx.geq_art_vars)
+    empty!(ws.eq_art_vars)
+    empty!(ws.leq_art_vars)
+    empty!(ws.geq_art_vars)
 
-    for (col_var, rec) in columns(ctx.pool)
+    for (col_var, rec) in columns(ws.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec)))
     end
-    for pmv in pure_master_variables(ctx.decomp)
+    for pmv in pure_master_variables(ws.decomp)
         MOI.modify(model, obj_type,
-            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ctx.decomp, pmv)))
+            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)))
     end
     return nothing
 end
@@ -406,7 +406,7 @@ colgen_iteration_output_type(::ColGenWorkspace) = ColGenIterationOutput
 stop_colgen_phase(::ColGenWorkspace, _, ::Nothing, _, _, _) = false
 
 function stop_colgen_phase(
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     ::Union{Phase0,Phase2},
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
@@ -415,21 +415,21 @@ function stop_colgen_phase(
 )
     master_lp_obj = colgen_iter_output.master_lp_obj
     no_column_added = colgen_iter_output.nb_columns_added == 0
-    iteration_limit = iteration > max_cg_iterations(ctx)
+    iteration_limit = iteration > max_cg_iterations(ws)
     lp_gap_closed = (
         !isnothing(master_lp_obj) &&
         !isnothing(incumbent_dual_bound) &&
         abs(master_lp_obj - incumbent_dual_bound) < LP_GAP_TOL
     )
     ip_pruned = _dual_bound_dominated(
-        ctx, incumbent_dual_bound, ctx.ip_primal_bound
+        ws, incumbent_dual_bound, ws.ip_primal_bound
     )
     return iteration_limit || no_column_added ||
            lp_gap_closed || ip_pruned
 end
 
 function stop_colgen_phase(
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     ::Phase1,
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
@@ -485,16 +485,16 @@ end
 
 colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
 
-function has_artificial_vars_in_solution(ctx::ColGenWorkspace, tol=RC_IMPROVING_TOL)::Bool
-    model = master_model(ctx.decomp)
-    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+function has_artificial_vars_in_solution(ws::ColGenWorkspace, tol=RC_IMPROVING_TOL)::Bool
+    model = master_model(ws.decomp)
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
         MOI.get(model, MOI.VariablePrimal(), s_neg) > tol && return true
     end
-    for (_, s) in ctx.leq_art_vars
+    for (_, s) in ws.leq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
     end
-    for (_, s) in ctx.geq_art_vars
+    for (_, s) in ws.geq_art_vars
         MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
     end
     return false
@@ -502,7 +502,7 @@ end
 
 function new_phase_output(
     ::Type{<:ColGenPhaseOutput},
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     min_sense,
     phase,
     stage,
@@ -517,9 +517,9 @@ function new_phase_output(
     )
     subprob_inf = colgen_iter_output.subproblem_infeasible
     converged   = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)
-    has_art = has_artificial_vars_in_solution(ctx)
+    has_art = has_artificial_vars_in_solution(ws)
     ip_pruned_flag = _dual_bound_dominated(
-        ctx, inc_dual_bound, ctx.ip_primal_bound
+        ws, inc_dual_bound, ws.ip_primal_bound
     )
     return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag)
 end
@@ -564,9 +564,9 @@ end
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
 function new_output(
-    ::Type{ColGenOutput}, ctx::ColGenWorkspace, p::ColGenPhaseOutput
+    ::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput
 )
-    ip = ctx.ip_incumbent
+    ip = ws.ip_incumbent
     if p.subproblem_infeasible
         return ColGenOutput(
             subproblem_infeasible, nothing, nothing, ip
@@ -611,8 +611,8 @@ function after_colgen_iteration(
     # do nothing
 end
 
-function is_better_dual_bound(ctx::ColGenWorkspace, dual_bound::Float64, incumbent::Float64)
-    sense = is_minimization(ctx) ? 1 : -1
+function is_better_dual_bound(ws::ColGenWorkspace, dual_bound::Float64, incumbent::Float64)
+    sense = is_minimization(ws) ? 1 : -1
     return sense * dual_bound > sense * incumbent
 end
 
@@ -636,10 +636,10 @@ function run_col_gen(decomp, config::ColGenConfig)
 end
 
 """
-    run_column_generation(ctx::ColGenWorkspace) -> ColGenOutput
+    run_column_generation(ws::ColGenWorkspace) -> ColGenOutput
 
 Run the column generation algorithm on the given workspace.
 """
-function run_column_generation(ctx::ColGenWorkspace)
-    return ColGen.run!(ctx, nothing)
+function run_column_generation(ws::ColGenWorkspace)
+    return ColGen.run!(ws, nothing)
 end

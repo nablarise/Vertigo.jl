@@ -37,10 +37,10 @@ function test_dml_gap_basic(; smoothing_alpha=0.0)
 
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.incumbent_dual_bound - 63.0) <= 1e-4
     end
@@ -86,10 +86,10 @@ function test_dml_gap_converges(; smoothing_alpha=0.0)
         decomp, sp_map = _build_dml_gap(cost, weight, capacity)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 63.0) <= 1e-4
@@ -107,10 +107,10 @@ function test_dml_gap_converges2(; smoothing_alpha=0.0)
         decomp, sp_map = _build_dml_gap(cost, weight, capacity)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 70.33333) <= 1e-4
@@ -130,10 +130,10 @@ function test_dml_maximization(; smoothing_alpha=0.0)
         )
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
     end
@@ -169,10 +169,10 @@ function test_dml_with_penalty(; smoothing_alpha=0.0)
         end
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 51.0) <= 1e-4
@@ -213,10 +213,10 @@ function test_dml_with_penalty_cardinality(; smoothing_alpha=0.0)
         end
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 37.0) <= 1e-4
@@ -250,10 +250,10 @@ function test_dml_fixed_master_cost(; smoothing_alpha=0.0)
         end
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 163.0) <= 1e-4
@@ -291,10 +291,10 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
         end
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
-        ctx = _build_colgen_context_from_dml(
+        ws = _build_colgen_context_from_dml(
             decomp, sp_map; smoothing_alpha
         )
-        output = run_column_generation(ctx)
+        output = run_column_generation(ws)
         @test output.status == optimal
         @test output.incumbent_dual_bound ≈ output.master_lp_obj atol=1e-4
     end

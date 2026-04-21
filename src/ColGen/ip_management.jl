@@ -7,15 +7,15 @@
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 # Check art vars using already-captured variable_values — avoids querying the MOI model.
-function _has_artificial_vars_in_solution(ctx, mast_primal_sol; tol=INTEGRALITY_TOL)
+function _has_artificial_vars_in_solution(ws, mast_primal_sol; tol=INTEGRALITY_TOL)
     vars = mast_primal_sol.sol.variable_values
-    for (_, (s_pos, s_neg)) in ctx.eq_art_vars
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
         (abs(get(vars, s_pos, 0.0)) > tol || abs(get(vars, s_neg, 0.0)) > tol) && return true
     end
-    for (_, s) in ctx.leq_art_vars
+    for (_, s) in ws.leq_art_vars
         abs(get(vars, s, 0.0)) > tol && return true
     end
-    for (_, s) in ctx.geq_art_vars
+    for (_, s) in ws.geq_art_vars
         abs(get(vars, s, 0.0)) > tol && return true
     end
     return false
@@ -23,11 +23,11 @@ end
 
 # Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
 # Returns (MasterIpPrimalSol, false) if all values are integral, (nothing, false) if not.
-function _project_if_integral(mast_primal_sol, ctx; tol=INTEGRALITY_TOL)
+function _project_if_integral(mast_primal_sol, ws; tol=INTEGRALITY_TOL)
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     non_zero_continuous = Tuple{MOI.VariableIndex,Float64}[]
     obj = 0.0
-    for (col_var, rec) in columns(ctx.pool)
+    for (col_var, rec) in columns(ws.pool)
         val = get(mast_primal_sol.sol.variable_values, col_var, 0.0)
         rounded = round(val)
         abs(val - rounded) > tol && return nothing, false
@@ -37,7 +37,7 @@ function _project_if_integral(mast_primal_sol, ctx; tol=INTEGRALITY_TOL)
             obj += column_original_cost(rec) * ival
         end
     end
-    decomp = ctx.decomp
+    decomp = ws.decomp
     for pmv in pure_master_variables(decomp)
         val = get(mast_primal_sol.sol.variable_values, pmv.id, 0.0)
         cost = pure_master_cost(decomp, pmv)
@@ -66,28 +66,28 @@ end
 
 function check_primal_ip_feasibility!(
     mast_primal_sol::MasterPrimalSolution,
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     ::CGPhase
 )
-    _has_artificial_vars_in_solution(ctx, mast_primal_sol) && return nothing, false
-    return _project_if_integral(mast_primal_sol, ctx)
+    _has_artificial_vars_in_solution(ws, mast_primal_sol) && return nothing, false
+    return _project_if_integral(mast_primal_sol, ws)
 end
 
 function _is_strictly_better(
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     candidate::MasterIpPrimalSol,
     incumbent::MasterIpPrimalSol
 )
-    is_minimization(ctx) ? candidate.obj_value < incumbent.obj_value - RC_IMPROVING_TOL :
+    is_minimization(ws) ? candidate.obj_value < incumbent.obj_value - RC_IMPROVING_TOL :
                            candidate.obj_value > incumbent.obj_value + RC_IMPROVING_TOL
 end
 
 function update_inc_primal_sol!(
-    ctx::ColGenWorkspace, ::Nothing, new_sol::MasterIpPrimalSol
+    ws::ColGenWorkspace, ::Nothing, new_sol::MasterIpPrimalSol
 )
-    current = ctx.ip_incumbent
-    if isnothing(current) || _is_strictly_better(ctx, new_sol, current)
-        ctx.ip_incumbent = new_sol
+    current = ws.ip_incumbent
+    if isnothing(current) || _is_strictly_better(ws, new_sol, current)
+        ws.ip_incumbent = new_sol
     end
     return nothing
 end

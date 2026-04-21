@@ -67,18 +67,18 @@ end
 function test_branching_constraint_add_remove()
     @testset "[branching_constraint] add and remove" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
+        ws = build_gap_context(inst)
+        run_column_generation(ws)
 
-        backend = bp_master_model(ctx)
-        bcs = bp_branching_constraints(ctx)
+        backend = bp_master_model(ws)
+        bcs = bp_branching_constraints(ws)
         @test isempty(bcs)
 
-        pool = bp_pool(ctx)
-        decomp = bp_decomp(ctx)
+        pool = bp_pool(ws)
+        decomp = bp_decomp(ws)
         primal = get_primal_solution(backend)
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
         @test !isempty(candidates)
         candidate = first(candidates)
@@ -87,14 +87,14 @@ function test_branching_constraint_add_remove()
             decomp, pool, candidate.orig_var
         )
         ci = add_branching_constraint!(
-            backend, ctx, terms,
+            backend, ws, terms,
             MOI.LessThan(candidate.floor_val),
             candidate.orig_var
         )
         @test length(bcs) == 1
         @test MOI.is_valid(backend, ci)
 
-        remove_branching_constraint!(backend, ctx, ci)
+        remove_branching_constraint!(backend, ws, ci)
         @test isempty(bcs)
         @test !MOI.is_valid(backend, ci)
     end
@@ -103,16 +103,16 @@ end
 function test_run_sb_probe_returns_dual_bounds()
     @testset "[run_sb_probe] returns dual bounds" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        cg_out = run_column_generation(ctx)
+        ws = build_gap_context(inst)
+        cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
-        backend = bp_master_model(ctx)
+        backend = bp_master_model(ws)
         primal = get_primal_solution(backend)
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
-        space = BPSpace(ctx; node_limit=1)
+        space = BPSpace(ws; node_limit=1)
         candidate = first(candidates)
 
         result = run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
@@ -129,40 +129,40 @@ end
 function test_run_sb_probe_restores_state()
     @testset "[run_sb_probe] restores context state" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        cg_out = run_column_generation(ctx)
+        ws = build_gap_context(inst)
+        cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
-        backend = bp_master_model(ctx)
+        backend = bp_master_model(ws)
         primal = get_primal_solution(backend)
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
-        space = BPSpace(ctx; node_limit=1)
+        space = BPSpace(ws; node_limit=1)
         candidate = first(candidates)
 
         # Save state before probe
-        orig_max_iter = max_cg_iterations(ctx)
-        orig_ip_inc = bp_ip_incumbent(ctx)
-        orig_ip_bound = bp_ip_primal_bound(ctx)
-        orig_n_bcs = length(bp_branching_constraints(ctx))
+        orig_max_iter = max_cg_iterations(ws)
+        orig_ip_inc = bp_ip_incumbent(ws)
+        orig_ip_bound = bp_ip_primal_bound(ws)
+        orig_n_bcs = length(bp_branching_constraints(ws))
 
         run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
 
         # State must be restored
-        @test max_cg_iterations(ctx) == orig_max_iter
-        @test bp_ip_incumbent(ctx) === orig_ip_inc
-        @test bp_ip_primal_bound(ctx) === orig_ip_bound
-        @test length(bp_branching_constraints(ctx)) == orig_n_bcs
+        @test max_cg_iterations(ws) == orig_max_iter
+        @test bp_ip_incumbent(ws) === orig_ip_inc
+        @test bp_ip_primal_bound(ws) === orig_ip_bound
+        @test length(bp_branching_constraints(ws)) == orig_n_bcs
     end
 end
 
 function test_multi_phase_sb_e2e()
     @testset "[MultiPhaseStrongBranching] e2e small GAP finds optimal" begin
         inst = random_gap_instance(2, 4; seed=10)
-        ctx = build_gap_context(inst)
+        ws = build_gap_context(inst)
         output = run_branch_and_price(
-            ctx;
+            ws;
             node_limit=100,
             branching_strategy=MultiPhaseStrongBranching(
                 max_candidates=3,
@@ -179,8 +179,8 @@ end
 function test_multi_phase_sb_selects_variable()
     @testset "[MultiPhaseStrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
+        ws = build_gap_context(inst)
+        run_column_generation(ws)
 
         sb = MultiPhaseStrongBranching(
             max_candidates=5,
@@ -188,9 +188,9 @@ function test_multi_phase_sb_selects_variable()
                 max_cg_iterations=10, lookahead=0
             )]
         )
-        primal = get_primal_solution(bp_master_model(ctx))
+        primal = get_primal_solution(bp_master_model(ws))
         space = BPSpace(
-            ctx; node_limit=1,
+            ws; node_limit=1,
             branching_strategy=sb
         )
 

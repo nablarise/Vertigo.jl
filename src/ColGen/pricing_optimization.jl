@@ -8,8 +8,8 @@ struct DefaultPricingStrategy{I}
     pricing_sps::I
 end
 
-function get_pricing_strategy(ctx::ColGenWorkspace, ::CGPhase)
-    return DefaultPricingStrategy(get_pricing_subprobs(ctx))
+function get_pricing_strategy(ws::ColGenWorkspace, ::CGPhase)
+    return DefaultPricingStrategy(get_pricing_subprobs(ws))
 end
 
 pricing_strategy_iterate(s::DefaultPricingStrategy) = iterate(s.pricing_sps)
@@ -141,7 +141,7 @@ end
 # ── optimize_pricing_problem! ─────────────────────────────────────────────────
 
 function optimize_pricing_problem!(
-    ctx::ColGenWorkspace,
+    ws::ColGenWorkspace,
     sp_id,
     pricing_sp::PricingSubproblem,
     ::SubproblemMoiOptimizer,
@@ -149,7 +149,7 @@ function optimize_pricing_problem!(
     stab_changes_mast_dual_sol
 )
     sp_model = moi_pricing_sp(pricing_sp)
-    sp_sense = is_minimization(ctx) ? MOI.MIN_SENSE : MOI.MAX_SENSE
+    sp_sense = is_minimization(ws) ? MOI.MIN_SENSE : MOI.MAX_SENSE
     MOI.set(sp_model, MOI.ObjectiveSense(), sp_sense)
     MOI.optimize!(sp_model)
 
@@ -163,21 +163,21 @@ function optimize_pricing_problem!(
 
     sp_obj = MOI.get(sp_model, MOI.ObjectiveValue())
 
-    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ctx.decomp), sp_id)
-    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ctx.decomp), sp_id)
-    fk = subproblem_fixed_cost(ctx.decomp, sp_id)
+    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ws.decomp), sp_id)
+    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ws.decomp), sp_id)
+    fk = subproblem_fixed_cost(ws.decomp, sp_id)
     reduced_cost = sp_obj + fk - ν_lb - ν_ub
 
     # Minimization: improving when reduced_cost < -ε (min(rc) is very negative).
     # Maximization: improving when reduced_cost > +ε (max(rc) is positive).
-    is_improving = if is_minimization(ctx)
+    is_improving = if is_minimization(ws)
         reduced_cost < -RC_IMPROVING_TOL
     else
         reduced_cost > RC_IMPROVING_TOL
     end
 
     # Extract solution — filter to SP decision variables
-    sp_vars = Set(subproblem_variables(ctx.decomp, sp_id))
+    sp_vars = Set(subproblem_variables(ws.decomp, sp_id))
     all_vals = get_primal_solution(sp_model)
     entries = Tuple{MOI.VariableIndex,Float64}[]
     for (var, val) in all_vals
