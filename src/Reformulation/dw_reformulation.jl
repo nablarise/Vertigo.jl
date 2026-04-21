@@ -46,6 +46,8 @@ _mapped_subproblem_var(m::OneToOneMapping, orig_var) =
 
 original_variables(d::DWReformulation) = d.mapping.all_orig_vars
 
+orig_var_type(::DWReformulation{X}) where {X} = X
+
 # Subproblem queries
 subproblem_ids(d::DWReformulation) = keys(d.subproblems)
 

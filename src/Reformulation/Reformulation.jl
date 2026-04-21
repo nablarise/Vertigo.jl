@@ -56,7 +56,7 @@ export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 # Interface functions
 export original_cost, coupling_coefficients
-export mapped_original_var, mapped_subproblem_var, original_variables
+export mapped_original_var, mapped_subproblem_var, original_variables, orig_var_type
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost
 export convexity_bounds, nb_subproblem_multiplicity
 export pure_master_variables, pure_master_cost, pure_master_bounds
