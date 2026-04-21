@@ -117,9 +117,9 @@ function run_branching_selection(
     mu::Float64 = 1.0 / 6.0,
     tol::Float64 = 1e-6
 )
-    ctx = space.ctx
+    ws = space.ws
     candidates = find_fractional_variables(
-        ctx, primal_values; tol=tol
+        ws, primal_values; tol=tol
     )
     isempty(candidates) && return BranchingResult(all_integral)
 

@@ -33,21 +33,21 @@ remove the constraint, and return an `SBProbeResult`.
 The constraint is always removed in a `finally` block.
 """
 function _run_one_lp_direction(space, candidate, set)
-    ctx = space.ctx
+    ws = space.ws
     backend = space.backend
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
+    decomp = bp_decomp(ws)
+    pool = bp_pool(ws)
 
     terms = build_branching_terms(decomp, pool, candidate.orig_var)
     ci = add_branching_constraint!(
-        backend, ctx, terms, set, candidate.orig_var
+        backend, ws, terms, set, candidate.orig_var
     )
 
     try
         obj, is_inf = solve_master_lp_only!(backend)
         return SBProbeResult(obj, obj, is_inf)
     finally
-        remove_branching_constraint!(backend, ctx, ci)
+        remove_branching_constraint!(backend, ws, ci)
     end
 end
 
@@ -61,7 +61,7 @@ function probe_candidate(
     bctx::BranchingContext, phase::LPProbePhase, space,
     candidate::BranchingCandidate, parent_lp::Float64
 )
-    snapshot = _capture_probe_state(space.ctx, space)
+    snapshot = _capture_probe_state(space.ws, space)
     try
         before_probe(bctx, phase, candidate, :left)
         left = _run_one_lp_direction(
@@ -70,7 +70,7 @@ function probe_candidate(
         )
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
-        _restore_probe_state!(space.ctx, space, snapshot)
+        _restore_probe_state!(space.ws, space, snapshot)
         before_probe(bctx, phase, candidate, :right)
         right = _run_one_lp_direction(
             space, candidate,
@@ -81,6 +81,6 @@ function probe_candidate(
             candidate, parent_lp, left, right
         )
     finally
-        _restore_probe_state!(space.ctx, space, snapshot)
+        _restore_probe_state!(space.ws, space, snapshot)
     end
 end

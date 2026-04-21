@@ -7,9 +7,9 @@ using Vertigo.Branching: solve_master_lp_only!, bp_master_model
 function test_lp_probe_feasible()
     @testset "[solve_master_lp_only!] returns LP objective" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
-        backend = bp_master_model(ctx)
+        ws = build_gap_context(inst)
+        run_column_generation(ws)
+        backend = bp_master_model(ws)
         obj, is_inf = solve_master_lp_only!(backend)
         @test !is_inf
         @test !isnothing(obj)
@@ -20,9 +20,9 @@ end
 function test_lp_probe_infeasible()
     @testset "[solve_master_lp_only!] detects infeasible LP" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        run_column_generation(ctx)
-        backend = bp_master_model(ctx)
+        ws = build_gap_context(inst)
+        run_column_generation(ws)
+        backend = bp_master_model(ws)
 
         # Add contradictory constraints to make the LP infeasible
         x = MOI.get(backend, MOI.ListOfVariableIndices())

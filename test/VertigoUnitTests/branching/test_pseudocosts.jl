@@ -147,10 +147,10 @@ function test_pseudocosts()
 
     @testset "[MultiPhaseStrongBranching] selects variable with cg_output" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        cg_out = run_column_generation(ctx)
+        ws = build_gap_context(inst)
+        cg_out = run_column_generation(ws)
 
-        primal = get_primal_solution(bp_master_model(ctx))
+        primal = get_primal_solution(bp_master_model(ws))
         rb = MultiPhaseStrongBranching(
             max_candidates=10,
             phases=[CGProbePhase(
@@ -159,7 +159,7 @@ function test_pseudocosts()
             reliability_threshold=2
         )
         space = BPSpace(
-            ctx; node_limit=1, branching_strategy=rb
+            ws; node_limit=1, branching_strategy=rb
         )
 
         # Create a mock node with cg_output
@@ -178,9 +178,9 @@ function test_pseudocosts()
 
     @testset "[MultiPhaseStrongBranching] lookahead stops early" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ctx = build_gap_context(inst)
-        cg_out = run_column_generation(ctx)
-        primal = get_primal_solution(bp_master_model(ctx))
+        ws = build_gap_context(inst)
+        cg_out = run_column_generation(ws)
+        primal = get_primal_solution(bp_master_model(ws))
 
         # lookahead=1, all unreliable -> at most 2 probed
         rb = MultiPhaseStrongBranching(
@@ -191,7 +191,7 @@ function test_pseudocosts()
             reliability_threshold=100
         )
         space = BPSpace(
-            ctx; node_limit=1, branching_strategy=rb
+            ws; node_limit=1, branching_strategy=rb
         )
         node_data = BPNodeData()
         node_data.cg_output = cg_out
@@ -216,9 +216,9 @@ function test_pseudocosts()
             )],
             reliability_threshold=2
         )
-        ctx = build_gap_context(inst)
+        ws = build_gap_context(inst)
         output = run_branch_and_price(
-            ctx;
+            ws;
             node_limit=100,
             branching_strategy=rb
         )

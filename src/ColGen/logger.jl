@@ -16,11 +16,11 @@ mutable struct ColGenLoggerWorkspace
     master_time::Float64
     pricing_time::Float64
     function ColGenLoggerWorkspace(
-        ctx::ColGenWorkspace;
+        ws::ColGenWorkspace;
         log_level::Int=1,
         log_frequency::Int=1
     )
-        return new(ctx, 0.0, log_level, log_frequency, 0.0, 0.0)
+        return new(ws, 0.0, log_level, log_frequency, 0.0, 0.0)
     end
 end
 
@@ -35,95 +35,95 @@ function _fmt_bound(x)
     return @sprintf("%.4f", x)
 end
 
-# ── Protocol delegation (context as arg 1) ───────────────────────────
+# ── Protocol delegation (workspace as arg 1) ─────────────────────────
 
-new_phase_iterator(lctx::ColGenLoggerWorkspace)                        = new_phase_iterator(lctx.inner)
-new_stage_iterator(lctx::ColGenLoggerWorkspace)                        = new_stage_iterator(lctx.inner)
-setup_stabilization!(lctx::ColGenLoggerWorkspace, master)              = setup_stabilization!(lctx.inner, master)
-stop_colgen(lctx::ColGenLoggerWorkspace, args...)                      = stop_colgen(lctx.inner, args...)
-colgen_output_type(lctx::ColGenLoggerWorkspace)                        = colgen_output_type(lctx.inner)
-new_output(O, lctx::ColGenLoggerWorkspace, args...)                    = new_output(O, lctx.inner, args...)
-stop_colgen_phase(lctx::ColGenLoggerWorkspace, args...)                = stop_colgen_phase(lctx.inner, args...)
-is_better_dual_bound(lctx::ColGenLoggerWorkspace, args...)             = is_better_dual_bound(lctx.inner, args...)
-colgen_phase_output_type(lctx::ColGenLoggerWorkspace)                  = colgen_phase_output_type(lctx.inner)
-new_phase_output(O, lctx::ColGenLoggerWorkspace, args...)              = new_phase_output(O, lctx.inner, args...)
-is_minimization(lctx::ColGenLoggerWorkspace)                           = is_minimization(lctx.inner)
-get_master(lctx::ColGenLoggerWorkspace)                                = get_master(lctx.inner)
-get_reform(lctx::ColGenLoggerWorkspace)                                = get_reform(lctx.inner)
-colgen_iteration_output_type(lctx::ColGenLoggerWorkspace)              = colgen_iteration_output_type(lctx.inner)
-update_inc_primal_sol!(lctx::ColGenLoggerWorkspace, args...)           = update_inc_primal_sol!(lctx.inner, args...)
-update_master_constrs_dual_vals!(lctx::ColGenLoggerWorkspace, args...) = update_master_constrs_dual_vals!(lctx.inner, args...)
-compute_reduced_costs!(lctx::ColGenLoggerWorkspace, args...)           = compute_reduced_costs!(lctx.inner, args...)
-update_reduced_costs!(lctx::ColGenLoggerWorkspace, args...)            = update_reduced_costs!(lctx.inner, args...)
-set_of_columns(lctx::ColGenLoggerWorkspace)                            = set_of_columns(lctx.inner)
-get_pricing_strategy(lctx::ColGenLoggerWorkspace, args...)             = get_pricing_strategy(lctx.inner, args...)
-get_pricing_subprobs(lctx::ColGenLoggerWorkspace)                      = get_pricing_subprobs(lctx.inner)
-insert_columns!(lctx::ColGenLoggerWorkspace, args...)                  = insert_columns!(lctx.inner, args...)
-compute_dual_bound(lctx::ColGenLoggerWorkspace, args...)               = compute_dual_bound(lctx.inner, args...)
-compute_sp_init_db(lctx::ColGenLoggerWorkspace, sp)                    = compute_sp_init_db(lctx.inner, sp)
-compute_sp_init_pb(lctx::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lctx.inner, sp)
-max_cg_iterations(lctx::ColGenLoggerWorkspace)                         = max_cg_iterations(lctx.inner)
-set_max_cg_iterations!(lctx::ColGenLoggerWorkspace, n::Int)            = set_max_cg_iterations!(lctx.inner, n)
+new_phase_iterator(lws::ColGenLoggerWorkspace)                        = new_phase_iterator(lws.inner)
+new_stage_iterator(lws::ColGenLoggerWorkspace)                        = new_stage_iterator(lws.inner)
+setup_stabilization!(lws::ColGenLoggerWorkspace, master)              = setup_stabilization!(lws.inner, master)
+stop_colgen(lws::ColGenLoggerWorkspace, args...)                      = stop_colgen(lws.inner, args...)
+colgen_output_type(lws::ColGenLoggerWorkspace)                        = colgen_output_type(lws.inner)
+new_output(O, lws::ColGenLoggerWorkspace, args...)                    = new_output(O, lws.inner, args...)
+stop_colgen_phase(lws::ColGenLoggerWorkspace, args...)                = stop_colgen_phase(lws.inner, args...)
+is_better_dual_bound(lws::ColGenLoggerWorkspace, args...)             = is_better_dual_bound(lws.inner, args...)
+colgen_phase_output_type(lws::ColGenLoggerWorkspace)                  = colgen_phase_output_type(lws.inner)
+new_phase_output(O, lws::ColGenLoggerWorkspace, args...)              = new_phase_output(O, lws.inner, args...)
+is_minimization(lws::ColGenLoggerWorkspace)                           = is_minimization(lws.inner)
+get_master(lws::ColGenLoggerWorkspace)                                = get_master(lws.inner)
+get_reform(lws::ColGenLoggerWorkspace)                                = get_reform(lws.inner)
+colgen_iteration_output_type(lws::ColGenLoggerWorkspace)              = colgen_iteration_output_type(lws.inner)
+update_inc_primal_sol!(lws::ColGenLoggerWorkspace, args...)           = update_inc_primal_sol!(lws.inner, args...)
+update_master_constrs_dual_vals!(lws::ColGenLoggerWorkspace, args...) = update_master_constrs_dual_vals!(lws.inner, args...)
+compute_reduced_costs!(lws::ColGenLoggerWorkspace, args...)           = compute_reduced_costs!(lws.inner, args...)
+update_reduced_costs!(lws::ColGenLoggerWorkspace, args...)            = update_reduced_costs!(lws.inner, args...)
+set_of_columns(lws::ColGenLoggerWorkspace)                            = set_of_columns(lws.inner)
+get_pricing_strategy(lws::ColGenLoggerWorkspace, args...)             = get_pricing_strategy(lws.inner, args...)
+get_pricing_subprobs(lws::ColGenLoggerWorkspace)                      = get_pricing_subprobs(lws.inner)
+insert_columns!(lws::ColGenLoggerWorkspace, args...)                  = insert_columns!(lws.inner, args...)
+compute_dual_bound(lws::ColGenLoggerWorkspace, args...)               = compute_dual_bound(lws.inner, args...)
+compute_sp_init_db(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_db(lws.inner, sp)
+compute_sp_init_pb(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lws.inner, sp)
+max_cg_iterations(lws::ColGenLoggerWorkspace)                         = max_cg_iterations(lws.inner)
+set_max_cg_iterations!(lws::ColGenLoggerWorkspace, n::Int)            = set_max_cg_iterations!(lws.inner, n)
 
-# ── Protocol delegation (context as arg 2) ───────────────────────────
+# ── Protocol delegation (workspace as arg 2) ─────────────────────────
 
-update_stabilization_after_pricing_optim!(stab, lctx::ColGenLoggerWorkspace, args...) =
-    update_stabilization_after_pricing_optim!(stab, lctx.inner, args...)
+update_stabilization_after_pricing_optim!(stab, lws::ColGenLoggerWorkspace, args...) =
+    update_stabilization_after_pricing_optim!(stab, lws.inner, args...)
 
-check_primal_ip_feasibility!(sol, lctx::ColGenLoggerWorkspace, phase) =
-    check_primal_ip_feasibility!(sol, lctx.inner, phase)
+check_primal_ip_feasibility!(sol, lws::ColGenLoggerWorkspace, phase) =
+    check_primal_ip_feasibility!(sol, lws.inner, phase)
 
 # ── Timing wrappers ──────────────────────────────────────────────────
 
-function optimize_master_lp_problem!(master, lctx::ColGenLoggerWorkspace)
+function optimize_master_lp_problem!(master, lws::ColGenLoggerWorkspace)
     t0 = time()
-    result = optimize_master_lp_problem!(master, lctx.inner)
-    lctx.master_time += time() - t0
+    result = optimize_master_lp_problem!(master, lws.inner)
+    lws.master_time += time() - t0
     return result
 end
 
-function optimize_pricing_problem!(lctx::ColGenLoggerWorkspace, args...)
+function optimize_pricing_problem!(lws::ColGenLoggerWorkspace, args...)
     t0 = time()
-    result = optimize_pricing_problem!(lctx.inner, args...)
-    lctx.pricing_time += time() - t0
+    result = optimize_pricing_problem!(lws.inner, args...)
+    lws.pricing_time += time() - t0
     return result
 end
 
 # ── Logging overrides ────────────────────────────────────────────────
 
-function setup_reformulation!(lctx::ColGenLoggerWorkspace, phase)
-    lctx.master_time = 0.0
-    lctx.pricing_time = 0.0
-    setup_reformulation!(lctx.inner, phase)
+function setup_reformulation!(lws::ColGenLoggerWorkspace, phase)
+    lws.master_time = 0.0
+    lws.pricing_time = 0.0
+    setup_reformulation!(lws.inner, phase)
 end
 
 function after_colgen_iteration(
-    lctx::ColGenLoggerWorkspace, phase, _stage,
+    lws::ColGenLoggerWorkspace, phase, _stage,
     colgen_iterations, stab, out,
     incumbent_dual_bound, _ip_primal_sol
 )
-    lctx.log_level == 0 && return
+    lws.log_level == 0 && return
 
-    mst = lctx.master_time
-    spt = lctx.pricing_time
-    lctx.master_time = 0.0
-    lctx.pricing_time = 0.0
+    mst = lws.master_time
+    spt = lws.pricing_time
+    lws.master_time = 0.0
+    lws.pricing_time = 0.0
 
     is_terminal = out.nb_columns_added == 0
     if !is_terminal &&
-        colgen_iterations % lctx.log_frequency != 0
+        colgen_iterations % lws.log_frequency != 0
         return
     end
 
     prefix = phase isa Phase0 ? "  " :
              phase isa Phase1 ? "# " : "##"
 
-    et = time() - lctx.cg_start_time
+    et = time() - lws.cg_start_time
     al = _alpha_val(stab)
     db_star = _fmt_bound(incumbent_dual_bound)
     mlp = _fmt_bound(out.master_lp_obj)
-    ip_val = isnothing(lctx.inner.ip_incumbent) ? nothing :
-             lctx.inner.ip_incumbent.obj_value
+    ip_val = isnothing(lws.inner.ip_incumbent) ? nothing :
+             lws.inner.ip_incumbent.obj_value
     pb = _fmt_bound(ip_val)
 
     line = string(
@@ -135,7 +135,7 @@ function after_colgen_iteration(
         "> <PB=", pb, ">"
     )
 
-    if lctx.log_level >= 2
+    if lws.log_level >= 2
         db = _fmt_bound(out.dual_bound)
         line *= string(
             @sprintf(" <mst=%5.2f> <spt=%5.2f>", mst, spt),
@@ -149,7 +149,7 @@ end
 # ── Entry point ──────────────────────────────────────────────────────
 
 """
-    run_column_generation(lctx::ColGenLoggerWorkspace) -> ColGenOutput
+    run_column_generation(lws::ColGenLoggerWorkspace) -> ColGenOutput
 
 Run column generation with compact, tag-based terminal logging.
 
@@ -158,17 +158,17 @@ Run column generation with compact, tag-based terminal logging.
 julia> # (see test for a full example)
 ```
 """
-function run_column_generation(lctx::ColGenLoggerWorkspace)
-    lctx.cg_start_time = time()
-    output = ColGen.run!(lctx, nothing)
-    _print_cg_footer(lctx, output)
+function run_column_generation(lws::ColGenLoggerWorkspace)
+    lws.cg_start_time = time()
+    output = ColGen.run!(lws, nothing)
+    _print_cg_footer(lws, output)
     return output
 end
 
 function _print_cg_footer(
-    lctx::ColGenLoggerWorkspace, output::ColGenOutput
+    lws::ColGenLoggerWorkspace, output::ColGenOutput
 )
-    lctx.log_level == 0 && return
+    lws.log_level == 0 && return
     println()
     if output.status == optimal
         println("[STATUS] Convergence reached.")
@@ -181,10 +181,10 @@ function _print_cg_footer(
     else
         println("[STATUS] Iteration limit reached.")
     end
-    if !isnothing(lctx.inner.ip_incumbent)
+    if !isnothing(lws.inner.ip_incumbent)
         @printf(
             "[STATUS] IP incumbent: %.6e\n",
-            lctx.inner.ip_incumbent.obj_value
+            lws.inner.ip_incumbent.obj_value
         )
     end
 end

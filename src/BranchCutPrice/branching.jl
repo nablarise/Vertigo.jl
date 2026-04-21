@@ -4,7 +4,7 @@
 
 """
     create_branching_children(id_counter, parent, orig_var, x_val,
-                              ctx, dual_bound, cut_tracker)
+                              ws, dual_bound, cut_tracker)
 
 Create left and right child nodes by branching on original variable
 `orig_var`. Each child adds a robust branching constraint as a
@@ -15,10 +15,10 @@ Right child: Σ_j λ_j · a_{i,j} ≥ ⌈x_val⌉
 """
 function create_branching_children(
     id_counter, parent, orig_var, x_val,
-    ctx, dual_bound, cut_tracker
+    ws, dual_bound, cut_tracker
 )
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
+    decomp = bp_decomp(ws)
+    pool = bp_pool(ws)
     floor_val = floor(x_val)
     ceil_val = ceil(x_val)
 

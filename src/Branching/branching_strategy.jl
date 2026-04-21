@@ -71,7 +71,7 @@ function select_branching_variable(
     primal_values::Dict{MOI.VariableIndex,Float64}
 )
     orig_var, x_val = most_fractional_original_variable(
-        space.ctx, primal_values; tol=space.tol
+        space.ws, primal_values; tol=space.tol
     )
     isnothing(orig_var) && return BranchingResult(all_integral)
     return BranchingResult(orig_var, x_val)

@@ -65,16 +65,16 @@ function build_branching_terms(decomp, pool, orig_var)
 end
 
 """
-    add_branching_constraint!(backend, ctx, terms, set, orig_var)
+    add_branching_constraint!(backend, ws, terms, set, orig_var)
 
 Add a branching constraint to the MOI backend and register it
 in `branching_constraints` in a single function call.
 Returns the MOI constraint index.
 """
-function add_branching_constraint!(backend, ctx, terms, set, orig_var)
+function add_branching_constraint!(backend, ws, terms, set, orig_var)
     f = MOI.ScalarAffineFunction(terms, 0.0)
     ci = MOI.add_constraint(backend, f, set)
-    bcs = bp_branching_constraints(ctx)
+    bcs = bp_branching_constraints(ws)
     push!(bcs, ColGen.ActiveBranchingConstraint(
         TaggedCI(ci), orig_var
     ))
@@ -82,16 +82,16 @@ function add_branching_constraint!(backend, ctx, terms, set, orig_var)
 end
 
 """
-    remove_branching_constraint!(backend, ctx, ci)
+    remove_branching_constraint!(backend, ws, ci)
 
 Delete the MOI constraint and remove it from `branching_constraints`.
 Defensive: handles partial state gracefully.
 """
-function remove_branching_constraint!(backend, ctx, ci)
+function remove_branching_constraint!(backend, ws, ci)
     if MOI.is_valid(backend, ci)
         MOI.delete(backend, ci)
     end
-    bcs = bp_branching_constraints(ctx)
+    bcs = bp_branching_constraints(ws)
     tagged = TaggedCI(ci)
     filter!(bc -> bc.constraint_index != tagged, bcs)
     return
@@ -109,23 +109,23 @@ function _try_capture_basis(backend)
     end
 end
 
-function _capture_probe_state(ctx, space)
+function _capture_probe_state(ws, space)
     return (
-        max_iter = ColGen.max_cg_iterations(ctx),
-        ip_inc = bp_ip_incumbent(ctx),
-        ip_bound = bp_ip_primal_bound(ctx),
-        bcs = copy(bp_branching_constraints(ctx)),
+        max_iter = ColGen.max_cg_iterations(ws),
+        ip_inc = bp_ip_incumbent(ws),
+        ip_bound = bp_ip_primal_bound(ws),
+        bcs = copy(bp_branching_constraints(ws)),
         basis = _try_capture_basis(space.backend),
     )
 end
 
-function _restore_probe_state!(ctx, space, snapshot)
-    bcs = bp_branching_constraints(ctx)
+function _restore_probe_state!(ws, space, snapshot)
+    bcs = bp_branching_constraints(ws)
     empty!(bcs)
     append!(bcs, snapshot.bcs)
-    ColGen.set_max_cg_iterations!(ctx, snapshot.max_iter)
-    bp_set_ip_primal_bound!(ctx, snapshot.ip_bound)
-    bp_set_ip_incumbent!(ctx, snapshot.ip_inc)
+    ColGen.set_max_cg_iterations!(ws, snapshot.max_iter)
+    bp_set_ip_primal_bound!(ws, snapshot.ip_bound)
+    bp_set_ip_incumbent!(ws, snapshot.ip_inc)
     if !isnothing(snapshot.basis)
         try
             MathOptState.apply_change!(
@@ -143,19 +143,19 @@ function _restore_probe_state!(ctx, space, snapshot)
 end
 
 function _run_one_direction(space, candidate, set, max_cg_iter)
-    ctx = space.ctx
+    ws = space.ws
     backend = space.backend
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
+    decomp = bp_decomp(ws)
+    pool = bp_pool(ws)
 
     terms = build_branching_terms(decomp, pool, candidate.orig_var)
     ci = add_branching_constraint!(
-        backend, ctx, terms, set, candidate.orig_var
+        backend, ws, terms, set, candidate.orig_var
     )
-    ColGen.set_max_cg_iterations!(ctx, max_cg_iter)
+    ColGen.set_max_cg_iterations!(ws, max_cg_iter)
 
     try
-        cg_output = ColGen.run_column_generation(ctx)
+        cg_output = ColGen.run_column_generation(ws)
         is_inf = cg_output.status == ColGen.master_infeasible ||
                  cg_output.status == ColGen.subproblem_infeasible
         return SBProbeResult(
@@ -164,7 +164,7 @@ function _run_one_direction(space, candidate, set, max_cg_iter)
             is_inf
         )
     finally
-        remove_branching_constraint!(backend, ctx, ci)
+        remove_branching_constraint!(backend, ws, ci)
     end
 end
 
@@ -182,7 +182,7 @@ function run_sb_probe(
     candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
-    snapshot = _capture_probe_state(space.ctx, space)
+    snapshot = _capture_probe_state(space.ws, space)
     try
         before_probe(bctx, phase, candidate, :left)
         left = _run_one_direction(
@@ -192,7 +192,7 @@ function run_sb_probe(
         )
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
-        _restore_probe_state!(space.ctx, space, snapshot)
+        _restore_probe_state!(space.ws, space, snapshot)
         before_probe(bctx, phase, candidate, :right)
         right = _run_one_direction(
             space, candidate,
@@ -204,7 +204,7 @@ function run_sb_probe(
             candidate, parent_lp_obj, left, right
         )
     finally
-        _restore_probe_state!(space.ctx, space, snapshot)
+        _restore_probe_state!(space.ws, space, snapshot)
     end
 end
 

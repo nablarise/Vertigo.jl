@@ -51,14 +51,14 @@ function _build_branching_test_context()
     record_column!(pool, col_var_b, sp1, sol_b, 5.0)
 
     config = ColGenConfig()
-    ctx = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
 
-    return ctx, col_var_a, col_var_b
+    return ws, col_var_a, col_var_b
 end
 
 # ────────────────────────────────────────────────────────────────
@@ -67,10 +67,10 @@ end
 
 function test_find_fractional_all_integral()
     @testset "[find_fractional_variables] empty primal → no candidates" begin
-        ctx, _, _ = _build_branching_test_context()
+        ws, _, _ = _build_branching_test_context()
         primal = Dict{MOI.VariableIndex,Float64}()
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
         @test isempty(candidates)
     end
@@ -78,7 +78,7 @@ end
 
 function test_find_fractional_with_known_values()
     @testset "[find_fractional_variables] known λ → known fractional x" begin
-        ctx, col_var_a, col_var_b = _build_branching_test_context()
+        ws, col_var_a, col_var_b = _build_branching_test_context()
 
         # λ_a = 0.3, λ_b = 0.6
         primal = Dict{MOI.VariableIndex,Float64}(
@@ -95,7 +95,7 @@ function test_find_fractional_with_known_values()
         #   (1,3) frac=0.4, (1,1) frac=0.3, (1,2) frac=0.1
 
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
 
         @test length(candidates) == 3
@@ -118,7 +118,7 @@ end
 
 function test_find_fractional_integral_projection()
     @testset "[find_fractional_variables] λ=1.0 → integral projection" begin
-        ctx, col_var_a, _ = _build_branching_test_context()
+        ws, col_var_a, _ = _build_branching_test_context()
 
         # Only column A active at λ=1.0:
         #   x(1,1) = 1.0, x(1,2) = 1.0 — both integral
@@ -127,7 +127,7 @@ function test_find_fractional_integral_projection()
         )
 
         candidates = find_fractional_variables(
-            ctx, primal; tol=1e-6
+            ws, primal; tol=1e-6
         )
         @test isempty(candidates)
     end

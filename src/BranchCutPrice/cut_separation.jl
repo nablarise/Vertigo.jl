@@ -38,14 +38,14 @@ Add a single separated robust cut to the master model and register
 it in the CG context.
 """
 function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
-    ctx = space.ctx
+    ws = space.ws
     saf = _build_cut_saf(
-        bp_decomp(ctx), bp_pool(ctx), space.backend, cut
+        bp_decomp(ws), bp_pool(ws), space.backend, cut
     )
     ci = MOI.add_constraint(space.backend, saf, cut.set)
     tagged = TaggedCI(ci)
     push!(
-        bp_robust_cuts(ctx),
+        bp_robust_cuts(ws),
         ColGen.ActiveRobustCut(tagged, cut.coefficients)
     )
     return tagged
@@ -62,8 +62,8 @@ function _separate_and_add_cuts!(
 )::Int
     isnothing(space.separator) && return 0
     cg_output.status != ColGen.optimal && return 0
-    decomp = bp_decomp(space.ctx)
-    pool = bp_pool(space.ctx)
+    decomp = bp_decomp(space.ws)
+    pool = bp_pool(space.ws)
     primal_cache = get_primal_solution(space.backend)
     x = project_to_original(
         decomp, pool,

@@ -126,14 +126,14 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
 
     # ── Build context ─────────────────────────────────────────────────────────
     config = ColGenConfig(max_cg_iterations=max_cg_iterations)
-    ctx = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
 
-    return ctx
+    return ws
 end
 
 # ColGen

@@ -22,12 +22,12 @@ function colgen_output_type end
 function new_output end
 
 """
-    run!(ctx, ip_primal_sol; iter = 1) -> AbstractColGenOutput
+    run!(ws, ip_primal_sol; iter = 1) -> AbstractColGenOutput
 
 Runs the column generation algorithm.
 
 Arguments are:
-- `ctx`: column generation context
+- `ws`: column generation workspace
 - `ip_primal_sol`: current best primal solution to the master problem
 - `iter`: iteration number (default: 1)
 
@@ -59,12 +59,12 @@ function colgen_phase_output_type end
 function new_phase_output end
 
 """
-    run_colgen_phase!(ctx, phase, stage, ip_primal_sol, stab; iter = 1) -> AbstractColGenPhaseOutput
+    run_colgen_phase!(ws, phase, stage, ip_primal_sol, stab; iter = 1) -> AbstractColGenPhaseOutput
 
 Runs a phase of the column generation algorithm.
 
 Arguments are:
-- `ctx`: column generation context
+- `ws`: column generation workspace
 - `phase`: current column generation phase
 - `stage`: current column generation stage
 - `ip_primal_sol`: current best primal solution to the master problem

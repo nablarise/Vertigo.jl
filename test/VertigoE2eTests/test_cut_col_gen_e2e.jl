@@ -121,11 +121,11 @@ end
 function test_fenchel_cut_gap()
     @testset "[bcp+cuts] GAP with Fenchel cuts" begin
         inst = gap_fenchel_instance()
-        ctx = build_gap_fenchel_context(inst)
+        ws = build_gap_fenchel_context(inst)
         separator = _make_fenchel_separator(inst)
 
         output = run_branch_and_price(
-            ctx;
+            ws;
             separator=separator,
             max_cut_rounds=20,
             min_gap_improvement=0.0,

@@ -137,22 +137,22 @@ function build_phase_test_context()
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub, conv_lb)
 
     config = ColGenConfig()
-    ctx = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(decomp, pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
 
-    return ctx, (λ1=λ1, λ2=λ2, y_cont=y_cont, y_int=y_int)
+    return ws, (λ1=λ1, λ2=λ2, y_cont=y_cont, y_int=y_int)
 end
 
 # ──────────────────────────────────────────────────────────────────
 
 function test_setup_reformulation_phase0_relaxes_integrality()
     @testset "[setup_reformulation] phase 0 relaxes integrality" begin
-        ctx, _ = build_phase_test_context()
-        model = master_model(ctx.decomp)
+        ws, _ = build_phase_test_context()
+        model = master_model(ws.decomp)
 
         int_cis = MOI.get(model,
             MOI.ListOfConstraintIndices{
@@ -160,7 +160,7 @@ function test_setup_reformulation_phase0_relaxes_integrality()
             }())
         @test length(int_cis) == 1
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
         int_cis2 = MOI.get(model,
             MOI.ListOfConstraintIndices{
@@ -170,16 +170,16 @@ function test_setup_reformulation_phase0_relaxes_integrality()
 
         # Artificial variables were created for c1 (EqualTo)
         # and convexity constraints.
-        @test !isempty(ctx.eq_art_vars)
+        @test !isempty(ws.eq_art_vars)
     end
 end
 
 function test_setup_reformulation_phase1_zeroes_costs()
     @testset "[setup_reformulation] phase 1 zeroes all variable costs" begin
-        ctx, vars = build_phase_test_context()
-        model = master_model(ctx.decomp)
+        ws, vars = build_phase_test_context()
+        model = master_model(ws.decomp)
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
         # Original costs still present after phase 0.
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
@@ -187,7 +187,7 @@ function test_setup_reformulation_phase1_zeroes_costs()
         @test _obj_coeff(model, vars.y_cont) ≈ 3.5
         @test _obj_coeff(model, vars.y_int) ≈ 7.0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase1())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
 
         # All original costs zeroed.
         @test _obj_coeff(model, vars.λ1) ≈ 0.0
@@ -199,16 +199,16 @@ end
 
 function test_setup_reformulation_phase2_restores_costs()
     @testset "[setup_reformulation] phase 2 restores original costs" begin
-        ctx, vars = build_phase_test_context()
-        model = master_model(ctx.decomp)
+        ws, vars = build_phase_test_context()
+        model = master_model(ws.decomp)
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase1())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
 
         @test _obj_coeff(model, vars.y_cont) ≈ 0.0
         @test _obj_coeff(model, vars.y_int) ≈ 0.0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase2())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase2())
 
         # Column costs restored from pool.
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
@@ -221,49 +221,49 @@ end
 
 function test_setup_reformulation_phase2_removes_art_vars()
     @testset "[setup_reformulation] phase 2 removes artificial variables" begin
-        ctx, _ = build_phase_test_context()
+        ws, _ = build_phase_test_context()
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
-        n_art = length(ctx.eq_art_vars) +
-                length(ctx.leq_art_vars) +
-                length(ctx.geq_art_vars)
+        n_art = length(ws.eq_art_vars) +
+                length(ws.leq_art_vars) +
+                length(ws.geq_art_vars)
         @test n_art > 0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase1())
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase2())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase2())
 
-        @test isempty(ctx.eq_art_vars)
-        @test isempty(ctx.leq_art_vars)
-        @test isempty(ctx.geq_art_vars)
+        @test isempty(ws.eq_art_vars)
+        @test isempty(ws.leq_art_vars)
+        @test isempty(ws.geq_art_vars)
     end
 end
 
 function test_setup_reformulation_full_sequence()
     @testset "[setup_reformulation] full phase 0 → 1 → 2 roundtrip" begin
-        ctx, vars = build_phase_test_context()
-        model = master_model(ctx.decomp)
+        ws, vars = build_phase_test_context()
+        model = master_model(ws.decomp)
 
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
         @test _obj_coeff(model, vars.λ2) ≈ 8.0
         @test _obj_coeff(model, vars.y_cont) ≈ 3.5
         @test _obj_coeff(model, vars.y_int) ≈ 7.0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
         @test _obj_coeff(model, vars.λ1) ≈ 5.0
         @test _obj_coeff(model, vars.λ2) ≈ 8.0
         @test _obj_coeff(model, vars.y_cont) ≈ 3.5
         @test _obj_coeff(model, vars.y_int) ≈ 7.0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase1())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
 
         @test _obj_coeff(model, vars.λ1) ≈ 0.0
         @test _obj_coeff(model, vars.λ2) ≈ 0.0
         @test _obj_coeff(model, vars.y_cont) ≈ 0.0
         @test _obj_coeff(model, vars.y_int) ≈ 0.0
 
-        Vertigo.ColGen.setup_reformulation!(ctx, Phase2())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase2())
 
         # Model should still solve.
         MOI.optimize!(model)

@@ -3,19 +3,19 @@
 # SPDX-License-Identifier: Proprietary
 
 """
-    most_fractional_original_variable(ctx, primal_values; tol=1e-6)
+    most_fractional_original_variable(ws, primal_values; tol=1e-6)
 
 Project the master LP solution to original-variable space and find the
 most fractional original variable (closest to 0.5). Returns
 `(orig_var, x_val)` or `(nothing, nothing)` if all are integral.
 """
 function most_fractional_original_variable(
-    ctx,
+    ws,
     primal_values::Dict{MOI.VariableIndex,Float64};
     tol::Float64 = 1e-6
 )
-    decomp = bp_decomp(ctx)
-    pool = bp_pool(ctx)
+    decomp = bp_decomp(ws)
+    pool = bp_pool(ws)
     x_values = project_to_original(
         decomp, pool, v -> get(primal_values, v, 0.0)
     )
