@@ -344,8 +344,9 @@ function run_branch_and_price(
         DefaultBranchingContext()
     end
 
+    X = orig_var_type(bp_decomp(ws))
     effective_strategy = if branching_strategy isa MultiPhaseStrongBranching
-        MultiPhaseStrongBranching(;
+        MultiPhaseStrongBranching{X}(;
             max_candidates=branching_strategy.max_candidates,
             mu=branching_strategy.mu,
             phases=branching_strategy.phases,
