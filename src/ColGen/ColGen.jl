@@ -30,6 +30,9 @@ include("moi_solutions.jl")
 # ── Helpers ──────────────────────────────────────────────────────────────────
 include("helpers.jl")
 
+# ── Configuration ────────────────────────────────────────────────────────────
+include("config.jl")
+
 # ── Context and phase/stage control ───────────────────────────────────────────
 include("context.jl")
 
@@ -46,7 +49,7 @@ include("logger.jl")
 # ── Exports ───────────────────────────────────────────────────────────────────
 
 # Context and solver entry point
-export ColGenConfig, ColGenWorkspace, ColGenLoggerContext
+export ColGenConfig, ColGenWorkspace, ColGenLoggerWorkspace
 export run_col_gen, run_column_generation, ColGenOutput
 export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export CGPhase, Phase0, Phase1, Phase2
