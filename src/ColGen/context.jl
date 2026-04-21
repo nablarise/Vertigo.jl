@@ -654,17 +654,17 @@ and `config`, then dispatches to [`_run_col_gen`](@ref).
 """
 function run_col_gen(decomp, config::ColGenConfig)
     workspace = ColGenWorkspace(decomp, config)
-    return _run_col_gen(decomp, config, workspace)
+    return _run_col_gen(workspace)
 end
 
 """
-    _run_col_gen(decomp, config::ColGenConfig, workspace::ColGenWorkspace) -> ColGenOutput
+    _run_col_gen(workspace::ColGenWorkspace) -> ColGenOutput
 
 Internal entry point. Runs the column generation algorithm on an
 already-constructed workspace. Useful for reuse across solves or
 testing.
 """
-function _run_col_gen(decomp, config::ColGenConfig, workspace::ColGenWorkspace)
+function _run_col_gen(workspace::ColGenWorkspace)
     return ColGen.run!(workspace, nothing)
 end
 

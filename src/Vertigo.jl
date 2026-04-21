@@ -53,7 +53,7 @@ export ColumnPool
 
 # Context and solver entry point
 export ColGenConfig, ColGenWorkspace, ColGenLoggerContext
-export run_col_gen, _run_col_gen, run_column_generation, ColGenOutput
+export run_col_gen, run_column_generation, ColGenOutput
 export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export WentgesSmoothing, NoStabilization
 
