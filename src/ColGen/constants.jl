@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 const DUAL_CONSISTENCY_TOL = 1e-4
 const INTEGRALITY_TOL = 1e-5

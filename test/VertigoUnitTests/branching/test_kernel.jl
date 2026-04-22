@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 using Vertigo.Branching: select_initial_candidates,
     score_candidate, filter_candidates, stop_phase,

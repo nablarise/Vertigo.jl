@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 _rhs(s::MOI.LessThan) = s.upper
 _rhs(s::MOI.GreaterThan) = s.lower

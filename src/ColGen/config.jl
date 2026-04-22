@@ -3,7 +3,7 @@
 # Project: Vertigo.jl
 # Date: 2026-04
 # Generated with: Claude Opus 4.6
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 """
     ColGenConfig

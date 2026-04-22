@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 using Vertigo.Branching: SBProbeResult, SBCandidateResult,
     sb_score, BranchingCandidate, find_fractional_variables,

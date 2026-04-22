@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 using Vertigo.Branching: solve_master_lp_only!, bp_master_model
 

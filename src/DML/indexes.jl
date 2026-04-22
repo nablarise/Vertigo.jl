@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 _eachindex(obj) = eachindex(obj)
 _eachindex(obj::Matrix) = [(i, j) for i in axes(obj, 1), j in axes(obj, 2)]

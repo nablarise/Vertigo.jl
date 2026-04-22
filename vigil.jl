@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 # Add test modules to LOAD_PATH
 for submodule in filter(item -> isdir(joinpath(@__DIR__, "test", item)), readdir(joinpath(@__DIR__, "test")))
