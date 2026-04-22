@@ -123,6 +123,7 @@ function test_stabilization()
     @testset "[stabilization] misprice" begin
         test_misprice_inactive()
         test_misprice_deterministic_schedule()
+        test_misprice_hard_cap()
     end
     @testset "[stabilization] iter_update" begin
         test_decrease_alpha()
@@ -312,6 +313,25 @@ function test_misprice_deterministic_schedule()
     update_stabilization_after_misprice!(stab, nothing)
     @test stab.cur_smooth_dual_sol_coeff ≈ 0.0
     @test stab.nb_misprices == 3
+end
+
+function test_misprice_hard_cap()
+    # Use high alpha (0.95) so the formula alone would allow ~20
+    # misprices, but the hard cap (default 10) should kick in first.
+    ws = _build_stab_ctx(alpha=0.95)
+    master = get_master(ws)
+    stab = setup_stabilization!(ws, master)
+
+    for _ in 1:9
+        update_stabilization_after_misprice!(stab, nothing)
+    end
+    # After 9 misprices, formula gives α > 0
+    @test stab.cur_smooth_dual_sol_coeff > 0.0
+
+    # 10th misprice hits the cap → α forced to 0
+    update_stabilization_after_misprice!(stab, nothing)
+    @test stab.nb_misprices == 10
+    @test stab.cur_smooth_dual_sol_coeff == 0.0
 end
 
 function test_decrease_alpha()
