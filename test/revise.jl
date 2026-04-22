@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 # Interactive dev loop: run this file from the REPL with include("test/revise.jl")
 # Revise will automatically pick up changes to ColumnGeneration source files.

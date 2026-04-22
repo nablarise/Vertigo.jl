@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 # Accessors that dispatch on both ColGenWorkspace and ColGenLoggerWorkspace,
 # so BranchCutPrice works with either type.

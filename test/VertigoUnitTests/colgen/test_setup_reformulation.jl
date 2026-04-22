@@ -1,6 +1,6 @@
 # Copyright (c) 2025 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
-# SPDX-License-Identifier: Proprietary
+# SPDX-License-Identifier: MIT
 
 # Helper: read a variable's objective coefficient from the MOI model.
 function _obj_coeff(model, var::MOI.VariableIndex)
