@@ -122,6 +122,7 @@ mutable struct ColGenWorkspace{D<:AbstractDecomposition}
     robust_cuts::Vector{ActiveRobustCut}
     smoothing_alpha::Float64
     max_cg_iterations::Int
+    max_misprice_iterations::Int
 end
 
 """
@@ -157,7 +158,8 @@ function ColGenWorkspace(
         eq_art_vars, leq_art_vars, geq_art_vars,
         nothing, nothing,
         ActiveBranchingConstraint[], ActiveRobustCut[],
-        config.smoothing_alpha, config.max_cg_iterations
+        config.smoothing_alpha, config.max_cg_iterations,
+        config.max_misprice_iterations
     )
 end
 
