@@ -22,10 +22,11 @@ function test_bp_gap_a_instances()
             inst = parse_gap_file(filepath)
             ws = build_gap_context(inst; smoothing_alpha=0.5)
             dot_path = "$class-$agents-$jobs.dot"
-            output = run_branch_and_price(
+            bcp_ctx = BranchCutPriceContext(
                 ws; node_limit = 5_000,
                 dot_file = dot_path
             )
+            output = run_branch_and_price(bcp_ctx)
 
             @test output.status in (:optimal, :node_limit)
 

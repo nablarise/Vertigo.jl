@@ -260,6 +260,18 @@ struct MultiPhaseStrongBranching{X} <: AbstractBranchingStrategy
             branching_ctx
         )
     end
+
+    # Internal constructor used by `with_branching_ctx` to share the
+    # caller's pseudocost tracker across rebuilt strategies.
+    function MultiPhaseStrongBranching{X}(
+        max_candidates::Int,
+        mu::Float64,
+        phases::Vector{AbstractBranchingPhase},
+        pseudocosts::PseudocostTracker{X},
+        branching_ctx::BranchingContext
+    ) where {X}
+        new{X}(max_candidates, mu, phases, pseudocosts, branching_ctx)
+    end
 end
 
 """
@@ -271,6 +283,22 @@ type is known at construction time.
 """
 function MultiPhaseStrongBranching(; kwargs...)
     return MultiPhaseStrongBranching{Any}(; kwargs...)
+end
+
+"""
+    with_branching_ctx(mpsb, ctx) -> MultiPhaseStrongBranching
+
+Return a new `MultiPhaseStrongBranching` identical to `mpsb` but with
+its branching context replaced by `ctx`. The pseudocost tracker is
+shared, so updates flow back to the original strategy.
+"""
+function with_branching_ctx(
+    mpsb::MultiPhaseStrongBranching{X}, ctx::BranchingContext
+) where {X}
+    return MultiPhaseStrongBranching{X}(
+        mpsb.max_candidates, mpsb.mu, mpsb.phases,
+        mpsb.pseudocosts, ctx
+    )
 end
 
 """
