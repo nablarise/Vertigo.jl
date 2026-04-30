@@ -356,7 +356,7 @@ function BranchCutPriceContext(
     branching_ctx = log_level > 0 ?
         BranchingLoggerContext(; log_level=log_level) :
         DefaultBranchingContext()
-    effective_strategy = _wire_branching_ctx(
+    effective_strategy = _branching_strategy_with_ctx(
         branching_strategy, branching_ctx
     )
     space = BPSpace(
@@ -376,9 +376,9 @@ end
 
 # Default: leave the strategy as-is. Specialized below for strategies
 # that hold a `BranchingContext`.
-_wire_branching_ctx(s::AbstractBranchingStrategy, _) = s
+_branching_strategy_with_ctx(s::AbstractBranchingStrategy, _) = s
 
-function _wire_branching_ctx(
+function _branching_strategy_with_ctx(
     s::MultiPhaseStrongBranching, ctx::BranchingContext
 )
     return with_branching_ctx(s, ctx)
