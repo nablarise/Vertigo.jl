@@ -124,7 +124,7 @@ function test_fenchel_cut_gap()
         ws = build_gap_fenchel_context(inst)
         separator = _make_fenchel_separator(inst)
 
-        bcp_ctx = BranchCutPriceContext(
+        bcp_ws = BranchCutPriceWorkspace(
             ws;
             separator=separator,
             max_cut_rounds=20,
@@ -132,7 +132,7 @@ function test_fenchel_cut_gap()
             node_limit=1,
             log_level=2
         )
-        output = run_branch_and_price(bcp_ctx)
+        output = run_branch_and_price(bcp_ws)
 
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)

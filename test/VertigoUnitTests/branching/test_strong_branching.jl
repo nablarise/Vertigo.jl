@@ -161,7 +161,7 @@ function test_multi_phase_sb_e2e()
     @testset "[MultiPhaseStrongBranching] e2e small GAP finds optimal" begin
         inst = random_gap_instance(2, 4; seed=10)
         ws = build_gap_context(inst)
-        bcp_ctx = BranchCutPriceContext(
+        bcp_ws = BranchCutPriceWorkspace(
             ws;
             node_limit=100,
             branching_strategy=MultiPhaseStrongBranching(
@@ -171,7 +171,7 @@ function test_multi_phase_sb_e2e()
                 )]
             )
         )
-        output = run_branch_and_price(bcp_ctx)
+        output = run_branch_and_price(bcp_ws)
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
     end

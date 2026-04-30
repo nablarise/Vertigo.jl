@@ -217,12 +217,12 @@ function test_pseudocosts()
             reliability_threshold=2
         )
         ws = build_gap_context(inst)
-        bcp_ctx = BranchCutPriceContext(
+        bcp_ws = BranchCutPriceWorkspace(
             ws;
             node_limit=100,
             branching_strategy=rb
         )
-        output = run_branch_and_price(bcp_ctx)
+        output = run_branch_and_price(bcp_ws)
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
         @test !isempty(rb.pseudocosts.records)
