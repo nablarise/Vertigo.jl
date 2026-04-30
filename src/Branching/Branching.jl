@@ -30,7 +30,7 @@ include("logger.jl")
 # ── Public API ────────────────────────────────────────────────────────────
 export AbstractBranchingPhase, LPProbePhase, CGProbePhase
 export AbstractBranchingStrategy, MostFractionalBranching
-export MultiPhaseStrongBranching
+export MultiPhaseStrongBranching, with_branching_ctx
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 export BranchingStatus, BranchingResult
 export branching_ok, all_integral, node_infeasible

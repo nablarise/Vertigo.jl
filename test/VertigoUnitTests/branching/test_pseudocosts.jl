@@ -217,15 +217,14 @@ function test_pseudocosts()
             reliability_threshold=2
         )
         ws = build_gap_context(inst)
-        output = run_branch_and_price(
+        bcp_ctx = BranchCutPriceContext(
             ws;
             node_limit=100,
             branching_strategy=rb
         )
+        output = run_branch_and_price(bcp_ctx)
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
-        # Broken: run_branch_and_price reconstructs the strategy,
-        # so rb.pseudocosts is never updated. See #37.
-        @test_broken !isempty(rb.pseudocosts.records)
+        @test !isempty(rb.pseudocosts.records)
     end
 end

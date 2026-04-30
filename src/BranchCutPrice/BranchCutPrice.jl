@@ -28,7 +28,8 @@ include("evaluator.jl")
 include("rmp_heuristic.jl")
 include("dot_logger.jl")
 
-export BPSpace, BPEvaluator, BPOutput, run_branch_and_price
+export BPSpace, BPEvaluator, BPOutput, BranchCutPriceContext
+export run_branch_and_price
 export BPDotLoggerContext
 
 end # module BranchCutPrice

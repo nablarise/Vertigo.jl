@@ -294,16 +294,30 @@ function TreeSearch.ts_branching_description(
     return nothing
 end
 
-# ── Entry point ──────────────────────────────────────────────────────────
+# ── Branch-and-price context ─────────────────────────────────────────────
 
 """
-    run_branch_and_price(ws; strategy, node_limit, tol,
-                         rmp_time_limit, rmp_heuristic,
-                         separator, max_cut_rounds,
-                         log_level, dot_file) -> BPOutput
+    BranchCutPriceContext
 
-Run the branch-and-price algorithm using column generation at each
-node and most-fractional branching on original variables.
+Bundle of all configuration needed to run branch-and-price: a `BPSpace`,
+the tree-search strategy, and the optional `.dot` output path. Build it
+once with the keyword constructor — wiring of the branching logger
+context (including pseudocost-tracker preservation) is handled there —
+then hand it to [`run_branch_and_price`](@ref).
+"""
+struct BranchCutPriceContext{Sp<:BPSpace,Strat}
+    space::Sp
+    strategy::Strat
+    dot_file::Union{Nothing,String}
+end
+
+"""
+    BranchCutPriceContext(ws; strategy, node_limit, tol, rmp_time_limit,
+                          rmp_heuristic, separator, max_cut_rounds,
+                          min_gap_improvement, branching_strategy,
+                          log_level, dot_file)
+
+Build a `BranchCutPriceContext` from a column generation workspace.
 
 # Arguments
 - `ws`: Column generation workspace (`ColGenWorkspace` or `ColGenLoggerWorkspace`).
@@ -317,14 +331,15 @@ node and most-fractional branching on original variables.
 - `separator`: Robust cut separator (default: `nothing`).
 - `max_cut_rounds::Int`: Maximum cut separation rounds per node
   (default: 0).
-- `min_gap_improvement::Float64`: Minimum relative gap improvement
-  to continue cut rounds (default: 0.01).
+- `min_gap_improvement::Float64`: Minimum relative gap improvement to
+  continue cut rounds (default: 0.01).
+- `branching_strategy`: Branching strategy (default: `MostFractionalBranching()`).
 - `log_level::Int`: Logging verbosity (0 = off, 1 = table,
   2 = BaPCod-style verbose). Default: 0.
 - `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
   (default: `nothing` — no dot file written).
 """
-function run_branch_and_price(
+function BranchCutPriceContext(
     ws::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
     strategy = TreeSearch.DepthFirstStrategy(),
     node_limit::Int = 10_000,
@@ -338,25 +353,12 @@ function run_branch_and_price(
     log_level::Int = 0,
     dot_file::Union{Nothing,String} = nothing
 )
-    branching_ctx = if log_level > 0
-        BranchingLoggerContext(; log_level=log_level)
-    else
+    branching_ctx = log_level > 0 ?
+        BranchingLoggerContext(; log_level=log_level) :
         DefaultBranchingContext()
-    end
-
-    X = orig_var_type(bp_decomp(ws))
-    effective_strategy = if branching_strategy isa MultiPhaseStrongBranching
-        MultiPhaseStrongBranching{X}(;
-            max_candidates=branching_strategy.max_candidates,
-            mu=branching_strategy.mu,
-            phases=branching_strategy.phases,
-            reliability_threshold=branching_strategy.pseudocosts.reliability_threshold,
-            branching_ctx=branching_ctx
-        )
-    else
-        branching_strategy
-    end
-
+    effective_strategy = _branching_strategy_with_ctx(
+        branching_strategy, branching_ctx
+    )
     space = BPSpace(
         ws;
         node_limit = node_limit,
@@ -369,14 +371,37 @@ function run_branch_and_price(
         branching_strategy = effective_strategy,
         log_level = log_level
     )
+    return BranchCutPriceContext(space, strategy, dot_file)
+end
+
+# Default: leave the strategy as-is. Specialized below for strategies
+# that hold a `BranchingContext`.
+_branching_strategy_with_ctx(s::AbstractBranchingStrategy, _) = s
+
+function _branching_strategy_with_ctx(
+    s::MultiPhaseStrongBranching, ctx::BranchingContext
+)
+    return with_branching_ctx(s, ctx)
+end
+
+# ── Entry point ──────────────────────────────────────────────────────────
+
+"""
+    run_branch_and_price(bcp_ctx::BranchCutPriceContext) -> BPOutput
+
+Run the branch-and-price algorithm described by `bcp_ctx`.
+"""
+function run_branch_and_price(bcp_ctx::BranchCutPriceContext)
+    space = bcp_ctx.space
+    strategy = bcp_ctx.strategy
     evaluator = BPEvaluator()
-    if !isnothing(dot_file)
-        dot_ctx = BPDotLoggerContext(space, evaluator, dot_file)
+    if !isnothing(bcp_ctx.dot_file)
+        dot_ctx = BPDotLoggerContext(space, evaluator, bcp_ctx.dot_file)
         return TreeSearch.search(strategy, dot_ctx)
     end
-    if log_level > 0
+    if space.log_level > 0
         ts_ctx = TreeSearch.TreeSearchLoggerContext(
-            space, evaluator, log_level
+            space, evaluator, space.log_level
         )
         return TreeSearch.search(strategy, ts_ctx)
     end
