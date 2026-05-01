@@ -24,9 +24,7 @@ end
 
 function main()
     zip_path = joinpath(@__DIR__, "instances.zip")
-    isfile(zip_path) || error(
-        "missing $(zip_path); run download_instances.jl first"
-    )
+    isfile(zip_path) || error("missing $(zip_path)")
 
     workdir = mktempdir()
     unzip_to(zip_path, workdir)

@@ -10,7 +10,7 @@ function main()
         readdir(instances_dir; join=true)))
 
     isempty(paths) && error(
-        "no instances under $(instances_dir); run download_instances.jl first"
+        "no instances under $(instances_dir); drop *.json files there first"
     )
 
     cfg = BenchConfig(
