@@ -28,7 +28,6 @@ GAPLIB serves each instance as a small JSON document with the schema
 | `runner.jl`                  | Bench loop, metric capture, writers.         |
 | `run_quick.jl`               | Entry point — smoke set.                     |
 | `run_full.jl`                | Entry point — full set (unzips on demand).   |
-| `download_instances.jl`      | One-off — rebuild `instances.zip` from web.  |
 | `results/`                   | Output dir (gitignored).                     |
 
 ## Running
@@ -43,12 +42,6 @@ julia --project=examples examples/gap/run_full.jl
 `run_quick.jl` runs the seven smoke instances under a 500-node B&P cap
 (~1–2 min total). `run_full.jl` unpacks `instances.zip` to a temp
 directory and runs every instance under a 10000-node cap.
-
-To rebuild the instance archive from GAPLIB (rarely needed):
-
-```
-julia --project=examples examples/gap/download_instances.jl
-```
 
 ## Metrics
 
