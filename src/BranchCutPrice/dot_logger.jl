@@ -26,7 +26,7 @@ Wraps a branch-and-price search space and evaluator to produce an
 incremental Graphviz `.dot` file of the search tree.
 
 # Fields
-- `space::BranchCutPriceWorkspace`: The B&P search space.
+- `space::BranchCutPriceWorkspace`: The B&P workspace.
 - `evaluator::BPEvaluator`: The node evaluator.
 - `filepath::String`: Output `.dot` file path.
 - `branching_labels::Dict{Int,String}`: Maps child node ID to edge label.
