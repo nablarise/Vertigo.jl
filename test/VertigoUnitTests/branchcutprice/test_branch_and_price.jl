@@ -46,11 +46,12 @@ function test_branch_and_price()
         ]
         capacity = Float64[10, 10, 10]
         inst = GAPInstance(3, 6, cost, weight, capacity)
-        ws = build_gap_context(inst)
-        bcp_ctx = BranchCutPriceContext(
-            ws; node_limit = 1000, rmp_heuristic = false
+        decomp = build_gap_decomp(inst)
+        bcp_ws = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(node_limit = 1000, rmp_heuristic = false)
         )
-        output = run_branch_and_price(bcp_ctx)
+        output = run_branch_and_price(bcp_ws)
         @test output.nodes_explored < 1000
         @test !isnothing(output.incumbent)
         @test output.incumbent.obj_value == 181.0
