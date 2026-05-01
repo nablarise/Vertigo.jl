@@ -45,14 +45,13 @@ function parse_gap_json(path::String)::GAPInstance
 end
 
 """
-    build_gap_context(inst::GAPInstance; smoothing_alpha=0.0) -> ColGenWorkspace
+    build_gap_model(inst::GAPInstance) -> DWReformulation
 
-Build a Dantzig-Wolfe column-generation workspace for `inst` using the
-`@dantzig_wolfe` modeling DSL: `x` and the per-machine `knapsack`
-constraint go to subproblem `k`; the per-task `assign` constraint
-stays in the master.
+Build a flat JuMP model for `inst` and apply the Dantzig-Wolfe
+decomposition: `x` and the per-machine `knapsack` constraint go to
+subproblem `k`; the per-task `assign` constraint stays in the master.
 """
-function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
+function build_gap_model(inst::GAPInstance)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -73,9 +72,17 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
         assign[_]   => master()
         knapsack[k] => subproblem(k)
     end
+    return decomp
+end
 
-    config = ColGenConfig(
+"""
+    build_col_gen_config(; smoothing_alpha=0.0) -> ColGenConfig
+
+Construct the column-generation algorithm parameters used by the
+benchmark.
+"""
+function build_col_gen_config(; smoothing_alpha::Float64=0.0)
+    return ColGenConfig(
         smoothing_alpha=smoothing_alpha, silent=true
     )
-    return ColGenWorkspace(decomp, config)
 end

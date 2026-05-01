@@ -66,9 +66,11 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
     local output
     elapsed = @elapsed begin
         try
-            ws = build_gap_context(
-                inst; smoothing_alpha=cfg.smoothing_alpha
+            decomp = build_gap_model(inst)
+            colgen_config = build_col_gen_config(
+                smoothing_alpha=cfg.smoothing_alpha
             )
+            ws = ColGenWorkspace(decomp, colgen_config)
             bcp_ctx = BranchCutPriceContext(
                 ws;
                 node_limit = cfg.node_limit,
