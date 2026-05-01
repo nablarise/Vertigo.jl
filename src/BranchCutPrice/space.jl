@@ -52,6 +52,7 @@ mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparato
     best_dual_bound::Float64
     open_node_bounds::Dict{Int,Float64}
     nodes_explored::Int
+    root_lp_value::Union{Float64,Nothing}
     node_limit::Int
     tol::Float64
     rmp_time_limit::Float64
@@ -103,6 +104,7 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
         is_minimization(cg_ws) ? -Inf : Inf,
         Dict{Int,Float64}(),
         0,
+        nothing,
         config.node_limit,
         config.tol,
         config.rmp_time_limit,
@@ -164,7 +166,8 @@ function TreeSearch.output(space::BranchCutPriceWorkspace)
     end
     return BPOutput(
         status, space.incumbent,
-        space.best_dual_bound, space.nodes_explored
+        space.best_dual_bound, space.nodes_explored,
+        space.root_lp_value
     )
 end
 
