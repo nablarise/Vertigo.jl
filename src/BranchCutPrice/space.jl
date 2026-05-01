@@ -150,10 +150,10 @@ end
 function _recompute_global_dual_bound!(space::BPSpace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        # Tree fully explored: the proven dual bound must not be reset.
-        # When an incumbent exists, every leaf has been resolved (solved,
-        # pruned by bound, or proven infeasible), so the incumbent value
-        # is the proven optimum.
+        # No open nodes left: every leaf was solved, pruned by bound, or
+        # proven infeasible. If an incumbent exists, it is the proven
+        # optimum. Otherwise the problem is infeasible — leave the bound
+        # at its initial ±Inf.
         if !isnothing(space.incumbent)
             space.best_dual_bound = space.incumbent.obj_value
         end
