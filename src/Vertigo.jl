@@ -73,7 +73,7 @@ export has_convexity_ub, has_convexity_lb
 export convexity_ub_pairs, convexity_lb_pairs
 
 # Branch-and-price
-export BPSpace, BPEvaluator, BPOutput
+export BPEvaluator, BPOutput
 export BranchCutPriceConfig, BranchCutPriceWorkspace
 export run_branch_and_price
 export TreeSearchLoggerContext

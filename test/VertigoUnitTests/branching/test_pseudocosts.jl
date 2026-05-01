@@ -8,7 +8,7 @@ using Vertigo.Branching: PseudocostRecord, PseudocostTracker,
     BranchingCandidate, SBProbeResult, SBCandidateResult,
     MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
     bp_master_model, branching_ok
-using Vertigo.BranchCutPrice: BPSpace, BPNodeData
+using Vertigo.BranchCutPrice: BPNodeData
 using Vertigo.Reformulation: get_primal_solution
 
 function test_pseudocosts()
@@ -147,10 +147,7 @@ function test_pseudocosts()
 
     @testset "[MultiPhaseStrongBranching] selects variable with cg_output" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ws = build_gap_context(inst)
-        cg_out = run_column_generation(ws)
-
-        primal = get_primal_solution(bp_master_model(ws))
+        decomp = build_gap_decomp(inst)
         rb = MultiPhaseStrongBranching(
             max_candidates=10,
             phases=[CGProbePhase(
@@ -158,9 +155,12 @@ function test_pseudocosts()
             )],
             reliability_threshold=2
         )
-        space = BPSpace(
-            ws; node_limit=1, branching_strategy=rb
+        space = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
         )
+        cg_out = run_column_generation(space.ws)
+        primal = get_primal_solution(bp_master_model(space.ws))
 
         # Create a mock node with cg_output
         node_data = BPNodeData()
@@ -178,10 +178,7 @@ function test_pseudocosts()
 
     @testset "[MultiPhaseStrongBranching] lookahead stops early" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ws = build_gap_context(inst)
-        cg_out = run_column_generation(ws)
-        primal = get_primal_solution(bp_master_model(ws))
-
+        decomp = build_gap_decomp(inst)
         # lookahead=1, all unreliable -> at most 2 probed
         rb = MultiPhaseStrongBranching(
             max_candidates=100,
@@ -190,9 +187,12 @@ function test_pseudocosts()
             )],
             reliability_threshold=100
         )
-        space = BPSpace(
-            ws; node_limit=1, branching_strategy=rb
+        space = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
         )
+        cg_out = run_column_generation(space.ws)
+        primal = get_primal_solution(bp_master_model(space.ws))
         node_data = BPNodeData()
         node_data.cg_output = cg_out
         mock_node = (user_data=node_data,)
@@ -216,11 +216,12 @@ function test_pseudocosts()
             )],
             reliability_threshold=2
         )
-        ws = build_gap_context(inst)
+        decomp = build_gap_decomp(inst)
         bcp_ws = BranchCutPriceWorkspace(
-            ws;
-            node_limit=100,
-            branching_strategy=rb
+            decomp,
+            BranchCutPriceConfig(
+                node_limit=100, branching_strategy=rb
+            )
         )
         output = run_branch_and_price(bcp_ws)
         @test output.status in (:optimal, :node_limit)

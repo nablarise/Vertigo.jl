@@ -26,20 +26,20 @@ Wraps a branch-and-price search space and evaluator to produce an
 incremental Graphviz `.dot` file of the search tree.
 
 # Fields
-- `space::BPSpace`: The B&P search space.
+- `space::BranchCutPriceWorkspace`: The B&P search space.
 - `evaluator::BPEvaluator`: The node evaluator.
 - `filepath::String`: Output `.dot` file path.
 - `branching_labels::Dict{Int,String}`: Maps child node ID to edge label.
 """
 mutable struct BPDotLoggerContext
-    space::BPSpace
+    space::BranchCutPriceWorkspace
     evaluator::BPEvaluator
     filepath::String
     branching_labels::Dict{Int,String}
 end
 
 function BPDotLoggerContext(
-    space::BPSpace,
+    space::BranchCutPriceWorkspace,
     evaluator::BPEvaluator,
     filepath::String
 )

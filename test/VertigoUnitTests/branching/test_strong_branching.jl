@@ -11,7 +11,6 @@ using Vertigo.Branching: SBProbeResult, SBCandidateResult,
     MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
     BranchingResult, branching_ok,
     DefaultBranchingContext
-using Vertigo.BranchCutPrice: BPSpace
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
 
@@ -103,7 +102,11 @@ end
 function test_run_sb_probe_returns_dual_bounds()
     @testset "[run_sb_probe] returns dual bounds" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ws = build_gap_context(inst)
+        decomp = build_gap_decomp(inst)
+        space = BranchCutPriceWorkspace(
+            decomp, BranchCutPriceConfig(node_limit=1)
+        )
+        ws = space.ws
         cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
@@ -112,7 +115,6 @@ function test_run_sb_probe_returns_dual_bounds()
         candidates = find_fractional_variables(
             ws, primal; tol=1e-6
         )
-        space = BPSpace(ws; node_limit=1)
         candidate = first(candidates)
 
         result = run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
@@ -129,7 +131,11 @@ end
 function test_run_sb_probe_restores_state()
     @testset "[run_sb_probe] restores context state" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ws = build_gap_context(inst)
+        decomp = build_gap_decomp(inst)
+        space = BranchCutPriceWorkspace(
+            decomp, BranchCutPriceConfig(node_limit=1)
+        )
+        ws = space.ws
         cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
@@ -138,7 +144,6 @@ function test_run_sb_probe_restores_state()
         candidates = find_fractional_variables(
             ws, primal; tol=1e-6
         )
-        space = BPSpace(ws; node_limit=1)
         candidate = first(candidates)
 
         # Save state before probe
@@ -160,15 +165,17 @@ end
 function test_multi_phase_sb_e2e()
     @testset "[MultiPhaseStrongBranching] e2e small GAP finds optimal" begin
         inst = random_gap_instance(2, 4; seed=10)
-        ws = build_gap_context(inst)
+        decomp = build_gap_decomp(inst)
         bcp_ws = BranchCutPriceWorkspace(
-            ws;
-            node_limit=100,
-            branching_strategy=MultiPhaseStrongBranching(
-                max_candidates=3,
-                phases=[CGProbePhase(
-                    max_cg_iterations=5, lookahead=0
-                )]
+            decomp,
+            BranchCutPriceConfig(
+                node_limit=100,
+                branching_strategy=MultiPhaseStrongBranching(
+                    max_candidates=3,
+                    phases=[CGProbePhase(
+                        max_cg_iterations=5, lookahead=0
+                    )]
+                )
             )
         )
         output = run_branch_and_price(bcp_ws)
@@ -180,20 +187,19 @@ end
 function test_multi_phase_sb_selects_variable()
     @testset "[MultiPhaseStrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
-        ws = build_gap_context(inst)
-        run_column_generation(ws)
-
+        decomp = build_gap_decomp(inst)
         sb = MultiPhaseStrongBranching(
             max_candidates=5,
             phases=[CGProbePhase(
                 max_cg_iterations=10, lookahead=0
             )]
         )
-        primal = get_primal_solution(bp_master_model(ws))
-        space = BPSpace(
-            ws; node_limit=1,
-            branching_strategy=sb
+        space = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(node_limit=1, branching_strategy=sb)
         )
+        run_column_generation(space.ws)
+        primal = get_primal_solution(bp_master_model(space.ws))
 
         result = select_branching_variable(
             sb, space, nothing, primal

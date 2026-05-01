@@ -14,7 +14,7 @@ Returns a `ColGen.MasterIpPrimalSol` if a feasible IP solution
 is found, `nothing` otherwise.
 """
 function solve_restricted_master_ip!(
-    space::BPSpace,
+    space::BranchCutPriceWorkspace,
     cg_output::ColGen.ColGenOutput
 )
     if cg_output.status == ColGen.master_infeasible ||

@@ -48,9 +48,9 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_context(inst) -> ColGenWorkspace
+    build_gap_decomp(inst) -> DWReformulation
 
-Build a column generation workspace for the given GAP instance.
+Build the Dantzig–Wolfe decomposition for the given GAP instance.
 
 The master model contains:
   - Assignment coupling constraints: Σₖ xₖₜ = 1 for each task t (EqualTo)
@@ -58,7 +58,7 @@ The master model contains:
 
 Each subproblem is a binary knapsack for one machine.
 """
-function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
+function build_gap_decomp(inst::GAPInstance)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -90,9 +90,6 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────────────
-    SpVar = MOI.VariableIndex
-    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
-
     builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
 
     for k in K
@@ -115,25 +112,30 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
 
     decomp = build(builder)
 
-    # ── Column pool ───────────────────────────────────────────────────────────
-    pool = ColumnPool()
-
     # ── Convexity constraint indices ──────────────────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
-    # ── Build context ─────────────────────────────────────────────────────────
+    return decomp
+end
+
+"""
+    build_gap_context(inst; max_cg_iterations=1000) -> ColGenWorkspace
+
+Build a `ColGenWorkspace` for a GAP instance. Convenience for CG-only
+unit tests; thin wrapper around [`build_gap_decomp`](@ref).
+"""
+function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
+    decomp = build_gap_decomp(inst)
     config = ColGenConfig(max_cg_iterations=max_cg_iterations)
-    ws = ColGenWorkspace(decomp, pool,
+    return ColGenWorkspace(decomp, ColumnPool(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-
-    return ws
 end
 
 # ColGen
