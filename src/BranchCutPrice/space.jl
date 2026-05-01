@@ -152,10 +152,12 @@ function _recompute_global_dual_bound!(space::BPSpace)
     if isempty(bounds)
         # No open nodes left: every leaf was solved, pruned by bound, or
         # proven infeasible. If an incumbent exists, it is the proven
-        # optimum. Otherwise the problem is infeasible — leave the bound
-        # at its initial ±Inf.
-        if !isnothing(space.incumbent)
-            space.best_dual_bound = space.incumbent.obj_value
+        # optimum. Otherwise the problem is infeasible, so the proven
+        # dual bound is +Inf (min) / -Inf (max).
+        space.best_dual_bound = if !isnothing(space.incumbent)
+            space.incumbent.obj_value
+        else
+            is_minimization(space.ws) ? Inf : -Inf
         end
         return
     end
