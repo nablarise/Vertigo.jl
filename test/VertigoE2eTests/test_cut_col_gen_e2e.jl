@@ -121,18 +121,20 @@ end
 function test_fenchel_cut_gap()
     @testset "[bcp+cuts] GAP with Fenchel cuts" begin
         inst = gap_fenchel_instance()
-        ws = build_gap_fenchel_context(inst)
+        decomp = build_gap_fenchel_decomp(inst)
         separator = _make_fenchel_separator(inst)
 
-        bcp_ctx = BranchCutPriceContext(
-            ws;
-            separator=separator,
-            max_cut_rounds=20,
-            min_gap_improvement=0.0,
-            node_limit=1,
-            log_level=2
+        bcp_ws = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(
+                separator=separator,
+                max_cut_rounds=20,
+                min_gap_improvement=0.0,
+                node_limit=1,
+                log_level=2
+            )
         )
-        output = run_branch_and_price(bcp_ctx)
+        output = run_branch_and_price(bcp_ws)
 
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)

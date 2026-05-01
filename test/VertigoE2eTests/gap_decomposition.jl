@@ -90,7 +90,12 @@ end
 # Build ColGenWorkspace for a GAP instance
 # ──────────────────────────────────────────────────────────────────────
 
-function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
+"""
+    build_gap_decomp(inst) -> DWReformulation
+
+Build the Dantzig–Wolfe decomposition for a GAP instance.
+"""
+function build_gap_decomp(inst::GAPInstance)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -122,9 +127,6 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    SpVar = MOI.VariableIndex
-    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
-
     builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
 
     for k in K
@@ -147,26 +149,31 @@ function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
 
     decomp = build(builder)
 
-    # ── Column pool ───────────────────────────────────────────────────
-    pool = ColumnPool()
-
     # ── Convexity constraint indices ──────────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
-    # ── Build context ─────────────────────────────────────────────────
+    return decomp
+end
+
+"""
+    build_gap_context(inst; smoothing_alpha=0.0) -> ColGenLoggerWorkspace
+
+Build a CG workspace (logger-wrapped) for a GAP instance. Convenience
+for CG-only e2e tests.
+"""
+function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
+    decomp = build_gap_decomp(inst)
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, ColumnPool(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ws = ColGenLoggerWorkspace(inner_ws)
-
-    return ws
+    return ColGenLoggerWorkspace(inner_ws)
 end
 
 function build_gap_context_with_fixed_cost(
@@ -881,9 +888,14 @@ function gap_fenchel_instance()
     return GAPInstanceWithOpeningCosts(M, J, c, w, Q, f)
 end
 
-function build_gap_fenchel_context(
-    inst::GAPInstanceWithOpeningCosts;
-    smoothing_alpha::Float64=0.0
+"""
+    build_gap_fenchel_decomp(inst) -> DWReformulation
+
+Build the Dantzig–Wolfe decomposition for a GAP-with-opening-costs
+instance suitable for Fenchel-cut testing.
+"""
+function build_gap_fenchel_decomp(
+    inst::GAPInstanceWithOpeningCosts
 )
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
@@ -935,11 +947,6 @@ function build_gap_fenchel_context(
 
     # ── Build Decomposition ───────────────────────────────────────
     X = Tuple{Symbol,Int,Int}
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},
-        MOI.EqualTo{Float64}
-    }
-
     builder = DWReformulationBuilder{X}(minimize=true)
 
     for k in K
@@ -979,9 +986,6 @@ function build_gap_fenchel_context(
 
     decomp = build(builder)
 
-    # ── Column pool ───────────────────────────────────────────────
-    pool = ColumnPool()
-
     # ── Convexity constraint indices ──────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
         PricingSubproblemId(k) => TaggedCI(
@@ -999,9 +1003,21 @@ function build_gap_fenchel_context(
         conv_ub_map, conv_lb_map
     )
 
-    # ── Build context ─────────────────────────────────────────────
+    return decomp
+end
+
+"""
+    build_gap_fenchel_context(inst; smoothing_alpha=0.0) -> ColGenLoggerWorkspace
+
+Convenience CG-workspace builder atop [`build_gap_fenchel_decomp`](@ref).
+"""
+function build_gap_fenchel_context(
+    inst::GAPInstanceWithOpeningCosts;
+    smoothing_alpha::Float64=0.0
+)
+    decomp = build_gap_fenchel_decomp(inst)
     config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    inner_ws = ColGenWorkspace(decomp, ColumnPool(),
         Dict{TaggedCI,Tuple{
             MOI.VariableIndex,MOI.VariableIndex
         }}(),
@@ -1009,9 +1025,7 @@ function build_gap_fenchel_context(
         Dict{TaggedCI,MOI.VariableIndex}(),
         config
     )
-    ws = ColGenLoggerWorkspace(inner_ws)
-
-    return ws
+    return ColGenLoggerWorkspace(inner_ws)
 end
 
 function build_gap_context_max(

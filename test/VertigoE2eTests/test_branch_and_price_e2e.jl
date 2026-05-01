@@ -20,13 +20,17 @@ function test_bp_gap_a_instances()
         @testset "[bp][$(label)] optimal = $(optimal)" begin
             filepath = get_gap_instance_path(class, agents, jobs)
             inst = parse_gap_file(filepath)
-            ws = build_gap_context(inst; smoothing_alpha=0.5)
+            decomp = build_gap_decomp(inst)
             dot_path = "$class-$agents-$jobs.dot"
-            bcp_ctx = BranchCutPriceContext(
-                ws; node_limit = 5_000,
-                dot_file = dot_path
+            bcp_ws = BranchCutPriceWorkspace(
+                decomp,
+                BranchCutPriceConfig(
+                    colgen=ColGenConfig(smoothing_alpha=0.5),
+                    node_limit=5_000,
+                    dot_file=dot_path
+                )
             )
-            output = run_branch_and_price(bcp_ctx)
+            output = run_branch_and_price(bcp_ws)
 
             @test output.status in (:optimal, :node_limit)
 
