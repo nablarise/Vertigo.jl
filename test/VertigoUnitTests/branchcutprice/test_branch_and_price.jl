@@ -25,6 +25,40 @@ function test_branch_and_price()
         @test output.nodes_explored <= 5
     end
 
+    @testset "[branch_and_price] fully explored tree reports :optimal" begin
+        # Regression for #63: when every node is processed, the dual
+        # bound must not be reset to -Inf and the status must be
+        # :optimal rather than :node_limit.
+        #
+        # Uses the toy GAP instance from `examples/gap/instances/toy.json`
+        # (3 machines, 6 tasks; known optimum = 181). The restricted-master
+        # IP heuristic is disabled so the incumbent comes from the LP/CG
+        # path and the empty-`open_node_bounds` branch is exercised.
+        cost = Float64[
+            10 12 13 14 15 17;
+            21 22 23 24 25 28;
+            31 32 33 34 35 36
+        ]
+        weight = Float64[
+            6 6 6 6 6 6;
+            4 4 4 4 4 4;
+            2 2 2 2 2 2
+        ]
+        capacity = Float64[10, 10, 10]
+        inst = GAPInstance(3, 6, cost, weight, capacity)
+        decomp = build_gap_decomp(inst)
+        bcp_ws = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(node_limit = 1000, rmp_heuristic = false)
+        )
+        output = run_branch_and_price(bcp_ws)
+        @test output.nodes_explored < 1000
+        @test !isnothing(output.incumbent)
+        @test output.incumbent.obj_value == 181.0
+        @test output.status == :optimal
+        @test output.best_dual_bound == output.incumbent.obj_value
+    end
+
     @testset "[branch_and_price] dual bound is valid" begin
         inst = random_gap_instance(2, 5; seed=42)
         decomp = build_gap_decomp(inst)
