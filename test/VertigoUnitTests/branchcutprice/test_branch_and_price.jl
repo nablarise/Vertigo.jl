@@ -21,6 +21,20 @@ function test_branch_and_price()
         @test output.nodes_explored <= 5
     end
 
+    @testset "[branch_and_price] fully explored tree reports :optimal" begin
+        # Regression for #63: when every node is processed, the dual
+        # bound must not be reset to -Inf and the status must be
+        # :optimal rather than :node_limit.
+        inst = random_gap_instance(2, 4; seed=42)
+        ws = build_gap_context(inst)
+        bcp_ctx = BranchCutPriceContext(ws; node_limit = 1000)
+        output = run_branch_and_price(bcp_ctx)
+        @test output.nodes_explored < 1000
+        @test !isnothing(output.incumbent)
+        @test output.status == :optimal
+        @test output.best_dual_bound == output.incumbent.obj_value
+    end
+
     @testset "[branch_and_price] dual bound is valid" begin
         inst = random_gap_instance(2, 5; seed=42)
         ws = build_gap_context(inst)

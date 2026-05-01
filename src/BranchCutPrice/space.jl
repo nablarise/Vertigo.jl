@@ -150,8 +150,13 @@ end
 function _recompute_global_dual_bound!(space::BPSpace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        space.best_dual_bound = is_minimization(space.ws) ?
-            -Inf : Inf
+        # Tree fully explored: the proven dual bound must not be reset.
+        # When an incumbent exists, every leaf has been resolved (solved,
+        # pruned by bound, or proven infeasible), so the incumbent value
+        # is the proven optimum.
+        if !isnothing(space.incumbent)
+            space.best_dual_bound = space.incumbent.obj_value
+        end
         return
     end
     space.best_dual_bound = is_minimization(space.ws) ?
