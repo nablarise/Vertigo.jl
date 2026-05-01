@@ -67,8 +67,8 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
     elapsed = @elapsed begin
         try
             decomp = build_gap_model(inst)
-            colgen_config = build_col_gen_config(
-                smoothing_alpha=cfg.smoothing_alpha
+            colgen_config = ColGenConfig(
+                smoothing_alpha=cfg.smoothing_alpha, silent=true
             )
             ws = ColGenWorkspace(decomp, colgen_config)
             bcp_ctx = BranchCutPriceContext(

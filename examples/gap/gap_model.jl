@@ -74,15 +74,3 @@ function build_gap_model(inst::GAPInstance)
     end
     return decomp
 end
-
-"""
-    build_col_gen_config(; smoothing_alpha=0.0) -> ColGenConfig
-
-Construct the column-generation algorithm parameters used by the
-benchmark.
-"""
-function build_col_gen_config(; smoothing_alpha::Float64=0.0)
-    return ColGenConfig(
-        smoothing_alpha=smoothing_alpha, silent=true
-    )
-end
