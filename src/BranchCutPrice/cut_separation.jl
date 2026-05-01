@@ -37,7 +37,7 @@ end
 Add a single separated robust cut to the master model and register
 it in the CG context.
 """
-function _add_robust_cut!(space::BPSpace, cut::SeparatedCut)
+function _add_robust_cut!(space::BranchCutPriceWorkspace, cut::SeparatedCut)
     ws = space.ws
     saf = _build_cut_saf(
         bp_decomp(ws), bp_pool(ws), space.backend, cut
@@ -58,7 +58,7 @@ Project the master LP solution to original space, separate cuts,
 and add them to the master. Returns the number of cuts added.
 """
 function _separate_and_add_cuts!(
-    space::BPSpace, cg_output::ColGen.ColGenOutput
+    space::BranchCutPriceWorkspace, cg_output::ColGen.ColGenOutput
 )::Int
     isnothing(space.separator) && return 0
     cg_output.status != ColGen.optimal && return 0

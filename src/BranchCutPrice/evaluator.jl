@@ -10,7 +10,7 @@ node and returns CUTOFF, FEASIBLE, or BRANCH.
 """
 struct BPEvaluator <: TreeSearch.AbstractNodeEvaluator end
 
-function _rebuild_branching_constraints!(space::BPSpace)
+function _rebuild_branching_constraints!(space::BranchCutPriceWorkspace)
     bcs = bp_branching_constraints(space.ws)
     empty!(bcs)
     for (cut_id, ci) in space.cut_helper.active_cuts
@@ -20,7 +20,7 @@ function _rebuild_branching_constraints!(space::BPSpace)
     return
 end
 
-function _should_prune(space::BPSpace, db)::Bool
+function _should_prune(space::BranchCutPriceWorkspace, db)::Bool
     isnothing(space.incumbent) && return false
     isnothing(db) && return false
     if is_minimization(space.ws)
@@ -30,7 +30,7 @@ function _should_prune(space::BPSpace, db)::Bool
 end
 
 function _is_improving_incumbent(
-    space::BPSpace, sol::ColGen.MasterIpPrimalSol
+    space::BranchCutPriceWorkspace, sol::ColGen.MasterIpPrimalSol
 )::Bool
     isnothing(space.incumbent) && return true
     if is_minimization(space.ws)
@@ -39,7 +39,7 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
-function _set_incumbent_bound!(space::BPSpace)
+function _set_incumbent_bound!(space::BranchCutPriceWorkspace)
     bp_set_ip_primal_bound!(
         space.ws,
         isnothing(space.incumbent) ?
@@ -49,7 +49,7 @@ function _set_incumbent_bound!(space::BPSpace)
 end
 
 function TreeSearch.evaluate!(
-    ::BPEvaluator, space::BPSpace, node
+    ::BPEvaluator, space::BranchCutPriceWorkspace, node
 )
     space.nodes_explored += 1
     delete!(space.open_node_bounds, node.id)

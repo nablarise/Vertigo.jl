@@ -20,15 +20,26 @@ end
 
 BPNodeData() = BPNodeData(nothing, nothing, nothing, nothing, nothing)
 
-# ── Search space ─────────────────────────────────────────────────────────
+# ── Branch-cut-price workspace ───────────────────────────────────────────
 
 """
-    BPSpace <: TreeSearch.AbstractSearchSpace
+    BranchCutPriceWorkspace <: TreeSearch.AbstractSearchSpace
 
-Search space for branch-and-price. Wraps the CG workspace, the MOI
-backend, domain/cut tracking, and branching metadata.
+Branch-and-price runtime state. Wraps the column generation workspace,
+the MOI master backend, domain/cut tracking, branching metadata, and
+the BCP knobs flattened from the originating
+[`BranchCutPriceConfig`](@ref). It is the search space passed to
+`TreeSearch.search`.
+
+Construct it from a decomposition and a config — symmetric to
+[`ColGen.ColGenWorkspace`](@ref):
+
+```julia
+ws = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(...))
+output = run_branch_and_price(ws)
+```
 """
-mutable struct BPSpace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearch.AbstractSearchSpace
+mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearch.AbstractSearchSpace
     ws::Ws
     backend::B
     domain_helper::MathOptState.DomainChangeTrackerHelper
@@ -50,57 +61,75 @@ mutable struct BPSpace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearc
     total_cuts_separated::Int
     branching_strategy::AbstractBranchingStrategy
     log_level::Int
+    strategy::Any
+    dot_file::Union{Nothing,String}
 end
 
 """
-    BPSpace(ws; node_limit=10_000, tol=1e-6, rmp_time_limit=60.0,
-            rmp_heuristic=true, separator=nothing,
-            max_cut_rounds=0, min_gap_improvement=0.01)
+    BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
 
-Create a branch-and-price search space from a column generation
-workspace. Registers existing variable bound constraints for tracking.
+Build a `BranchCutPriceWorkspace` from a Dantzig–Wolfe decomposition
+and a [`BranchCutPriceConfig`](@ref). Internally constructs a
+`ColGenWorkspace` from `config.colgen` (optionally wrapped in a
+`ColGenLoggerWorkspace` when `config.cg_log_level > 0`), wires the
+branching logger context based on `config.log_level`, and registers
+domain/cut trackers on the master.
 """
-function BPSpace(
-    ws::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
-    node_limit::Int = 10_000,
-    tol::Float64 = 1e-6,
-    rmp_time_limit::Float64 = 60.0,
-    rmp_heuristic::Bool = true,
-    separator::Union{Nothing,AbstractCutSeparator} = nothing,
-    max_cut_rounds::Int = 0,
-    min_gap_improvement::Float64 = 0.01,
-    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching(),
-    log_level::Int = 0
-)
-    master = bp_master_model(ws)
+function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
+    inner = ColGen.ColGenWorkspace(decomp, config.colgen)
+    cg_ws = config.cg_log_level > 0 ?
+        ColGen.ColGenLoggerWorkspace(inner; log_level=config.cg_log_level) :
+        inner
+
+    branching_ctx = config.log_level > 0 ?
+        BranchingLoggerContext(; log_level=config.log_level) :
+        DefaultBranchingContext()
+    effective_strategy = _branching_strategy_with_ctx(
+        config.branching_strategy, branching_ctx
+    )
+
+    master = bp_master_model(cg_ws)
     tracker = MathOptState.DomainChangeTracker()
-    domain_helper = MathOptState.transform_model!(
-        tracker, master
-    )
+    domain_helper = MathOptState.transform_model!(tracker, master)
     cut_tracker = MathOptState.LocalCutTracker()
-    cut_helper = MathOptState.transform_model!(
-        cut_tracker, master
-    )
-    return BPSpace(
-        ws, master, domain_helper,
+    cut_helper = MathOptState.transform_model!(cut_tracker, master)
+
+    return BranchCutPriceWorkspace(
+        cg_ws, master, domain_helper,
         cut_tracker, cut_helper,
         Dict{Int,Any}(),
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
-        is_minimization(ws) ? -Inf : Inf,
+        is_minimization(cg_ws) ? -Inf : Inf,
         Dict{Int,Float64}(),
-        0, node_limit, tol, rmp_time_limit,
-        rmp_heuristic, separator,
-        CutColGenContext(max_cut_rounds, min_gap_improvement),
         0,
-        branching_strategy,
-        log_level
+        config.node_limit,
+        config.tol,
+        config.rmp_time_limit,
+        config.rmp_heuristic,
+        config.separator,
+        CutColGenContext(config.max_cut_rounds, config.min_gap_improvement),
+        0,
+        effective_strategy,
+        config.log_level,
+        config.strategy,
+        config.dot_file
     )
+end
+
+# Default: leave the strategy as-is. Specialized below for strategies
+# that hold a `BranchingContext`.
+_branching_strategy_with_ctx(s::AbstractBranchingStrategy, _) = s
+
+function _branching_strategy_with_ctx(
+    s::MultiPhaseStrongBranching, ctx::BranchingContext
+)
+    return with_branching_ctx(s, ctx)
 end
 
 # ── TreeSearch interface ─────────────────────────────────────────────────
 
-function TreeSearch.new_root(space::BPSpace)
+function TreeSearch.new_root(space::BranchCutPriceWorkspace)
     empty_fwd = (
         MathOptState.DomainChangeDiff(),
         MathOptState.LocalCutChangeDiff()
@@ -119,11 +148,11 @@ function TreeSearch.new_root(space::BPSpace)
     return node
 end
 
-function TreeSearch.stop(space::BPSpace, _)
+function TreeSearch.stop(space::BranchCutPriceWorkspace, _)
     return space.nodes_explored >= space.node_limit
 end
 
-function TreeSearch.output(space::BPSpace)
+function TreeSearch.output(space::BranchCutPriceWorkspace)
     status = if !isnothing(space.incumbent)
         db = space.best_dual_bound
         ub = space.incumbent.obj_value
@@ -139,7 +168,9 @@ function TreeSearch.output(space::BPSpace)
     )
 end
 
-function TreeSearch.transition!(space::BPSpace, current, next)
+function TreeSearch.transition!(
+    space::BranchCutPriceWorkspace, current, next
+)
     fwd!, bwd! = MathOptState.make_transition_callbacks(
         space.backend, (space.domain_helper, space.cut_helper)
     )
@@ -147,7 +178,7 @@ function TreeSearch.transition!(space::BPSpace, current, next)
     return
 end
 
-function _recompute_global_dual_bound!(space::BPSpace)
+function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
     bounds = space.open_node_bounds
     if isempty(bounds)
         space.best_dual_bound = is_minimization(space.ws) ?
@@ -159,7 +190,7 @@ function _recompute_global_dual_bound!(space::BPSpace)
     return
 end
 
-function TreeSearch.branch!(space::BPSpace, node)
+function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     primal_values = get_primal_solution(space.backend)
 
     result = select_branching_variable(
@@ -212,7 +243,7 @@ function TreeSearch.branch!(space::BPSpace, node)
 end
 
 function TreeSearch.on_feasible_solution!(
-    ::BPSpace, ::TreeSearch.SearchNode
+    ::BranchCutPriceWorkspace, ::TreeSearch.SearchNode
 )
     # Incumbent already updated in evaluate!
     return
@@ -220,23 +251,23 @@ end
 
 # ── TreeSearch logger protocol ───────────────────────────────────────────
 
-function TreeSearch.ts_incumbent_value(s::BPSpace)
+function TreeSearch.ts_incumbent_value(s::BranchCutPriceWorkspace)
     return isnothing(s.incumbent) ? nothing : s.incumbent.obj_value
 end
 
-function TreeSearch.ts_best_dual_bound(s::BPSpace)
+function TreeSearch.ts_best_dual_bound(s::BranchCutPriceWorkspace)
     return s.best_dual_bound
 end
 
-function TreeSearch.ts_is_minimization(s::BPSpace)
+function TreeSearch.ts_is_minimization(s::BranchCutPriceWorkspace)
     return is_minimization(s.ws)
 end
 
-function TreeSearch.ts_nodes_explored(s::BPSpace)
+function TreeSearch.ts_nodes_explored(s::BranchCutPriceWorkspace)
     return s.nodes_explored
 end
 
-function TreeSearch.ts_search_status_message(s::BPSpace)
+function TreeSearch.ts_search_status_message(s::BranchCutPriceWorkspace)
     inc = s.incumbent
     if !isnothing(inc)
         db = s.best_dual_bound
@@ -251,15 +282,15 @@ function TreeSearch.ts_search_status_message(s::BPSpace)
         "Search complete."
 end
 
-function TreeSearch.ts_open_node_count(s::BPSpace)
+function TreeSearch.ts_open_node_count(s::BranchCutPriceWorkspace)
     return length(s.open_node_bounds)
 end
 
-function TreeSearch.ts_total_columns(s::BPSpace)
+function TreeSearch.ts_total_columns(s::BranchCutPriceWorkspace)
     return length(bp_pool(s.ws).by_column_var)
 end
 
-function TreeSearch.ts_active_columns(s::BPSpace)
+function TreeSearch.ts_active_columns(s::BranchCutPriceWorkspace)
     pool = bp_pool(s.ws)
     master = s.backend
     count = 0
@@ -271,12 +302,12 @@ function TreeSearch.ts_active_columns(s::BPSpace)
     return count
 end
 
-function TreeSearch.ts_total_cuts(s::BPSpace)
+function TreeSearch.ts_total_cuts(s::BranchCutPriceWorkspace)
     return s.total_cuts_separated
 end
 
 function TreeSearch.ts_branching_description(
-    s::BPSpace, node::TreeSearch.SearchNode
+    s::BranchCutPriceWorkspace, node::TreeSearch.SearchNode
 )
     TreeSearch.is_root(node) && return nothing
     _, cut_diff = node.local_forward_diff
@@ -294,116 +325,24 @@ function TreeSearch.ts_branching_description(
     return nothing
 end
 
-# ── Branch-and-price context ─────────────────────────────────────────────
-
-"""
-    BranchCutPriceContext
-
-Bundle of all configuration needed to run branch-and-price: a `BPSpace`,
-the tree-search strategy, and the optional `.dot` output path. Build it
-once with the keyword constructor — wiring of the branching logger
-context (including pseudocost-tracker preservation) is handled there —
-then hand it to [`run_branch_and_price`](@ref).
-"""
-struct BranchCutPriceContext{Sp<:BPSpace,Strat}
-    space::Sp
-    strategy::Strat
-    dot_file::Union{Nothing,String}
-end
-
-"""
-    BranchCutPriceContext(ws; strategy, node_limit, tol, rmp_time_limit,
-                          rmp_heuristic, separator, max_cut_rounds,
-                          min_gap_improvement, branching_strategy,
-                          log_level, dot_file)
-
-Build a `BranchCutPriceContext` from a column generation workspace.
-
-# Arguments
-- `ws`: Column generation workspace (`ColGenWorkspace` or `ColGenLoggerWorkspace`).
-- `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
-- `node_limit::Int`: Maximum nodes to explore (default: 10000).
-- `tol::Float64`: Numerical tolerance (default: 1e-6).
-- `rmp_time_limit::Float64`: Time limit in seconds for restricted master
-  IP heuristic at each node (default: 60.0).
-- `rmp_heuristic::Bool`: Run the restricted master IP heuristic at each
-  node to find feasible solutions (default: true).
-- `separator`: Robust cut separator (default: `nothing`).
-- `max_cut_rounds::Int`: Maximum cut separation rounds per node
-  (default: 0).
-- `min_gap_improvement::Float64`: Minimum relative gap improvement to
-  continue cut rounds (default: 0.01).
-- `branching_strategy`: Branching strategy (default: `MostFractionalBranching()`).
-- `log_level::Int`: Logging verbosity (0 = off, 1 = table,
-  2 = BaPCod-style verbose). Default: 0.
-- `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
-  (default: `nothing` — no dot file written).
-"""
-function BranchCutPriceContext(
-    ws::Union{ColGen.ColGenWorkspace,ColGen.ColGenLoggerWorkspace};
-    strategy = TreeSearch.DepthFirstStrategy(),
-    node_limit::Int = 10_000,
-    tol::Float64 = 1e-6,
-    rmp_time_limit::Float64 = 60.0,
-    rmp_heuristic::Bool = true,
-    separator::Union{Nothing,AbstractCutSeparator} = nothing,
-    max_cut_rounds::Int = 0,
-    min_gap_improvement::Float64 = 0.01,
-    branching_strategy::AbstractBranchingStrategy = MostFractionalBranching(),
-    log_level::Int = 0,
-    dot_file::Union{Nothing,String} = nothing
-)
-    branching_ctx = log_level > 0 ?
-        BranchingLoggerContext(; log_level=log_level) :
-        DefaultBranchingContext()
-    effective_strategy = _branching_strategy_with_ctx(
-        branching_strategy, branching_ctx
-    )
-    space = BPSpace(
-        ws;
-        node_limit = node_limit,
-        tol = tol,
-        rmp_time_limit = rmp_time_limit,
-        rmp_heuristic = rmp_heuristic,
-        separator = separator,
-        max_cut_rounds = max_cut_rounds,
-        min_gap_improvement = min_gap_improvement,
-        branching_strategy = effective_strategy,
-        log_level = log_level
-    )
-    return BranchCutPriceContext(space, strategy, dot_file)
-end
-
-# Default: leave the strategy as-is. Specialized below for strategies
-# that hold a `BranchingContext`.
-_branching_strategy_with_ctx(s::AbstractBranchingStrategy, _) = s
-
-function _branching_strategy_with_ctx(
-    s::MultiPhaseStrongBranching, ctx::BranchingContext
-)
-    return with_branching_ctx(s, ctx)
-end
-
 # ── Entry point ──────────────────────────────────────────────────────────
 
 """
-    run_branch_and_price(bcp_ctx::BranchCutPriceContext) -> BPOutput
+    run_branch_and_price(ws::BranchCutPriceWorkspace) -> BPOutput
 
-Run the branch-and-price algorithm described by `bcp_ctx`.
+Run the branch-and-price algorithm described by `ws`.
 """
-function run_branch_and_price(bcp_ctx::BranchCutPriceContext)
-    space = bcp_ctx.space
-    strategy = bcp_ctx.strategy
+function run_branch_and_price(ws::BranchCutPriceWorkspace)
     evaluator = BPEvaluator()
-    if !isnothing(bcp_ctx.dot_file)
-        dot_ctx = BPDotLoggerContext(space, evaluator, bcp_ctx.dot_file)
-        return TreeSearch.search(strategy, dot_ctx)
+    if !isnothing(ws.dot_file)
+        dot_ctx = BPDotLoggerContext(ws, evaluator, ws.dot_file)
+        return TreeSearch.search(ws.strategy, dot_ctx)
     end
-    if space.log_level > 0
+    if ws.log_level > 0
         ts_ctx = TreeSearch.TreeSearchLoggerContext(
-            space, evaluator, space.log_level
+            ws, evaluator, ws.log_level
         )
-        return TreeSearch.search(strategy, ts_ctx)
+        return TreeSearch.search(ws.strategy, ts_ctx)
     end
-    return TreeSearch.search(strategy, space, evaluator)
+    return TreeSearch.search(ws.strategy, ws, evaluator)
 end
