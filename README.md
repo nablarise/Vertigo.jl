@@ -1,6 +1,6 @@
 # Vertigo.jl
 
-A Julia framework for branch-cut-and-price, built with autonomous AI agents.
+A Julia framework for branch-cut-and-price.
 
 ## Features
 
