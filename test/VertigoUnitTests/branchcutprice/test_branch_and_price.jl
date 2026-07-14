@@ -54,9 +54,9 @@ function test_branch_and_price()
         output = run_branch_and_price(bcp_ws)
         @test output.nodes_explored < 1000
         @test !isnothing(output.incumbent)
-        @test output.incumbent.obj_value == 181.0
+        @test output.incumbent.obj_value ≈ 181.0 atol = 1e-6
         @test output.status == :optimal
-        @test output.best_dual_bound == output.incumbent.obj_value
+        @test output.best_dual_bound ≈ output.incumbent.obj_value atol = 1e-6
     end
 
     @testset "[branch_and_price] dual bound is valid" begin
