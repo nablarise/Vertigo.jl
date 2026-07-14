@@ -1,6 +1,6 @@
 # Vertigo.jl
 
-A Julia framework for branch-cut-and-price, built with autonomous AI agents.
+A Julia framework for branch-cut-and-price.
 
 ## Features
 
@@ -53,15 +53,6 @@ println("Status: ", output.status)           # optimal
 println("Dual bound: ", output.incumbent_dual_bound)  # 63.0
 ```
 
-## Agent-driven development
-
-Development is driven by autonomous AI agents running
-[Claude Code](https://docs.anthropic.com/en/docs/claude-code) in Docker
-containers. The agents automate the full GitHub workflow — from issue to
-merged PR.
-
-Agents never auto-merge. A human reviews and merges approved PRs.
-
 ## Status
 
-Experimental — under active development.
+Experimental.
