@@ -77,6 +77,12 @@ function TreeSearch.evaluate!(
         lp = _master_lp_obj(cg_output)
     end
 
+    # Root LP value after valid inequality separation
+    # (`nothing` if the root LP was infeasible or never solved).
+    if space.nodes_explored == 1
+        space.root_lp_value = cg_output.master_lp_obj
+    end
+
     if isnothing(node.user_data)
         node.user_data = BPNodeData()
     end

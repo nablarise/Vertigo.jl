@@ -13,6 +13,9 @@ function test_branch_and_price()
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
         @test output.nodes_explored >= 1
+        @test !isnothing(output.root_lp_value)
+        @test output.root_lp_value <=
+              output.incumbent.obj_value + 1e-6
     end
 
     @testset "[branch_and_price] respects node limit" begin
