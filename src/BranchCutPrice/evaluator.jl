@@ -59,9 +59,6 @@ function TreeSearch.evaluate!(
 
     # First CG + cut separation (unconditional)
     cg_output = ColGen.run_column_generation(space.ws)
-    if space.nodes_explored == 1
-        space.root_lp_value = cg_output.master_lp_obj
-    end
     nb_cuts = _separate_and_add_cuts!(space, cg_output)
     lp = _master_lp_obj(cg_output)
     round = 0
@@ -78,6 +75,12 @@ function TreeSearch.evaluate!(
         cg_output = ColGen.run_column_generation(space.ws)
         nb_cuts = _separate_and_add_cuts!(space, cg_output)
         lp = _master_lp_obj(cg_output)
+    end
+
+    # Root LP value after valid inequality separation
+    # (`nothing` if the root LP was infeasible or never solved).
+    if space.nodes_explored == 1
+        space.root_lp_value = cg_output.master_lp_obj
     end
 
     if isnothing(node.user_data)
