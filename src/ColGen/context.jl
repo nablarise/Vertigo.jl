@@ -565,6 +565,14 @@ end
 
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
+# An empty pricing round proves optimality only if the dual bound meets the
+# master value (up to the pricing tolerances).
+function _gap_is_open(p::ColGenPhaseOutput)
+    (isnothing(p.master_lp_obj) || isnothing(p.incumbent_dual_bound)) && return false
+    gap = abs(p.master_lp_obj - p.incumbent_dual_bound)
+    return gap > DUAL_CONSISTENCY_TOL * max(1.0, abs(p.master_lp_obj))
+end
+
 function new_output(
     ::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput
 )
@@ -583,6 +591,14 @@ function new_output(
             p.incumbent_dual_bound, ip
         )
     elseif p.colgen_converged
+        _gap_is_open(p) && @warn(
+            "The subproblems report no improving column, so the run is " *
+            "reported optimal, but the dual bound and the primal bound " *
+            "(master LP value) differ: optimality is not proven. Is the " *
+            "pricing exact?",
+            master_lp_obj = p.master_lp_obj,
+            dual_bound = p.incumbent_dual_bound
+        )
         return ColGenOutput(
             optimal, p.master_lp_obj,
             p.incumbent_dual_bound, ip
