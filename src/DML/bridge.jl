@@ -33,6 +33,42 @@ length(collect(subproblem_ids(decomp)))
 
 2
 ```
+
+# User-overridden subproblems
+A subproblem declared with `user_overriden=true` gets no MOI model: it is
+solved by an algorithm of your own. Its variables are still numbered `1..n`
+and still appear in the coupling constraints of the master. Install a pricer
+for each such subproblem before creating the `ColGenWorkspace`, otherwise
+the workspace constructor raises an error.
+
+Use `mapped_subproblem_var(decomp, original_var)` to find the variable a
+pricer must use for an original variable, and `mapped_original_var` for the
+reverse mapping.
+
+```jldoctest
+using JuMP, HiGHS, Vertigo
+
+model = Model()
+@variable(model, x[1:2, 1:3], Bin)
+@constraint(model, assign[j in 1:3], sum(x[m,j] for m in 1:2) >= 1)
+@constraint(model, cap[m in 1:2], sum(x[m,j] for j in 1:3) <= 2)
+@objective(model, Min, sum(x))
+
+decomp, sp_map = @dantzig_wolfe model begin
+    master() => (constraints = assign[_])
+    subproblem(m, user_overriden=true) => (
+        variables = x[m, _],
+        constraints = cap[m]
+    )
+end
+
+# No pricer yet: install one with `sp_models(decomp)[sp_map[m]] = pricer`.
+sp_models(decomp)[sp_map[1]] === nothing
+
+# output
+
+true
+```
 """
 function dantzig_wolfe_decomposition(
     model::JuMP.Model, dw_annotation;
