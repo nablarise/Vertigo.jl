@@ -142,6 +142,17 @@ function ColGenWorkspace(decomp, config::ColGenConfig)
     )
 end
 
+# A user-overridden subproblem has no model until the user installs a pricer.
+function _check_pricers_installed(decomp)
+    for (sp_id, model) in sp_models(decomp)
+        isnothing(model) && error(
+            "Subproblem $sp_id is user-overridden but has no pricer. " *
+            "Install one with `sp_models(decomp)[$sp_id] = pricer` before " *
+            "creating the ColGenWorkspace."
+        )
+    end
+end
+
 """
     ColGenWorkspace(decomp, pool, eq, leq, geq, config::ColGenConfig)
 
@@ -153,6 +164,7 @@ function ColGenWorkspace(
     eq_art_vars, leq_art_vars, geq_art_vars,
     config::ColGenConfig
 )
+    _check_pricers_installed(decomp)
     return ColGenWorkspace(
         decomp, pool,
         eq_art_vars, leq_art_vars, geq_art_vars,

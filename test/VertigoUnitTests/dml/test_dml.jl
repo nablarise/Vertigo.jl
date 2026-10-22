@@ -220,6 +220,9 @@ function test_dml_user_overriden_subproblem()
         @test all(isnothing, values(sp_models(decomp)))
         @test length(coupling_constraints(decomp)) == 7
 
+        # Column generation refuses to start until every pricer is installed.
+        @test_throws "has no pricer" ColGenWorkspace(decomp, ColGenConfig())
+
         # Rules assigning to the same subproblem must agree.
         @test_throws ErrorException @dantzig_wolfe model begin
             x[k, _] => subproblem(k, user_overriden=true)
