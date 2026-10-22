@@ -126,10 +126,19 @@ function dantzig_wolfe_decomposition(
 
     if opt !== nothing
         JuMP.set_optimizer(master_model, opt)
-        JuMP.set_silent(master_model)
-        for sp_model in values(sp_jump_models)
+        _requested_silent(
+            Iterators.flatten((master_vars, master_constrs)),
+            dw_annotation, "the master"
+        ) && JuMP.set_silent(master_model)
+        for (sp_id, sp_model) in sp_jump_models
             JuMP.set_optimizer(sp_model, opt)
-            JuMP.set_silent(sp_model)
+            _requested_silent(
+                Iterators.flatten((
+                    get(sp_vars_partition, sp_id, ()),
+                    get(sp_constrs_partition, sp_id, ())
+                )),
+                dw_annotation, "subproblem $sp_id"
+            ) && JuMP.set_silent(sp_model)
         end
     end
 
@@ -193,8 +202,8 @@ function dantzig_wolfe_decomposition(
 
     for id in sorted_ids
         sp_id = sp_id_map[id]
-        conv_lb_ref = @JuMP.constraint(master_model, 0 >= 1)
-        conv_ub_ref = @JuMP.constraint(master_model, 0 <= 1)
+        conv_lb_ref = JuMP.@constraint(master_model, 0 >= 1)
+        conv_ub_ref = JuMP.@constraint(master_model, 0 <= 1)
         conv_lb_map[sp_id] = TaggedCI(JuMP.index(conv_lb_ref))
         conv_ub_map[sp_id] = TaggedCI(JuMP.index(conv_ub_ref))
     end
@@ -210,6 +219,21 @@ function dantzig_wolfe_decomposition(
     )
 
     return (decomp, sp_id_map)
+end
+
+# Whether the model gathering `objects` (name => indexes pairs) must be
+# silent. Rules that don't say are ignored; the default is silent.
+function _requested_silent(objects, dw_annotation, target)
+    flags = Set{Bool}()
+    for (name, indexes) in objects, idx in indexes
+        silent = dw_annotation(Val(name), idx...).silent
+        silent === nothing || push!(flags, silent)
+    end
+    length(flags) > 1 && error(
+        "Conflicting `silent` settings for $target: " *
+        "all rules assigning to it must agree."
+    )
+    return isempty(flags) ? true : only(flags)
 end
 
 function _get_optimizer(model::JuMP.Model)

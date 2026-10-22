@@ -4,9 +4,11 @@
 
 struct SubproblemAssignment
     id_expr::Any
+    silent_expr::Any
 end
 
 struct MasterAssignment
+    silent_expr::Any
 end
 
 struct PatternRule
@@ -31,12 +33,15 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
 # Assignment Syntax
 - `subproblem(id)` — assign to subproblem with given ID
 - `master()` — assign to master problem
+- Both accept `silent=true|false` to silence (or not) the solver of the
+  model they assign to. Unset, a model is silent. Rules assigning to the
+  same model must not contradict each other.
 
 # Example
 ```julia
 @dantzig_wolfe model begin
     x[m, _] => subproblem(m)
-    knapsack[m] => subproblem(m)
+    knapsack[m] => subproblem(m, silent=false)
     coverage[_] => master()
 end
 ```
@@ -105,26 +110,48 @@ function parse_pattern(pattern)
 end
 
 function parse_assignment(assignment::Expr)
-    if assignment.head == :call
-        func_name = assignment.args[1]
-        if func_name == :subproblem
-            length(assignment.args) == 2 || error(
-                "subproblem() requires exactly one argument"
-            )
-            return SubproblemAssignment(assignment.args[2])
-        elseif func_name == :master
-            length(assignment.args) == 1 || error(
-                "master() takes no arguments"
-            )
-            return MasterAssignment()
-        else
-            error("Unknown assignment function: $func_name")
-        end
-    else
-        error(
-            "Expected function call for assignment, got: $assignment"
+    assignment.head == :call || error(
+        "Expected function call for assignment, got: $assignment"
+    )
+    func_name = assignment.args[1]
+    positional, silent_expr = split_call_args(assignment.args[2:end])
+    if func_name == :subproblem
+        length(positional) == 1 || error(
+            "subproblem() requires exactly one positional argument"
         )
+        return SubproblemAssignment(positional[1], silent_expr)
+    elseif func_name == :master
+        isempty(positional) || error(
+            "master() takes no positional arguments"
+        )
+        return MasterAssignment(silent_expr)
+    else
+        error("Unknown assignment function: $func_name")
     end
+end
+
+# Splits call arguments into positional ones and the `silent` value.
+# Handles both `f(a, silent=x)` and `f(a; silent=x)`.
+function split_call_args(args)
+    positional = Any[]
+    silent_expr = :nothing
+    for arg in args
+        kws = if arg isa Expr && arg.head == :parameters
+            arg.args
+        else
+            [arg]
+        end
+        for kw in kws
+            if kw isa Expr && kw.head in (:kw, :(=)) && kw.args[1] == :silent
+                silent_expr = kw.args[2]
+            elseif kw isa Expr && kw.head in (:kw, :(=))
+                error("Unknown keyword: $(kw.args[1])")
+            else
+                push!(positional, kw)
+            end
+        end
+    end
+    return positional, silent_expr
 end
 
 function generate_method_definitions(
@@ -152,9 +179,11 @@ function generate_method_definition(
 end
 
 function generate_assignment_expr(a::SubproblemAssignment)
-    return :(dantzig_wolfe_subproblem($(a.id_expr)))
+    return :(dantzig_wolfe_subproblem(
+        $(a.id_expr); silent=$(a.silent_expr)
+    ))
 end
 
-function generate_assignment_expr(::MasterAssignment)
-    return :(dantzig_wolfe_master())
+function generate_assignment_expr(a::MasterAssignment)
+    return :(dantzig_wolfe_master(; silent=$(a.silent_expr)))
 end
