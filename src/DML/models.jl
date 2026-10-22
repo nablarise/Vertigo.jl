@@ -65,7 +65,7 @@ function _replace_vars_in_func(
            JuMP.owner_model(var_mapping[var]) == target_model
     ]
     constant = preserve_constant ? func.constant : 0.0
-    return JuMP.AffExpr(constant, terms...)
+    return JuMP.AffExpr(constant, terms)
 end
 
 function _replace_vars_in_func(
