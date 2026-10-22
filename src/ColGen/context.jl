@@ -142,6 +142,17 @@ function ColGenWorkspace(decomp, config::ColGenConfig)
     )
 end
 
+# A user-overridden subproblem has no model until the user installs a pricer.
+function _check_pricers_installed(decomp)
+    for (sp_id, model) in sp_models(decomp)
+        isnothing(model) && error(
+            "Subproblem $sp_id is user-overridden but has no pricer. " *
+            "Install one with `sp_models(decomp)[$sp_id] = pricer` before " *
+            "creating the ColGenWorkspace."
+        )
+    end
+end
+
 """
     ColGenWorkspace(decomp, pool, eq, leq, geq, config::ColGenConfig)
 
@@ -153,6 +164,7 @@ function ColGenWorkspace(
     eq_art_vars, leq_art_vars, geq_art_vars,
     config::ColGenConfig
 )
+    _check_pricers_installed(decomp)
     return ColGenWorkspace(
         decomp, pool,
         eq_art_vars, leq_art_vars, geq_art_vars,
@@ -565,6 +577,14 @@ end
 
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
+# An empty pricing round proves optimality only if the dual bound meets the
+# master value (up to the pricing tolerances).
+function _gap_is_open(p::ColGenPhaseOutput)
+    (isnothing(p.master_lp_obj) || isnothing(p.incumbent_dual_bound)) && return false
+    gap = abs(p.master_lp_obj - p.incumbent_dual_bound)
+    return gap > DUAL_CONSISTENCY_TOL * max(1.0, abs(p.master_lp_obj))
+end
+
 function new_output(
     ::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput
 )
@@ -583,6 +603,14 @@ function new_output(
             p.incumbent_dual_bound, ip
         )
     elseif p.colgen_converged
+        _gap_is_open(p) && @warn(
+            "The subproblems report no improving column, so the run is " *
+            "reported optimal, but the dual bound and the primal bound " *
+            "(master LP value) differ: optimality is not proven. Is the " *
+            "pricing exact?",
+            master_lp_obj = p.master_lp_obj,
+            dual_bound = p.incumbent_dual_bound
+        )
         return ColGenOutput(
             optimal, p.master_lp_obj,
             p.incumbent_dual_bound, ip
