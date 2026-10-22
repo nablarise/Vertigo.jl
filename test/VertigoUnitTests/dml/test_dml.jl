@@ -256,6 +256,44 @@ function test_dml_annotation_options()
     end
 end
 
+function test_dml_pure_master_bounds_and_types()
+    @testset "[dml] pure master variables keep their bounds and integrality" begin
+        model = Model()
+        @variable(model, x[k in 1:2, t in 1:3], Bin)
+        @variable(model, 2 <= u <= 7)
+        @variable(model, 0 <= v <= 5, Int)
+        @variable(model, w >= 0)
+        @variable(model, b, Bin)
+        @constraint(model, assign[t in 1:3], sum(x[k, t] for k in 1:2) + u + v + w + b >= 1)
+        @constraint(model, knapsack[k in 1:2], sum(x[k, t] for t in 1:3) <= 2)
+        # Distinct costs identify each master variable in the decomposition.
+        @objective(model, Min, sum(x) + 1u + 2v + 3w + 4b)
+
+        decomp, _ = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            u => master()
+            v => master()
+            w => master()
+            b => master()
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+
+        by_cost = Dict(
+            round(Int, pure_master_cost(decomp, pmv)) => pmv
+            for pmv in pure_master_variables(decomp)
+        )
+        @test sort(collect(keys(by_cost))) == [1, 2, 3, 4]
+        is_int(c) = Vertigo.Reformulation.pure_master_is_integer(decomp, by_cost[c])
+        bounds(c) = pure_master_bounds(decomp, by_cost[c])
+
+        @test bounds(1) == (2.0, 7.0) && !is_int(1)        # u: continuous
+        @test bounds(2) == (0.0, 5.0) && is_int(2)         # v: integer
+        @test bounds(3) == (0.0, Inf) && !is_int(3)        # w: no upper bound
+        @test bounds(4) == (0.0, 1.0) && is_int(4)         # b: binary
+    end
+end
+
 # `_replace_vars_in_func` once splatted every term into `AffExpr(constant, terms...)`; Julia
 # compiles a new method per argument count and the cost grows far faster than the size, so a
 # subproblem with a few thousand variables took tens of seconds to decompose.
@@ -279,6 +317,102 @@ function test_dml_large_subproblem_objective()
     end
 end
 
+# The decomposition must not change the problem: with every feasible column of every
+# subproblem enumerated, the master (columns binary) has the optimum of the original model.
+function _random_gap_instance(rng)
+    K, T = rand(rng, 2:3), rand(rng, 4:6)
+    return (
+        K=K, T=T,
+        cost=rand(rng, 1:20, K, T), weight=rand(rng, 1:5, K, T), capacity=rand(rng, 5:9, K),
+    )
+end
+
+function _gap_model_for_decomposition(inst, penalty)
+    model = Model(HiGHS.Optimizer)
+    set_silent(model)
+    K, T = 1:inst.K, 1:inst.T
+    @variable(model, x[k in K, t in T], Bin)
+    @variable(model, u[t in T], Bin)
+    @constraint(model, assign[t in T], sum(x[k, t] for k in K) + (penalty ? u[t] : 0) == 1)
+    penalty || @constraint(model, no_penalty[t in T], u[t] == 0)
+    @constraint(
+        model, knapsack[k in K], sum(inst.weight[k, t] * x[k, t] for t in T) <= inst.capacity[k]
+    )
+    @objective(
+        model, Min,
+        sum(inst.cost[k, t] * x[k, t] for k in K, t in T) + sum(30 * u[t] for t in T)
+    )
+    return model
+end
+
+function _enumerated_master_optimum(inst, penalty, user_overriden)
+    model = _gap_model_for_decomposition(inst, penalty)
+    # Option values are evaluated inside Vertigo.DML, so they cannot name local variables.
+    decomp, sp_map = if user_overriden
+        @dantzig_wolfe model begin
+            x[k, _] => subproblem(k, user_overriden=true)
+            u[_] => master()
+            assign[_] => master()
+            no_penalty[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+    else
+        @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            u[_] => master()
+            assign[_] => master()
+            no_penalty[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+    end
+    master = master_model(decomp)
+    x = model[:x]
+    for k in 1:inst.K
+        sp_id = sp_map[k]
+        sp_vars = [last(mapped_subproblem_var(decomp, x[k, t])) for t in 1:inst.T]
+        for mask in 0:(2^inst.T - 1)
+            tasks = [t for t in 1:inst.T if (mask >> (t - 1)) & 1 == 1]
+            sum(inst.weight[k, t] for t in tasks; init=0) <= inst.capacity[k] || continue
+            sol = Vertigo.Reformulation._SpSolution(
+                sp_id, 0.0, [(sp_vars[t], 1.0) for t in tasks]
+            )
+            coeffs = Dict{Vertigo.TaggedCI,Float64}(
+                cid => c for (cid, c) in Vertigo.Reformulation.compute_column_coupling_coefficients(decomp, sp_id, sol)
+            )
+            coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
+            coeffs[convexity_lb_ci(decomp, sp_id)] = 1.0
+            Vertigo.ColGen.add_variable!(
+                master;
+                variable_type=MOI.ZeroOne(), constraint_coeffs=coeffs,
+                objective_coeff=Vertigo.Reformulation.compute_column_original_cost(decomp, sp_id, sol),
+            )
+        end
+    end
+    MOI.optimize!(master)
+    status = MOI.get(master, MOI.TerminationStatus())
+    return status == MOI.OPTIMAL ? MOI.get(master, MOI.ObjectiveValue()) : nothing, model
+end
+
+function test_dml_decomposition_matches_flat_model()
+    @testset "[dml] master over enumerated columns has the original optimum" begin
+        rng = Random.MersenneTwister(20261022)
+        feasible = 0
+        for _ in 1:10, penalty in (false, true), user_overriden in (false, true)
+            inst = _random_gap_instance(rng)
+            master_obj, model = _enumerated_master_optimum(inst, penalty, user_overriden)
+            optimize!(model)
+            flat_obj = termination_status(model) == MOI.OPTIMAL ? objective_value(model) : nothing
+            @test isnothing(master_obj) == isnothing(flat_obj)
+            if !isnothing(flat_obj) && !isnothing(master_obj)
+                @test master_obj ≈ flat_obj atol = 1e-6
+                feasible += 1
+            end
+        end
+        # Not vacuous: the 20 instances with a penalty variable are always feasible.
+        @test feasible >= 20
+    end
+end
+
 function test_dml()
     test_dml_user_overriden_subproblem()
     test_dml_macro_basic_gap()
@@ -286,5 +420,7 @@ function test_dml()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
     test_dml_annotation_options()
+    test_dml_pure_master_bounds_and_types()
     test_dml_large_subproblem_objective()
+    test_dml_decomposition_matches_flat_model()
 end
