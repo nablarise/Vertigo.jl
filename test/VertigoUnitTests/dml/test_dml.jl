@@ -232,10 +232,35 @@ function test_dml_user_overriden_subproblem()
     end
 end
 
+function test_dml_annotation_options()
+    @testset "[dml] annotation options land in their own fields" begin
+        sp = dantzig_wolfe_subproblem(3; user_overriden=true)
+        @test sp.id == 3
+        @test sp.user_overriden === true
+        @test sp.silent === nothing
+
+        sp = dantzig_wolfe_subproblem(:a; silent=false)
+        @test sp.id == :a
+        @test sp.user_overriden === nothing
+        @test sp.silent === false
+
+        sp = dantzig_wolfe_subproblem(1; silent=true, user_overriden=false)
+        @test (sp.user_overriden, sp.silent) == (false, true)
+
+        @test dantzig_wolfe_master().silent === nothing
+        @test dantzig_wolfe_master(silent=false).silent === false
+
+        # No positional constructor: swapping two `Union{Nothing,Bool}` goes unnoticed.
+        @test_throws MethodError Vertigo.DML.SubproblemAnnotation(1, true, false)
+        @test_throws MethodError Vertigo.DML.MasterAnnotation(true)
+    end
+end
+
 function test_dml()
     test_dml_user_overriden_subproblem()
     test_dml_macro_basic_gap()
     test_dml_silent()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
+    test_dml_annotation_options()
 end
