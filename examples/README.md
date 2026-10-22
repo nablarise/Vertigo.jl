@@ -17,6 +17,7 @@ writes them to CSV/JSON for diffing between commits.
 | Path        | Problem                          |
 |-------------|----------------------------------|
 | `gap/`      | Generalized Assignment Problem   |
+| `gap_with_user_override/` | GAP with user-overridden subproblems priced by an exact knapsack DP |
 
 ## Running
 
@@ -26,6 +27,7 @@ Each suite has its own `run_quick.jl` (smoke set, ~minutes) and
 ```
 julia --project=examples examples/gap/run_quick.jl
 julia --project=examples examples/gap/run_full.jl
+julia --project=examples examples/gap_with_user_override/run_quick.jl
 ```
 
 Results land under `<suite>/results/` (gitignored).

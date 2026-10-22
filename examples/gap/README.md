@@ -61,9 +61,9 @@ row per instance. Captured columns:
 | `nb_nodes`      | `BPOutput.nodes_explored`                     |
 | `nb_columns`    | **stub** — pending issue #60                  |
 | `nb_rmp_iters`  | **stub** — pending issue #61                  |
-| `root_lp_value` | **stub** — pending issue #62                  |
+| `root_lp_value` | `BPOutput.root_lp_value`                      |
 
-The three stub fields are written as empty cells in CSV / `null` in
+The two stub fields are written as empty cells in CSV / `null` in
 JSON until the corresponding `BPOutput` accessors land.
 
 `status` and `dual_bound` are also affected by issue #63: when a
