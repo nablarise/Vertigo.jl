@@ -29,35 +29,26 @@ end
 
 # Every variable and constraint has to be reachable by name: the rules address
 # objects by name, so an anonymous one would silently stay out of the
-# decomposition. Array-like containers (dense, `DenseAxisArray`,
-# `SparseAxisArray`) are fine; `container=Dict` is not.
+# decomposition.
 function _check_all_objects_named(model)
-    named_vars = Set{JuMP.VariableRef}()
-    named_constrs = Set{JuMP.ConstraintRef}()
-    for (_, obj) in JuMP.object_dictionary(model)
-        if obj isa JuMP.AbstractVariableRef
-            push!(named_vars, obj)
-        elseif obj isa JuMP.ConstraintRef
-            push!(named_constrs, obj)
-        elseif obj isa AbstractArray && length(obj) > 0
-            if first(obj) isa JuMP.AbstractVariableRef
-                union!(named_vars, obj)
-            elseif first(obj) isa JuMP.ConstraintRef
-                union!(named_constrs, obj)
-            end
-        end
-    end
+    named_vars = Set(
+        get_scalar_object(model, name, idx)
+        for (name, idx) in _named_objects(model, JuMP.AbstractVariableRef)
+    )
+    named_constrs = Set(
+        get_scalar_object(model, name, idx)
+        for (name, idx) in _named_objects(model, JuMP.ConstraintRef)
+    )
     for var in JuMP.all_variables(model)
         var in named_vars || throw(ArgumentError(
             "variable `$var` has no name the rules can address: declare it with a " *
-            "name, e.g. `@variable(model, y[1:3])`, and not with `container=Dict`"
+            "name, e.g. `@variable(model, y[1:3])`"
         ))
     end
     for constr in JuMP.all_constraints(model; include_variable_in_set_constraints=false)
         constr in named_constrs || throw(ArgumentError(
             "constraint `$constr` has no name the rules can address: declare it " *
-            "with a name, e.g. `@constraint(model, c[i in I], ...)`, and not with " *
-            "`container=Dict`"
+            "with a name, e.g. `@constraint(model, c[i in I], ...)`"
         ))
     end
     return nothing
@@ -94,102 +85,36 @@ function _check_no_foreign_variables(
     return nothing
 end
 
-function _master_variables(model, dw_annotation)
-    master_vars = Dict{Symbol,Any}()
-    for (var_name, var_obj) in JuMP.object_dictionary(model)
-        if var_obj isa AbstractArray && length(var_obj) > 0 && first(var_obj) isa JuMP.AbstractVariableRef
-            for idx in _eachindex(var_obj)
-                annotation = _annotation(dw_annotation, :variable, var_name, Tuple(idx))
-                if annotation isa MasterAnnotation
-                    if !haskey(master_vars, var_name)
-                        master_vars[var_name] = Set{Tuple}()
-                    end
-                    push!(master_vars[var_name], Tuple(idx))
-                end
-            end
-        elseif var_obj isa JuMP.AbstractVariableRef
-            annotation = _annotation(dw_annotation, :variable, var_name, ())
-            if annotation isa MasterAnnotation
-                if !haskey(master_vars, var_name)
-                    master_vars[var_name] = Set{Tuple{}}([()])
-                end
-            end
-        end
+# Scalars keep a `Set{Tuple{}}` of indices: the model builder dispatches on it.
+_push_index!(by_name::Dict{Symbol,Any}, name, idx) =
+    push!(get!(() -> idx == () ? Set{Tuple{}}() : Set{Tuple}(), by_name, name), idx)
+
+# What the rules assign `R`s (variables or constraints) to: `name => indexes`
+# for the master, and `sp_id => (name => indexes)` for the subproblems.
+function _master_objects(model, dw_annotation, ::Type{R}, kind::Symbol) where {R}
+    master = Dict{Symbol,Any}()
+    for (name, idx) in _named_objects(model, R)
+        _annotation(dw_annotation, kind, name, idx) isa MasterAnnotation &&
+            _push_index!(master, name, idx)
     end
-    return master_vars
+    return master
 end
 
-function _partition_subproblem_variables(model, dw_annotation)
-    sp_vars = Dict{Any,Dict{Symbol,Any}}()
-    for (var_name, var_obj) in JuMP.object_dictionary(model)
-        if var_obj isa AbstractArray && length(var_obj) > 0 && first(var_obj) isa JuMP.AbstractVariableRef
-            for idx in _eachindex(var_obj)
-                annotation = _annotation(dw_annotation, :variable, var_name, Tuple(idx))
-                if annotation isa SubproblemAnnotation
-                    sp_dict = get!(Dict{Symbol,Any}, sp_vars, annotation.id)
-                    idx_set = get!(Set{Tuple}, sp_dict, var_name)
-                    push!(idx_set, Tuple(idx))
-                end
-            end
-        elseif var_obj isa JuMP.AbstractVariableRef
-            annotation = _annotation(dw_annotation, :variable, var_name, ())
-            if annotation isa SubproblemAnnotation
-                sp_dict = get!(Dict{Symbol,Any}, sp_vars, annotation.id)
-                if !haskey(sp_dict, var_name)
-                    sp_dict[var_name] = Set{Tuple{}}([()])
-                end
-            end
-        end
+function _subproblem_objects(model, dw_annotation, ::Type{R}, kind::Symbol) where {R}
+    partition = Dict{Any,Dict{Symbol,Any}}()
+    for (name, idx) in _named_objects(model, R)
+        annotation = _annotation(dw_annotation, kind, name, idx)
+        annotation isa SubproblemAnnotation || continue
+        _push_index!(get!(Dict{Symbol,Any}, partition, annotation.id), name, idx)
     end
-    return sp_vars
+    return partition
 end
 
-function _master_constraints(model, dw_annotation)
-    master_constrs = Dict{Symbol,Any}()
-    for (constr_name, constr_obj) in JuMP.object_dictionary(model)
-        if constr_obj isa AbstractArray && length(constr_obj) > 0 && first(constr_obj) isa JuMP.ConstraintRef
-            for idx in _eachindex(constr_obj)
-                annotation = _annotation(dw_annotation, :constraint, constr_name, Tuple(idx))
-                if annotation isa MasterAnnotation
-                    if !haskey(master_constrs, constr_name)
-                        master_constrs[constr_name] = Set{Tuple}()
-                    end
-                    push!(master_constrs[constr_name], Tuple(idx))
-                end
-            end
-        elseif constr_obj isa JuMP.ConstraintRef
-            annotation = _annotation(dw_annotation, :constraint, constr_name, ())
-            if annotation isa MasterAnnotation
-                if !haskey(master_constrs, constr_name)
-                    master_constrs[constr_name] = Set{Tuple{}}([()])
-                end
-            end
-        end
-    end
-    return master_constrs
-end
-
-function _partition_subproblem_constraints(model, dw_annotation)
-    sp_constrs = Dict{Any,Dict{Symbol,Any}}()
-    for (constr_name, constr_obj) in JuMP.object_dictionary(model)
-        if constr_obj isa AbstractArray && length(constr_obj) > 0 && first(constr_obj) isa JuMP.ConstraintRef
-            for idx in _eachindex(constr_obj)
-                annotation = _annotation(dw_annotation, :constraint, constr_name, Tuple(idx))
-                if annotation isa SubproblemAnnotation
-                    sp_dict = get!(Dict{Symbol,Any}, sp_constrs, annotation.id)
-                    idx_set = get!(Set{Tuple}, sp_dict, constr_name)
-                    push!(idx_set, Tuple(idx))
-                end
-            end
-        elseif constr_obj isa JuMP.ConstraintRef
-            annotation = _annotation(dw_annotation, :constraint, constr_name, ())
-            if annotation isa SubproblemAnnotation
-                sp_dict = get!(Dict{Symbol,Any}, sp_constrs, annotation.id)
-                if !haskey(sp_dict, constr_name)
-                    sp_dict[constr_name] = Set{Tuple{}}([()])
-                end
-            end
-        end
-    end
-    return sp_constrs
-end
+_master_variables(model, ann) =
+    _master_objects(model, ann, JuMP.AbstractVariableRef, :variable)
+_partition_subproblem_variables(model, ann) =
+    _subproblem_objects(model, ann, JuMP.AbstractVariableRef, :variable)
+_master_constraints(model, ann) =
+    _master_objects(model, ann, JuMP.ConstraintRef, :constraint)
+_partition_subproblem_constraints(model, ann) =
+    _subproblem_objects(model, ann, JuMP.ConstraintRef, :constraint)

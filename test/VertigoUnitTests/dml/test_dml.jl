@@ -493,37 +493,34 @@ function test_dml_rule_errors()
         @test occursin("constraint", err.msg) && occursin("no name", err.msg)
     end
 
-    @testset "[dml] sparse containers are decomposed, Dict containers rejected" begin
-        model = Model()
-        @variable(model, y[i = 1:3, j = 1:3; i < j] >= 0)
-        @variable(model, z[1:2], Bin)
-        @constraint(model, cap[i = 1:3; i > 1], sum(y[a, b] for (a, b) in eachindex(y)) <= 5)
-        @constraint(model, link[i = 1:2], z[i] + sum(y) >= 1)
-        @objective(model, Min, sum(y) + sum(z))
-        decomp, _ = @dantzig_wolfe model begin
-            y[_, _] => subproblem(1)
-            cap[_] => subproblem(1)
-            z[_] => master()
-            link[_] => master()
-        end
-        @test length(subproblem_variables(decomp, first(subproblem_ids(decomp)))) == 3
-        @test length(coupling_constraints(decomp)) == 2
-
-        model = _build_gap_jump_model()
-        @constraint(model, dict_c[i = 1:2], model[:x][1, i] <= 1, container = Dict)
-        err = try
-            @dantzig_wolfe model begin
+    @testset "[dml] every JuMP container is decomposed by its real indices" begin
+        # x[k, t]: two subproblems "a" and "b" over tasks 3:5, linked by cover[t].
+        # The decomposition must be the same whatever container JuMP stores them in.
+        for container in (
+            JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict
+        )
+            model = Model()
+            K, T = ["a", "b"], 3:5
+            x = @variable(model, [k in K, t in T], base_name = "x", container = container)
+            model[:x] = x
+            model[:cover] = @constraint(
+                model, [t in T], sum(x[k, t] for k in K) == 1, container = container
+            )
+            @constraint(
+                model, cap[k in K], sum(x[k, t] for t in T) <= 2, container = Dict
+            )
+            @objective(model, Min, sum(x[k, t] for k in K, t in T))
+            decomp, sp_map = @dantzig_wolfe model begin
                 x[k, _] => subproblem(k)
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
-                dict_c[_] => master()
+                cover[_] => master()
+                cap[k] => subproblem(k)
             end
-            nothing
-        catch e
-            e
+            @test sort(collect(keys(sp_map))) == ["a", "b"]
+            for id in subproblem_ids(decomp)
+                @test length(subproblem_variables(decomp, id)) == 3
+            end
+            @test length(coupling_constraints(decomp)) == 3
         end
-        @test err isa ArgumentError
-        @test occursin("container=Dict", err.msg)
     end
 
     @testset "[dml] subproblem constraint on a foreign variable is rejected" begin
