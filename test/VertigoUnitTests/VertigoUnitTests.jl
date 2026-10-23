@@ -180,34 +180,46 @@ include("dml/test_dml.jl")
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+# Every test function runs in its own testset, all under one outer testset: a failure or an
+# exception in one test is recorded and the others still run. The outer testset throws once,
+# at the end, if anything failed.
 function run()
-    test_gap_decomposition_builder()
-    test_gap_column_pool_populated()
-    test_gap_lp_dual_bound_matches_primal()
-    test_ip_management()
-    test_treesearch_node()
-    test_treesearch_search_loop()
-    test_treesearch_strategies()
-    test_tree_search_logger()
-    test_local_cut_tracker()
-    test_lp_basis_tracker()
-    test_column_tracker()
-    test_cut_pool_tracker()
-    test_max_cg_iterations()
-    test_colgen_status()
-    test_branching_strategy()
-    test_lp_probe()
-    test_strong_branching()
-    test_pseudocosts()
-    test_kernel()
-    test_branching_logger()
-    test_branch_and_price()
-    test_stabilization()
-    test_setup_reformulation()
-    test_insert_columns()
-    test_build_cut_saf()
-    test_column_pool()
-    test_dml()
+    @testset "VertigoUnitTests" begin
+        for test in (
+            test_gap_decomposition_builder,
+            test_gap_column_pool_populated,
+            test_gap_lp_dual_bound_matches_primal,
+            test_ip_management,
+            test_treesearch_node,
+            test_treesearch_search_loop,
+            test_treesearch_strategies,
+            test_tree_search_logger,
+            test_local_cut_tracker,
+            test_lp_basis_tracker,
+            test_column_tracker,
+            test_cut_pool_tracker,
+            test_max_cg_iterations,
+            test_colgen_status,
+            test_branching_strategy,
+            test_lp_probe,
+            test_strong_branching,
+            test_pseudocosts,
+            test_kernel,
+            test_branching_logger,
+            test_branch_and_price,
+            test_stabilization,
+            test_setup_reformulation,
+            test_insert_columns,
+            test_build_cut_saf,
+            test_column_pool,
+            test_dml,
+        )
+            @testset "$(nameof(test))" begin
+                test()
+            end
+        end
+    end
+    return nothing
 end
 
 end # module VertigoUnitTests

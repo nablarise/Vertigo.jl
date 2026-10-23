@@ -394,7 +394,98 @@ function test_dml_user_overriden_subproblem()
     end
 end
 
+# ── Branch-and-price over every JuMP container ──────────────────────────────────────────
+#
+# The same GAP declared over different index sets and containers must decompose into the same
+# problem: branch-and-price finds the optimum of the flat model, and every declaration has
+# the root bound of the plain `1:n` one. Each instance has a fractional root (root bound
+# below the optimum), so branching is exercised.
+
+# (seed, machines, tasks, capacity)
+const CONTAINER_GAP_INSTANCES = [(2, 3, 10, 9.0), (7, 3, 10, 9.0), (9, 4, 12, 9.0)]
+
+function _container_gap_instance(seed, K, T, capacity)
+    rng = Random.MersenneTwister(seed)
+    return (
+        K=K, T=T,
+        cost=rand(rng, 1:20, K, T) .* 1.0, weight=rand(rng, 1:5, K, T) .* 1.0,
+        capacity=fill(capacity, K),
+    )
+end
+
+function test_dml_bp_over_containers()
+    auto = JuMP.Containers.AutoContainerType
+    dense, sparse = JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray
+    for (seed, K, T, capacity) in CONTAINER_GAP_INSTANCES
+        inst = _container_gap_instance(seed, K, T, capacity)
+        ints = (collect(1:K), collect(1:T))
+        labelled = (["m$k" for k in 1:K], collect(0:(T - 1)))   # string machines, zero-based tasks
+        cases = [
+            ("1:n Array", ints..., Array),
+            ("1:n auto", ints..., auto),
+            ("DenseAxisArray", labelled..., dense),
+            ("SparseAxisArray", labelled..., sparse),
+            ("Dict", labelled..., Dict),
+        ]
+        reference_root_lp = Ref{Union{Nothing,Float64}}(nothing)
+        for (label, Ks, Ts, container) in cases
+            @testset "[dml][bp] GAP seed $seed ($(K)x$(T)), $label" begin
+                kpos = Dict(k => i for (i, k) in enumerate(Ks))
+                tpos = Dict(t => j for (j, t) in enumerate(Ts))
+                model = Model(HiGHS.Optimizer)
+                set_silent(model)
+                @variable(model, x[k in Ks, t in Ts], Bin, container = container)
+                @constraint(
+                    model, assign[t in Ts], sum(x[k, t] for k in Ks) == 1, container = container
+                )
+                @constraint(
+                    model, knapsack[k in Ks],
+                    sum(inst.weight[kpos[k], tpos[t]] * x[k, t] for t in Ts) <=
+                    inst.capacity[kpos[k]],
+                    container = container
+                )
+                @objective(
+                    model, Min, sum(inst.cost[kpos[k], tpos[t]] * x[k, t] for k in Ks, t in Ts)
+                )
+
+                optimize!(model)
+                @test termination_status(model) == MOI.OPTIMAL
+                flat_optimum = objective_value(model)
+
+                decomp, sp_map = @dantzig_wolfe model begin
+                    x[k, _] => subproblem(k)
+                    assign[_] => master()
+                    knapsack[k] => subproblem(k)
+                end
+                @test Set(keys(sp_map)) == Set(Ks)
+
+                bcp_ws = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(node_limit=500))
+                output = redirect_stdout(devnull) do
+                    run_branch_and_price(bcp_ws)
+                end
+
+                @test !isnothing(output.incumbent)
+                if !isnothing(output.incumbent)
+                    @test output.incumbent.obj_value ≈ flat_optimum atol = 1e-6
+                end
+                @test output.root_lp_value < flat_optimum - 1e-6   # the root is fractional...
+                @test 1 < output.nodes_explored < 500              # ...so the search branched and finished
+                # Known solver limitation, unrelated to containers: once the tree is exhausted the
+                # global dual bound is -Inf and the status says :node_limit. Flips when fixed.
+                @test_broken output.status == :optimal
+
+                if isnothing(reference_root_lp[])
+                    reference_root_lp[] = output.root_lp_value
+                else
+                    @test output.root_lp_value ≈ reference_root_lp[] atol = 1e-6
+                end
+            end
+        end
+    end
+end
+
 function test_dml_e2e()
+    test_dml_bp_over_containers()
     test_dml_user_overriden_subproblem()
     for smoothing_alpha in (0.0, 0.5)
         test_dml_gap_converges(; smoothing_alpha)
