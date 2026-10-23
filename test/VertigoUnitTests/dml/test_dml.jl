@@ -493,6 +493,39 @@ function test_dml_rule_errors()
         @test occursin("constraint", err.msg) && occursin("no name", err.msg)
     end
 
+    @testset "[dml] sparse containers are decomposed, Dict containers rejected" begin
+        model = Model()
+        @variable(model, y[i = 1:3, j = 1:3; i < j] >= 0)
+        @variable(model, z[1:2], Bin)
+        @constraint(model, cap[i = 1:3; i > 1], sum(y[a, b] for (a, b) in eachindex(y)) <= 5)
+        @constraint(model, link[i = 1:2], z[i] + sum(y) >= 1)
+        @objective(model, Min, sum(y) + sum(z))
+        decomp, _ = @dantzig_wolfe model begin
+            y[_, _] => subproblem(1)
+            cap[_] => subproblem(1)
+            z[_] => master()
+            link[_] => master()
+        end
+        @test length(subproblem_variables(decomp, first(subproblem_ids(decomp)))) == 3
+        @test length(coupling_constraints(decomp)) == 2
+
+        model = _build_gap_jump_model()
+        @constraint(model, dict_c[i = 1:2], model[:x][1, i] <= 1, container = Dict)
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+                dict_c[_] => master()
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("container=Dict", err.msg)
+    end
+
     @testset "[dml] subproblem constraint on a foreign variable is rejected" begin
         model = _build_gap_jump_model()
         # knapsack[1] is declared on subproblem 1 but also uses x[2, 1].

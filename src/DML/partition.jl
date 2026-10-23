@@ -29,7 +29,8 @@ end
 
 # Every variable and constraint has to be reachable by name: the rules address
 # objects by name, so an anonymous one would silently stay out of the
-# decomposition.
+# decomposition. Array-like containers (dense, `DenseAxisArray`,
+# `SparseAxisArray`) are fine; `container=Dict` is not.
 function _check_all_objects_named(model)
     named_vars = Set{JuMP.VariableRef}()
     named_constrs = Set{JuMP.ConstraintRef}()
@@ -49,15 +50,14 @@ function _check_all_objects_named(model)
     for var in JuMP.all_variables(model)
         var in named_vars || throw(ArgumentError(
             "variable `$var` has no name the rules can address: declare it with a " *
-            "name, e.g. `@variable(model, y[1:3])`, in an array container " *
-            "(sparse containers are not supported)"
+            "name, e.g. `@variable(model, y[1:3])`, and not with `container=Dict`"
         ))
     end
     for constr in JuMP.all_constraints(model; include_variable_in_set_constraints=false)
         constr in named_constrs || throw(ArgumentError(
             "constraint `$constr` has no name the rules can address: declare it " *
-            "with a name, e.g. `@constraint(model, c[i in I], ...)`, in an array " *
-            "container (sparse containers are not supported)"
+            "with a name, e.g. `@constraint(model, c[i in I], ...)`, and not with " *
+            "`container=Dict`"
         ))
     end
     return nothing
