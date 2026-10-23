@@ -327,26 +327,34 @@ function _random_gap_instance(rng)
     )
 end
 
-function _gap_model_for_decomposition(inst, penalty)
+# `Ks` and `Ts` are the index sets the model is declared over, and `container` the JuMP
+# container its objects are stored in; both must make no difference to the decomposition.
+function _gap_model_for_decomposition(inst, penalty, Ks, Ts, container)
     model = Model(HiGHS.Optimizer)
     set_silent(model)
-    K, T = 1:inst.K, 1:inst.T
-    @variable(model, x[k in K, t in T], Bin)
-    @variable(model, u[t in T], Bin)
-    @constraint(model, assign[t in T], sum(x[k, t] for k in K) + (penalty ? u[t] : 0) == 1)
-    penalty || @constraint(model, no_penalty[t in T], u[t] == 0)
+    kpos = Dict(k => i for (i, k) in enumerate(Ks))
+    tpos = Dict(t => i for (i, t) in enumerate(Ts))
+    cost(k, t) = inst.cost[kpos[k], tpos[t]]
+    weight(k, t) = inst.weight[kpos[k], tpos[t]]
+    @variable(model, x[k in Ks, t in Ts], Bin, container = container)
+    @variable(model, u[t in Ts], Bin, container = container)
     @constraint(
-        model, knapsack[k in K], sum(inst.weight[k, t] * x[k, t] for t in T) <= inst.capacity[k]
+        model, assign[t in Ts], sum(x[k, t] for k in Ks) + (penalty ? u[t] : 0) == 1,
+        container = container
+    )
+    penalty || @constraint(model, no_penalty[t in Ts], u[t] == 0, container = container)
+    @constraint(
+        model, knapsack[k in Ks], sum(weight(k, t) * x[k, t] for t in Ts) <= inst.capacity[kpos[k]],
+        container = container
     )
     @objective(
-        model, Min,
-        sum(inst.cost[k, t] * x[k, t] for k in K, t in T) + sum(30 * u[t] for t in T)
+        model, Min, sum(cost(k, t) * x[k, t] for k in Ks, t in Ts) + sum(30 * u[t] for t in Ts)
     )
     return model
 end
 
-function _enumerated_master_optimum(inst, penalty, user_overriden)
-    model = _gap_model_for_decomposition(inst, penalty)
+function _enumerated_master_optimum(inst, penalty, user_overriden, Ks, Ts, container)
+    model = _gap_model_for_decomposition(inst, penalty, Ks, Ts, container)
     # Option values are evaluated inside Vertigo.DML, so they cannot name local variables.
     decomp, sp_map = if user_overriden
         @dantzig_wolfe model begin
@@ -365,16 +373,17 @@ function _enumerated_master_optimum(inst, penalty, user_overriden)
             knapsack[k] => subproblem(k)
         end
     end
+    @test Set(keys(sp_map)) == Set(Ks)   # subproblems are named by the declared indices
     master = master_model(decomp)
     x = model[:x]
-    for k in 1:inst.K
+    for (ki, k) in enumerate(Ks)
         sp_id = sp_map[k]
-        sp_vars = [last(mapped_subproblem_var(decomp, x[k, t])) for t in 1:inst.T]
+        sp_vars = [last(mapped_subproblem_var(decomp, x[k, t])) for t in Ts]
         for mask in 0:(2^inst.T - 1)
-            tasks = [t for t in 1:inst.T if (mask >> (t - 1)) & 1 == 1]
-            sum(inst.weight[k, t] for t in tasks; init=0) <= inst.capacity[k] || continue
+            positions = [ti for ti in 1:inst.T if (mask >> (ti - 1)) & 1 == 1]
+            sum(inst.weight[ki, ti] for ti in positions; init=0) <= inst.capacity[ki] || continue
             sol = Vertigo.Reformulation._SpSolution(
-                sp_id, 0.0, [(sp_vars[t], 1.0) for t in tasks]
+                sp_id, 0.0, [(sp_vars[ti], 1.0) for ti in positions]
             )
             coeffs = Dict{Vertigo.TaggedCI,Float64}(
                 cid => c for (cid, c) in Vertigo.Reformulation.compute_column_coupling_coefficients(decomp, sp_id, sol)
@@ -393,23 +402,83 @@ function _enumerated_master_optimum(inst, penalty, user_overriden)
     return status == MOI.OPTIMAL ? MOI.get(master, MOI.ObjectiveValue()) : nothing, model
 end
 
+# The same instance declared over different index sets and containers.
+function _gap_index_cases(inst)
+    auto = JuMP.Containers.AutoContainerType
+    dense, sparse = JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray
+    names = ["m$k" for k in 1:inst.K]
+    ints = (collect(1:inst.K), collect(1:inst.T))
+    labelled = (names, collect(0:(inst.T - 1)))      # string machines, zero-based tasks
+    shifted = (collect(1:inst.K), collect(5:(inst.T + 4)))
+    return [
+        ("integers, auto", ints..., auto),
+        ("integers, Array", ints..., Array),
+        ("strings and zero-based, auto", labelled..., auto),
+        ("strings and zero-based, DenseAxisArray", labelled..., dense),
+        ("strings and zero-based, SparseAxisArray", labelled..., sparse),
+        ("strings and zero-based, Dict", labelled..., Dict),
+        ("offset tasks, Dict", shifted..., Dict),
+        ("integers, SparseAxisArray", ints..., sparse),
+    ]
+end
+
 function test_dml_decomposition_matches_flat_model()
     @testset "[dml] master over enumerated columns has the original optimum" begin
         rng = Random.MersenneTwister(20261022)
         feasible = 0
-        for _ in 1:10, penalty in (false, true), user_overriden in (false, true)
+        for _ in 1:3, penalty in (false, true), user_overriden in (false, true)
             inst = _random_gap_instance(rng)
-            master_obj, model = _enumerated_master_optimum(inst, penalty, user_overriden)
-            optimize!(model)
-            flat_obj = termination_status(model) == MOI.OPTIMAL ? objective_value(model) : nothing
-            @test isnothing(master_obj) == isnothing(flat_obj)
-            if !isnothing(flat_obj) && !isnothing(master_obj)
-                @test master_obj ≈ flat_obj atol = 1e-6
-                feasible += 1
+            for (label, Ks, Ts, container) in _gap_index_cases(inst)
+                @testset "$label" begin
+                    master_obj, model = _enumerated_master_optimum(
+                        inst, penalty, user_overriden, Ks, Ts, container
+                    )
+                    optimize!(model)
+                    flat_obj = termination_status(model) == MOI.OPTIMAL ? objective_value(model) : nothing
+                    @test isnothing(master_obj) == isnothing(flat_obj)
+                    if !isnothing(flat_obj) && !isnothing(master_obj)
+                        @test master_obj ≈ flat_obj atol = 1e-6
+                        feasible += 1
+                    end
+                end
             end
         end
-        # Not vacuous: the 20 instances with a penalty variable are always feasible.
-        @test feasible >= 20
+        # Not vacuous: the instances with a penalty variable are always feasible.
+        @test feasible >= 12 * 8 / 2
+    end
+end
+
+# The contract the macro and annotation functions rely on: a rule is called for every element
+# of every variable and constraint, with the indices as they were declared (it may be called
+# more than once per element, so rules must be pure).
+function test_dml_rules_see_declared_indices()
+    @testset "[dml] rules receive the declared indices of every container" begin
+        K, T = ["a", "b"], 3:5
+        declared = Set((k, t) for k in K for t in T)
+        auto = JuMP.Containers.AutoContainerType
+        for container in (
+            auto, JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict
+        )
+            model = Model()
+            @variable(model, x[k in K, t in T], container = container)
+            @constraint(model, c[k in K, t in T], x[k, t] <= 1, container = container)
+            @variable(model, s)                       # scalar
+            @constraint(model, scalar_c, s <= 1)
+            @objective(model, Min, sum(x[k, t] for k in K, t in T) + s)
+
+            seen = Dict{Symbol,Vector{Any}}()
+            record(name, idx...) = push!(get!(Vector{Any}, seen, name), idx)
+            ann(::Val{:x}, k, t) = (record(:x, k, t); dantzig_wolfe_subproblem(k))
+            ann(::Val{:c}, k, t) = (record(:c, k, t); dantzig_wolfe_subproblem(k))
+            ann(::Val{:s}) = (record(:s); dantzig_wolfe_master())
+            ann(::Val{:scalar_c}) = (record(:scalar_c); dantzig_wolfe_master())
+            dantzig_wolfe_decomposition(model, ann)
+
+            for name in (:x, :c)
+                @test Set(Tuple.(seen[name])) == declared
+            end
+            @test unique(seen[:s]) == [()] && unique(seen[:scalar_c]) == [()]
+        end
     end
 end
 
@@ -574,4 +643,5 @@ function test_dml()
     test_dml_large_subproblem_objective()
     test_dml_decomposition_matches_flat_model()
     test_dml_rule_errors()
+    test_dml_rules_see_declared_indices()
 end
