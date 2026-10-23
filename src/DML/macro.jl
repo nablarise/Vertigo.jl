@@ -108,6 +108,18 @@ function parse_block(block::Expr)
     isempty(patterns) && error(
         "No patterns specified in @dantzig_wolfe block"
     )
+    # Patterns only hold index names, so two rules on the same name and
+    # number of indices match the same elements.
+    seen = Set{Tuple{Symbol,Int}}()
+    for p in patterns
+        key = (p.name, length(p.indices))
+        key in seen && error(
+            "`$(p.name)` with $(length(p.indices)) index(es) is matched by more " *
+            "than one rule in @dantzig_wolfe; each variable or constraint " *
+            "needs exactly one"
+        )
+        push!(seen, key)
+    end
     return patterns
 end
 

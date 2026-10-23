@@ -74,6 +74,7 @@ function dantzig_wolfe_decomposition(
     model::JuMP.Model, dw_annotation;
     optimizer=nothing
 )
+    _check_all_objects_named(model)
     master_vars = _master_variables(model, dw_annotation)
     sp_vars_partition = _partition_subproblem_variables(
         model, dw_annotation
@@ -81,6 +82,9 @@ function dantzig_wolfe_decomposition(
     master_constrs = _master_constraints(model, dw_annotation)
     sp_constrs_partition = _partition_subproblem_constraints(
         model, dw_annotation
+    )
+    _check_no_foreign_variables(
+        model, master_vars, sp_vars_partition, sp_constrs_partition
     )
 
     # Create master JuMP model

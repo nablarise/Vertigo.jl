@@ -413,6 +413,126 @@ function test_dml_decomposition_matches_flat_model()
     end
 end
 
+function test_dml_rule_errors()
+    @testset "[dml] missing rule names the object" begin
+        model = _build_gap_jump_model()
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("knapsack[1]", err.msg) || occursin("knapsack[2]", err.msg)
+        @test occursin("constraint", err.msg)
+
+        model = _build_gap_jump_model()
+        err = try
+            @dantzig_wolfe model begin
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("variable `x[", err.msg)
+    end
+
+    @testset "[dml] two rules on one name are rejected" begin
+        err = try
+            Core.eval(@__MODULE__, quote
+                @dantzig_wolfe _build_gap_jump_model() begin
+                    x[k, _] => subproblem(k)
+                    x[_, t] => subproblem(t)
+                    assign[_] => master()
+                    knapsack[k] => subproblem(k)
+                end
+            end)
+            nothing
+        catch e
+            e
+        end
+        @test err !== nothing
+        @test occursin("more than one rule", sprint(showerror, err))
+    end
+
+    @testset "[dml] unnamed variables and constraints are rejected" begin
+        model = _build_gap_jump_model()
+        @variable(model, [1:2], lower_bound = 0)
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("variable", err.msg) && occursin("no name", err.msg)
+
+        model = _build_gap_jump_model()
+        @constraint(model, sum(model[:x][1, t] for t in 1:7) <= 3)
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("constraint", err.msg) && occursin("no name", err.msg)
+    end
+
+    @testset "[dml] subproblem constraint on a foreign variable is rejected" begin
+        model = _build_gap_jump_model()
+        # knapsack[1] is declared on subproblem 1 but also uses x[2, 1].
+        @constraint(model, mixed, model[:x][1, 1] + model[:x][2, 1] <= 1)
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+                mixed => subproblem(1)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("`mixed`", err.msg)
+        @test occursin("subproblem 2", err.msg)
+
+        # A master variable in a subproblem constraint is just as foreign.
+        model = _build_gap_jump_model()
+        @variable(model, z >= 0)
+        @constraint(model, withz, model[:x][1, 1] + z <= 1)
+        err = try
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                z => master()
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+                withz => subproblem(1)
+            end
+            nothing
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("the master", err.msg)
+    end
+end
+
 function test_dml()
     test_dml_user_overriden_subproblem()
     test_dml_macro_basic_gap()
@@ -423,4 +543,5 @@ function test_dml()
     test_dml_pure_master_bounds_and_types()
     test_dml_large_subproblem_objective()
     test_dml_decomposition_matches_flat_model()
+    test_dml_rule_errors()
 end
