@@ -35,8 +35,3 @@ function _named_objects(model, ::Type{R}) where {R}
         idx in (obj isa R ? ((),) : _index_tuples(obj))
     )
 end
-
-function JuMP.Containers.default_container(::Vector{Tuple{Int64,Int64}})
-    return JuMP.Containers.SparseAxisArray
-end
-JuMP.Containers.default_container(::Vector{<:Tuple}) = JuMP.Containers.SparseAxisArray

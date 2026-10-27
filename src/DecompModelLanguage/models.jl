@@ -149,6 +149,7 @@ function _register_variable_object!(
             var_mapping[original_var] = JuMP.add_variable(reform_model, var, jump_var_name)
         end,
         indexes,
+        JuMP.Containers.SparseAxisArray,
     )
     return reform_model[var_name] = vars
 end
@@ -226,6 +227,7 @@ function _register_constraint_object!(
             )
         end,
         indexes,
+        JuMP.Containers.SparseAxisArray,
     )
     return reform_model[constr_name] = constrs
 end
