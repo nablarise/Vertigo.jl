@@ -11,8 +11,12 @@ function test_fingerprint_same_entries()
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
 
-        sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 2.0)])
-        sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 99.0, [(z1, 1.0), (z2, 2.0)])
+        sol_a = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 2.0)]
+        )
+        sol_b = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 99.0, [(z1, 1.0), (z2, 2.0)]
+        )
 
         @test sol_a.fingerprint == sol_b.fingerprint
     end
@@ -35,7 +39,9 @@ function test_fingerprint_zero_entries_filtered()
         z2 = MOI.VariableIndex(2)
 
         sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0)])
-        sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 0.0)])
+        sol_b = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 0.0)]
+        )
 
         @test sol_a.fingerprint == sol_b.fingerprint
         @test length(sol_a.entries) == 1
@@ -48,8 +54,12 @@ function test_fingerprint_order_independent()
         z1 = MOI.VariableIndex(1)
         z2 = MOI.VariableIndex(2)
 
-        sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 2.0)])
-        sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(z2, 2.0), (z1, 1.0)])
+        sol_a = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(z1, 1.0), (z2, 2.0)]
+        )
+        sol_b = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(z2, 2.0), (z1, 1.0)]
+        )
 
         @test sol_a.fingerprint == sol_b.fingerprint
     end
@@ -156,7 +166,9 @@ function test_column_pool_has_column_duplicate()
         @test has_column(pool, PricingSubproblemId(1), sol)
 
         # Same entries, rebuilt — same fingerprint.
-        sol_dup = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 99.0, [(z1, 1.0)])
+        sol_dup = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 99.0, [(z1, 1.0)]
+        )
         @test has_column(pool, PricingSubproblemId(1), sol_dup)
     end
 end
@@ -199,7 +211,9 @@ function test_column_pool_empty()
 
         @test isempty(collect(columns(pool)))
 
-        sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 0.0, [(MOI.VariableIndex(1), 1.0)])
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 0.0, [(MOI.VariableIndex(1), 1.0)]
+        )
         @test !has_column(pool, PricingSubproblemId(1), sol)
     end
 end
@@ -220,5 +234,5 @@ function test_column_pool()
     test_column_pool_has_column_duplicate()
     test_column_pool_has_column_different_values()
     test_column_pool_has_column_different_subproblem()
-    test_column_pool_empty()
+    return test_column_pool_empty()
 end

@@ -35,11 +35,12 @@ function MockSearchSpace(; max_depth=3, feasible_values=Set{Int}())
     return MockSearchSpace(
         max_depth,
         NodeIdCounter(),
-        Int[], Int[],
+        Int[],
+        Int[],
         Tuple{Int,Int}[],
         Ref(1),
         feasible_values,
-        Ref(typemax(Int))
+        Ref(typemax(Int)),
     )
 end
 
@@ -50,37 +51,51 @@ end
 TreeSearch.stop(::MockSearchSpace, _) = false
 
 function TreeSearch.output(space::MockSearchSpace)
-    return (visited_ids=space.visited_ids,
-            visited_values=space.visited_values,
-            transitions=space.transitions,
-            best=space.best_solution[])
+    return (
+        visited_ids=space.visited_ids,
+        visited_values=space.visited_values,
+        transitions=space.transitions,
+        best=space.best_solution[],
+    )
 end
 
-function TreeSearch.transition!(space::MockSearchSpace, current::SearchNode, next::SearchNode)
+function TreeSearch.transition!(
+    space::MockSearchSpace, current::SearchNode, next::SearchNode
+)
     push!(space.transitions, (current.id, next.id))
-    transition_to!(current, next,
+    return transition_to!(
+        current,
+        next,
         diff -> (space.current_model_value[] += diff.delta),
-        diff -> (space.current_model_value[] += diff.delta)
+        diff -> (space.current_model_value[] += diff.delta),
     )
 end
 
 function TreeSearch.branch!(space::MockSearchSpace, node::SearchNode)
     if node.depth >= space.max_depth
-        return SearchNode{MockDiff, MockUserData}[]
+        return SearchNode{MockDiff,MockUserData}[]
     end
 
     parent_val = node.user_data.value
     left_val = parent_val * 2
     left_delta = left_val - parent_val
-    left = child_node(space.counter, node,
-        MockDiff(left_delta), MockDiff(-left_delta),
-        user_data=MockUserData(left_val))
+    left = child_node(
+        space.counter,
+        node,
+        MockDiff(left_delta),
+        MockDiff(-left_delta);
+        user_data=MockUserData(left_val),
+    )
 
     right_val = parent_val * 2 + 1
     right_delta = right_val - parent_val
-    right = child_node(space.counter, node,
-        MockDiff(right_delta), MockDiff(-right_delta),
-        user_data=MockUserData(right_val))
+    right = child_node(
+        space.counter,
+        node,
+        MockDiff(right_delta),
+        MockDiff(-right_delta);
+        user_data=MockUserData(right_val),
+    )
 
     return [left, right]
 end
@@ -111,7 +126,9 @@ struct SelectiveCutoffEvaluator <: TreeSearch.AbstractNodeEvaluator
     cutoff_values::Set{Int}
 end
 
-function TreeSearch.evaluate!(eval::SelectiveCutoffEvaluator, space::MockSearchSpace, node::SearchNode)
+function TreeSearch.evaluate!(
+    eval::SelectiveCutoffEvaluator, space::MockSearchSpace, node::SearchNode
+)
     push!(space.visited_ids, node.id)
     push!(space.visited_values, node.user_data.value)
 
@@ -138,7 +155,9 @@ TreeSearch.branch!(s::BoundedSearchSpace, node) = TreeSearch.branch!(s.inner, no
 
 struct BoundedEvaluator <: TreeSearch.AbstractNodeEvaluator end
 
-function TreeSearch.evaluate!(::BoundedEvaluator, space::BoundedSearchSpace, node::SearchNode)
+function TreeSearch.evaluate!(
+    ::BoundedEvaluator, space::BoundedSearchSpace, node::SearchNode
+)
     space.eval_count += 1
     push!(space.inner.visited_ids, node.id)
     push!(space.inner.visited_values, node.user_data.value)
@@ -231,5 +250,5 @@ function test_treesearch_search_loop()
     test_treesearch_loop_cutoff_pruning()
     test_treesearch_loop_feasible_detection()
     test_treesearch_loop_stop_criterion()
-    test_treesearch_loop_dfs_transitions()
+    return test_treesearch_loop_dfs_transitions()
 end

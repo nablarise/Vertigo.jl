@@ -23,25 +23,23 @@ all fractional variables as `BranchingCandidate`s, sorted by
 fractionality descending (most fractional first).
 """
 function find_fractional_variables(
-    ws,
-    primal_values::Dict{MOI.VariableIndex,Float64};
-    tol::Float64 = 1e-6
+    ws, primal_values::Dict{MOI.VariableIndex,Float64}; tol::Float64=1e-6
 )
     decomp = bp_decomp(ws)
     pool = bp_pool(ws)
-    x_values = project_to_original(
-        decomp, pool, v -> get(primal_values, v, 0.0)
-    )
+    x_values = project_to_original(decomp, pool, v -> get(primal_values, v, 0.0))
 
     candidates = BranchingCandidate[]
     for (orig_var, x_val) in x_values
         frac_part = x_val - floor(x_val)
-        (frac_part < tol || frac_part > 1.0 - tol) && continue
+        if (frac_part < tol || frac_part > 1.0 - tol)
+            continue
+        end
         fractionality = min(frac_part, 1.0 - frac_part)
-        push!(candidates, BranchingCandidate(
-            orig_var, x_val, floor(x_val), ceil(x_val),
-            fractionality
-        ))
+        push!(
+            candidates,
+            BranchingCandidate(orig_var, x_val, floor(x_val), ceil(x_val), fractionality),
+        )
     end
     sort!(candidates; by=c -> c.fractionality, rev=true)
     return candidates

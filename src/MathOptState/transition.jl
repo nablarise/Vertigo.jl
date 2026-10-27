@@ -47,12 +47,12 @@ fwd!, bwd! = MathOptState.make_transition_callbacks(backend, helpers)
 ```
 """
 function make_transition_callbacks(backend, helpers::Tuple)
-    apply_fwd! = function(diffs::Tuple)
+    apply_fwd! = function (diffs::Tuple)
         for (diff, h) in zip(diffs, helpers)
             apply_change!(backend, diff, h)
         end
     end
-    apply_bwd! = function(diffs::Tuple)
+    apply_bwd! = function (diffs::Tuple)
         for (diff, h) in zip(diffs, helpers)
             apply_change!(backend, diff, h)
         end

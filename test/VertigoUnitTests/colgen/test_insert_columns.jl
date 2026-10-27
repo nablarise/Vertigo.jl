@@ -6,7 +6,9 @@
 function _constr_coeff(model, ci, var::MOI.VariableIndex)
     f = MOI.get(model, MOI.ConstraintFunction(), ci)
     for term in f.terms
-        term.variable == var && return term.coefficient
+        if term.variable == var
+            return term.coefficient
+        end
     end
     return 0.0
 end
@@ -34,58 +36,45 @@ No cuts.
 """
 function build_insert_columns_context()
     model = MOI.Utilities.CachingOptimizer(
-        MOI.Utilities.UniversalFallback(
-            MOI.Utilities.Model{Float64}()
-        ),
-        HiGHS.Optimizer()
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()), HiGHS.Optimizer()
     )
     MOI.set(model, MOI.Silent(), true)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     MOI.set(
         model,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
     )
 
     # Coupling constraints
     c1 = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.EqualTo(1.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.EqualTo(1.0),
     )
     c2 = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.EqualTo(1.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.EqualTo(1.0),
     )
 
     # Convexity constraints
     conv_ub = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.LessThan(1.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.LessThan(1.0),
     )
     conv_lb = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.GreaterThan(0.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.GreaterThan(0.0),
     )
 
     # Branching constraint on original variable x₁
     br = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.LessThan(1.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.LessThan(1.0),
     )
 
     # Decomposition
@@ -94,7 +83,7 @@ function build_insert_columns_context()
     # X = Tuple{Int,Int} for original variable mappings
     OrigVar = Tuple{Int,Int}
 
-    builder = DWReformulationBuilder{OrigVar}(minimize=true)
+    builder = DWReformulationBuilder{OrigVar}(; minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 1.0)
 
@@ -118,28 +107,32 @@ function build_insert_columns_context()
 
     pool = ColumnPool()
 
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_ub))
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(1) => TaggedCI(conv_lb))
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(1) => TaggedCI(conv_ub)
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(1) => TaggedCI(conv_lb)
+    )
 
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub_map, conv_lb_map)
 
     config = ColGenConfig()
-    ws = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 
     # Active branching constraint on x₁ = (1, 1)
-    push!(ws.branching_constraints,
-        Vertigo.ColGen.ActiveBranchingConstraint(TaggedCI(br), (1, 1))
+    push!(
+        ws.branching_constraints,
+        Vertigo.ColGen.ActiveBranchingConstraint(TaggedCI(br), (1, 1)),
     )
 
-    return ws, (
-        c1=c1, c2=c2, conv_ub=conv_ub, conv_lb=conv_lb,
-        br=br, z1=z1, z2=z2
-    )
+    return ws, (c1=c1, c2=c2, conv_ub=conv_ub, conv_lb=conv_lb, br=br, z1=z1, z2=z2)
 end
 
 # ──────────────────────────────────────────────────────────────────
@@ -151,7 +144,9 @@ function test_insert_columns_single_column()
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
-        sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             PricingSubproblemId(1), sol, true
         )
@@ -178,8 +173,12 @@ function test_insert_columns_two_columns()
         ws, refs = build_insert_columns_context()
         model = master_model(ws.decomp)
 
-        sol_a = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
-        sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)])
+        sol_a = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
+        sol_b = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)]
+        )
 
         pricing_a = Vertigo.ColGen.PricingPrimalSolution(
             PricingSubproblemId(1), sol_a, true
@@ -187,9 +186,7 @@ function test_insert_columns_two_columns()
         pricing_b = Vertigo.ColGen.PricingPrimalSolution(
             PricingSubproblemId(1), sol_b, true
         )
-        columns = Vertigo.ColGen.GeneratedColumns(
-            [pricing_a, pricing_b]
-        )
+        columns = Vertigo.ColGen.GeneratedColumns([pricing_a, pricing_b])
 
         n = Vertigo.ColGen.insert_columns!(ws, Phase0(), columns)
 
@@ -224,20 +221,20 @@ function test_insert_columns_duplicate_skipped()
     @testset "[insert_columns] duplicate column skipped" begin
         ws, refs = build_insert_columns_context()
 
-        sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             PricingSubproblemId(1), sol, true
         )
 
         n1 = Vertigo.ColGen.insert_columns!(
-            ws, Phase0(),
-            Vertigo.ColGen.GeneratedColumns([pricing_sol])
+            ws, Phase0(), Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n1 == 1
 
         n2 = Vertigo.ColGen.insert_columns!(
-            ws, Phase0(),
-            Vertigo.ColGen.GeneratedColumns([pricing_sol])
+            ws, Phase0(), Vertigo.ColGen.GeneratedColumns([pricing_sol])
         )
         @test n2 == 0
         @test length(ws.pool.by_column_var) == 1
@@ -279,7 +276,9 @@ function test_insert_columns_pool_records_original_cost()
     @testset "[insert_columns] pool records original cost" begin
         ws, refs = build_insert_columns_context()
 
-        sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
+        sol = Vertigo.Reformulation._SpSolution(
+            PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
+        )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
             PricingSubproblemId(1), sol, true
         )
@@ -388,5 +387,5 @@ function test_insert_columns()
     test_insert_columns_duplicate_skipped()
     test_insert_columns_mixed_sp_variables()
     test_insert_columns_pool_records_original_cost()
-    test_insert_columns_empty_set()
+    return test_insert_columns_empty_set()
 end

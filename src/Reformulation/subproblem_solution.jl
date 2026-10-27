@@ -17,8 +17,10 @@ struct _SpSolution <: AbstractSubproblemSolution
     fingerprint::UInt64
 end
 
-function _SpSolution(sp_id::PricingSubproblemId, obj_value::Float64, entries::Vector{Tuple{_VI,Float64}})
-    sorted = sort(entries; by = e -> e[1].value)
+function _SpSolution(
+    sp_id::PricingSubproblemId, obj_value::Float64, entries::Vector{Tuple{_VI,Float64}}
+)
+    sorted = sort(entries; by=e -> e[1].value)
     filter!(e -> !iszero(e[2]), sorted)
     fp = hash(map(e -> (e[1].value, round(e[2]; digits=10)), sorted))
     return _SpSolution(sp_id, obj_value, sorted, fp)

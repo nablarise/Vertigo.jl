@@ -24,12 +24,11 @@ struct ColGenConfig
     max_misprice_iterations::Int
     silent::Bool
     function ColGenConfig(;
-        smoothing_alpha::Float64 = 0.0,
-        max_cg_iterations::Int = 1000,
-        max_misprice_iterations::Int = 10,
-        silent::Bool = false
+        smoothing_alpha::Float64=0.0,
+        max_cg_iterations::Int=1000,
+        max_misprice_iterations::Int=10,
+        silent::Bool=false,
     )
-        new(smoothing_alpha, max_cg_iterations,
-            max_misprice_iterations, silent)
+        return new(smoothing_alpha, max_cg_iterations, max_misprice_iterations, silent)
     end
 end

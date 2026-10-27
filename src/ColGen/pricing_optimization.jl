@@ -134,7 +134,9 @@ get_pricing_subprob_optimizer(::ExactStage, ::PricingSubproblem) = SubproblemMoi
 # ── Convexity dual helper ─────────────────────────────────────────────────────
 
 function _get_convexity_dual(mast_dual_sol::MasterDualSolution, convexity_dict, sp_id)
-    haskey(convexity_dict, sp_id) || return 0.0
+    if !(haskey(convexity_dict, sp_id))
+        return 0.0
+    end
     return _dual_value(mast_dual_sol, convexity_dict[sp_id])
 end
 
@@ -146,7 +148,7 @@ function optimize_pricing_problem!(
     pricing_sp::PricingSubproblem,
     ::SubproblemMoiOptimizer,
     mast_dual_sol::MasterDualSolution,
-    stab_changes_mast_dual_sol
+    stab_changes_mast_dual_sol,
 )
     sp_model = moi_pricing_sp(pricing_sp)
     sp_sense = is_minimization(ws) ? MOI.MIN_SENSE : MOI.MAX_SENSE

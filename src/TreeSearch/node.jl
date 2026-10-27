@@ -39,7 +39,7 @@ A node in the search tree carrying local diffs for efficient state transitions.
 """
 mutable struct SearchNode{D,U}
     id::Int
-    parent::Union{Nothing, SearchNode{D,U}}
+    parent::Union{Nothing,SearchNode{D,U}}
     local_forward_diff::D
     local_backward_diff::D
     depth::Int
@@ -65,8 +65,8 @@ function root_node(
     forward_diff::D,
     backward_diff::D,
     user_data::U;
-    dual_bound::Float64 = -Inf
-) where {D, U}
+    dual_bound::Float64=(-Inf),
+) where {D,U}
     return SearchNode{D,U}(
         next_id!(id_counter),
         nothing,            # no parent
@@ -75,7 +75,7 @@ function root_node(
         0,                  # depth = 0
         dual_bound,
         true,               # root is always active
-        user_data
+        user_data,
     )
 end
 
@@ -98,8 +98,8 @@ function child_node(
     parent::SearchNode{D,U},
     local_forward_diff::D,
     local_backward_diff::D;
-    dual_bound::Float64 = parent.dual_bound,
-    user_data::U = parent.user_data
+    dual_bound::Float64=parent.dual_bound,
+    user_data::U=parent.user_data,
 ) where {D,U}
     return SearchNode{D,U}(
         next_id!(id_counter),
@@ -109,7 +109,7 @@ function child_node(
         parent.depth + 1,
         dual_bound,
         false,              # not active until transitioned to
-        user_data
+        user_data,
     )
 end
 
@@ -133,7 +133,9 @@ be on the path from root to `current`, hence is a common ancestor.
 """
 function find_common_ancestor(current::SearchNode, target::SearchNode)
     # Special case: same node
-    current === target && return current
+    if current === target
+        return current
+    end
 
     node = target
     while node !== nothing && !node.is_active
@@ -154,7 +156,9 @@ end
 Collect the path from `ancestor` (exclusive) down to `target` (inclusive).
 Returns nodes in top-down order (ancestor's child first, target last).
 """
-function collect_path_from_ancestor(ancestor::SearchNode{D,U}, target::SearchNode{D,U}) where {D,U}
+function collect_path_from_ancestor(
+    ancestor::SearchNode{D,U}, target::SearchNode{D,U}
+) where {D,U}
     path = SearchNode{D,U}[]
     node = target
     while node !== ancestor
@@ -188,13 +192,12 @@ The `is_active` flags are updated so that the active path always reflects the
 path from root to the current node.
 """
 function transition_to!(
-    current::SearchNode,
-    target::SearchNode,
-    apply_forward!::F,
-    apply_backward!::B
-) where {F, B}
+    current::SearchNode, target::SearchNode, apply_forward!::F, apply_backward!::B
+) where {F,B}
     # Same node: nothing to do
-    current === target && return target
+    if current === target
+        return target
+    end
 
     # Step 1: Find common ancestor
     ancestor = find_common_ancestor(current, target)

@@ -2,8 +2,11 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.Branching: find_fractional_variables,
-    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
+using Vertigo.Branching:
+    find_fractional_variables,
+    BranchingCandidate,
+    MostFractionalRule,
+    LeastFractionalRule,
     select_candidates
 
 # ────────────────────────────────────────────────────────────────
@@ -25,9 +28,7 @@ function _build_branching_test_context()
     z2 = MOI.VariableIndex(2)
     z3 = MOI.VariableIndex(3)
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(
-        minimize=true
-    )
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
     add_subproblem!(builder, sp1, 0.0, 0.0, 1.0)
     add_sp_variable!(builder, sp1, z1, 3.0)
     add_sp_variable!(builder, sp1, z2, 4.0)
@@ -41,21 +42,19 @@ function _build_branching_test_context()
     col_var_a = MOI.VariableIndex(101)
     col_var_b = MOI.VariableIndex(102)
 
-    sol_a = Vertigo.Reformulation._SpSolution(
-        sp1, 3.0, [(z1, 1.0), (z2, 1.0)]
-    )
-    sol_b = Vertigo.Reformulation._SpSolution(
-        sp1, 5.0, [(z2, 1.0), (z3, 1.0)]
-    )
+    sol_a = Vertigo.Reformulation._SpSolution(sp1, 3.0, [(z1, 1.0), (z2, 1.0)])
+    sol_b = Vertigo.Reformulation._SpSolution(sp1, 5.0, [(z2, 1.0), (z3, 1.0)])
     record_column!(pool, col_var_a, sp1, sol_a, 3.0)
     record_column!(pool, col_var_b, sp1, sol_b, 5.0)
 
     config = ColGenConfig()
-    ws = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 
     return ws, col_var_a, col_var_b
@@ -69,9 +68,7 @@ function test_find_fractional_all_integral()
     @testset "[find_fractional_variables] empty primal → no candidates" begin
         ws, _, _ = _build_branching_test_context()
         primal = Dict{MOI.VariableIndex,Float64}()
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
         @test isempty(candidates)
     end
 end
@@ -81,10 +78,7 @@ function test_find_fractional_with_known_values()
         ws, col_var_a, col_var_b = _build_branching_test_context()
 
         # λ_a = 0.3, λ_b = 0.6
-        primal = Dict{MOI.VariableIndex,Float64}(
-            col_var_a => 0.3,
-            col_var_b => 0.6,
-        )
+        primal = Dict{MOI.VariableIndex,Float64}(col_var_a => 0.3, col_var_b => 0.6)
 
         # Hand-computed projection x[orig] = Σ z_val * λ:
         #   x(1,1) = 1.0 * 0.3           = 0.3  → frac = 0.3
@@ -94,9 +88,7 @@ function test_find_fractional_with_known_values()
         # Sorted desc by fractionality:
         #   (1,3) frac=0.4, (1,1) frac=0.3, (1,2) frac=0.1
 
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
 
         @test length(candidates) == 3
 
@@ -122,13 +114,9 @@ function test_find_fractional_integral_projection()
 
         # Only column A active at λ=1.0:
         #   x(1,1) = 1.0, x(1,2) = 1.0 — both integral
-        primal = Dict{MOI.VariableIndex,Float64}(
-            col_var_a => 1.0,
-        )
+        primal = Dict{MOI.VariableIndex,Float64}(col_var_a => 1.0)
 
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
         @test isempty(candidates)
     end
 end
@@ -143,9 +131,7 @@ function test_select_candidates_most_fractional()
         c2 = BranchingCandidate(2, 2.5, 2.0, 3.0, 0.5)
         c3 = BranchingCandidate(3, 3.1, 3.0, 4.0, 0.1)
         candidates = [c2, c1, c3]
-        result = select_candidates(
-            MostFractionalRule(), candidates, 2
-        )
+        result = select_candidates(MostFractionalRule(), candidates, 2)
         @test length(result) == 2
         @test result[1].fractionality ≈ 0.5
         @test result[2].fractionality ≈ 0.3
@@ -158,9 +144,7 @@ function test_select_candidates_least_fractional()
         c2 = BranchingCandidate(2, 2.5, 2.0, 3.0, 0.5)
         c3 = BranchingCandidate(3, 3.1, 3.0, 4.0, 0.1)
         candidates = [c2, c1, c3]
-        result = select_candidates(
-            LeastFractionalRule(), candidates, 2
-        )
+        result = select_candidates(LeastFractionalRule(), candidates, 2)
         @test length(result) == 2
         @test result[1].fractionality ≈ 0.1
         @test result[2].fractionality ≈ 0.3
@@ -170,10 +154,8 @@ end
 function test_select_candidates_truncation()
     @testset "[branching_rules] max_candidates truncation" begin
         cs = [
-            BranchingCandidate(
-                i, Float64(i) + 0.5, Float64(i),
-                Float64(i) + 1.0, 0.5
-            ) for i in 1:10
+            BranchingCandidate(i, Float64(i) + 0.5, Float64(i), Float64(i) + 1.0, 0.5) for
+            i in 1:10
         ]
         result = select_candidates(MostFractionalRule(), cs, 3)
         @test length(result) == 3
@@ -190,5 +172,5 @@ function test_branching_strategy()
     test_find_fractional_integral_projection()
     test_select_candidates_most_fractional()
     test_select_candidates_least_fractional()
-    test_select_candidates_truncation()
+    return test_select_candidates_truncation()
 end

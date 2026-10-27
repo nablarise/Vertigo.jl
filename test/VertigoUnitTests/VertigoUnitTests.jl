@@ -12,16 +12,30 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 using Vertigo
-using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
-    check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2,
-    get_column_sp_id, get_column_cost, get_column_solution
+using Vertigo.ColGen:
+    MasterPrimalSolution,
+    PrimalMoiSolution,
+    check_primal_ip_feasibility!,
+    update_inc_primal_sol!,
+    Phase0,
+    Phase1,
+    Phase2,
+    get_column_sp_id,
+    get_column_cost,
+    get_column_solution
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
 using Vertigo.Reformulation: get_primal_solution
-using Vertigo.Branching: find_fractional_variables,
-    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
-    select_candidates, MostFractionalBranching, select_branching_variable,
-    bp_master_model, most_fractional_original_variable
+using Vertigo.Branching:
+    find_fractional_variables,
+    BranchingCandidate,
+    MostFractionalRule,
+    LeastFractionalRule,
+    select_candidates,
+    MostFractionalBranching,
+    select_branching_variable,
+    bp_master_model,
+    most_fractional_original_variable
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -90,7 +104,7 @@ function build_gap_decomp(inst::GAPInstance)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────────────
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -101,7 +115,9 @@ function build_gap_decomp(inst::GAPInstance)
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
             add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
             add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
@@ -113,8 +129,12 @@ function build_gap_decomp(inst::GAPInstance)
     decomp = build(builder)
 
     # ── Convexity constraint indices ──────────────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
@@ -129,12 +149,14 @@ unit tests; thin wrapper around [`build_gap_decomp`](@ref).
 """
 function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     decomp = build_gap_decomp(inst)
-    config = ColGenConfig(max_cg_iterations=max_cg_iterations)
-    return ColGenWorkspace(decomp, ColumnPool(),
+    config = ColGenConfig(; max_cg_iterations=max_cg_iterations)
+    return ColGenWorkspace(
+        decomp,
+        ColumnPool(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 end
 

@@ -134,8 +134,12 @@ end
 
 function _add_test_pure_master_var!(ws, var_id::Int, cost::Float64, is_integer::Bool)
     pmv = Vertigo.ColGen.PureMasterVariableData(
-        MOI.VariableIndex(var_id), cost, 0.0, 1.0, is_integer,
-        Vertigo.Reformulation.CouplingEntry[]
+        MOI.VariableIndex(var_id),
+        cost,
+        0.0,
+        1.0,
+        is_integer,
+        Vertigo.Reformulation.CouplingEntry[],
     )
     push!(ws.decomp.pure_master_vars, pmv)
     return MOI.VariableIndex(var_id)
@@ -149,9 +153,7 @@ function test_ip_project_integral_with_integer_pure_master()
         mv = _add_test_column!(ws, 700, 1, 5.0)
         pmv_id = _add_test_pure_master_var!(ws, 701, 3.0, true)
 
-        var_values = Dict{MOI.VariableIndex,Float64}(
-            mv => 1.0, pmv_id => 2.0
-        )
+        var_values = Dict{MOI.VariableIndex,Float64}(mv => 1.0, pmv_id => 2.0)
         sol = _make_primal_sol(var_values)
         result, cut = Vertigo.ColGen._project_if_integral(sol, ws)
 
@@ -171,9 +173,7 @@ function test_ip_project_fractional_integer_pure_master()
         mv = _add_test_column!(ws, 710, 1, 5.0)
         pmv_id = _add_test_pure_master_var!(ws, 711, 3.0, true)
 
-        var_values = Dict{MOI.VariableIndex,Float64}(
-            mv => 1.0, pmv_id => 0.5
-        )
+        var_values = Dict{MOI.VariableIndex,Float64}(mv => 1.0, pmv_id => 0.5)
         sol = _make_primal_sol(var_values)
         result, cut = Vertigo.ColGen._project_if_integral(sol, ws)
 
@@ -190,9 +190,7 @@ function test_ip_project_with_continuous_pure_master()
         mv = _add_test_column!(ws, 720, 1, 5.0)
         pmv_id = _add_test_pure_master_var!(ws, 721, 4.0, false)
 
-        var_values = Dict{MOI.VariableIndex,Float64}(
-            mv => 1.0, pmv_id => 0.75
-        )
+        var_values = Dict{MOI.VariableIndex,Float64}(mv => 1.0, pmv_id => 0.75)
         sol = _make_primal_sol(var_values)
         result, cut = Vertigo.ColGen._project_if_integral(sol, ws)
 
@@ -217,8 +215,7 @@ function test_ip_project_mixed_columns_and_pure_master()
         pmv_cont = _add_test_pure_master_var!(ws, 733, 1.5, false)
 
         var_values = Dict{MOI.VariableIndex,Float64}(
-            mv1 => 1.0, mv2 => 2.0,
-            pmv_int => 1.0, pmv_cont => 0.4
+            mv1 => 1.0, mv2 => 2.0, pmv_int => 1.0, pmv_cont => 0.4
         )
         sol = _make_primal_sol(var_values)
         result, cut = Vertigo.ColGen._project_if_integral(sol, ws)
@@ -241,7 +238,9 @@ function test_ip_has_art_eq_active()
         inst = random_gap_instance(1, 1; seed=7)
         ws = build_gap_context(inst)
 
-        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(99))
+        fake_ci = TaggedCI(
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(99)
+        )
         s_pos = MOI.VariableIndex(200)
         s_neg = MOI.VariableIndex(201)
         ws.eq_art_vars[fake_ci] = (s_pos, s_neg)
@@ -263,7 +262,9 @@ function test_ip_has_art_leq_active()
         inst = random_gap_instance(1, 1; seed=8)
         ws = build_gap_context(inst)
 
-        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}(98))
+        fake_ci = TaggedCI(
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}(98)
+        )
         s = MOI.VariableIndex(202)
         ws.leq_art_vars[fake_ci] = s
 
@@ -283,7 +284,11 @@ function test_ip_has_art_geq_active()
         inst = random_gap_instance(1, 1; seed=9)
         ws = build_gap_context(inst)
 
-        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}(97))
+        fake_ci = TaggedCI(
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}(
+                97
+            ),
+        )
         s = MOI.VariableIndex(203)
         ws.geq_art_vars[fake_ci] = s
 
@@ -319,7 +324,9 @@ function test_ip_check_with_art_vars_active()
 
         s_pos = MOI.VariableIndex(300)
         s_neg = MOI.VariableIndex(301)
-        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(88))
+        fake_ci = TaggedCI(
+            MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(88)
+        )
         ws.eq_art_vars[fake_ci] = (s_pos, s_neg)
 
         var_values = Dict{MOI.VariableIndex,Float64}(s_pos => 1.0)
@@ -385,8 +392,16 @@ function test_ip_update_incumbent_better_min()
         ws = build_gap_context(inst)
         @test is_minimization(ws.decomp)
 
-        update_inc_primal_sol!(ws, nothing, Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[]))
-        update_inc_primal_sol!(ws, nothing, Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]))
+        update_inc_primal_sol!(
+            ws,
+            nothing,
+            Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[]),
+        )
+        update_inc_primal_sol!(
+            ws,
+            nothing,
+            Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]),
+        )
         @test ws.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -396,8 +411,16 @@ function test_ip_update_incumbent_worse_rejected_min()
         inst = random_gap_instance(1, 1; seed=16)
         ws = build_gap_context(inst)
 
-        update_inc_primal_sol!(ws, nothing, Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]))
-        update_inc_primal_sol!(ws, nothing, Vertigo.ColGen.MasterIpPrimalSol(60.0, Tuple{MOI.VariableIndex,Int}[]))
+        update_inc_primal_sol!(
+            ws,
+            nothing,
+            Vertigo.ColGen.MasterIpPrimalSol(40.0, Tuple{MOI.VariableIndex,Int}[]),
+        )
+        update_inc_primal_sol!(
+            ws,
+            nothing,
+            Vertigo.ColGen.MasterIpPrimalSol(60.0, Tuple{MOI.VariableIndex,Int}[]),
+        )
         @test ws.ip_incumbent.obj_value ≈ 40.0
     end
 end
@@ -410,7 +433,7 @@ function test_ip_is_strictly_better_max()
 
         # Test the helper directly with manual sense logic
         sol_good = Vertigo.ColGen.MasterIpPrimalSol(100.0, Tuple{MOI.VariableIndex,Int}[])
-        sol_bad  = Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[])
+        sol_bad = Vertigo.ColGen.MasterIpPrimalSol(50.0, Tuple{MOI.VariableIndex,Int}[])
 
         # For minimization: lower is better
         @test Vertigo.ColGen._is_strictly_better(ws, sol_bad, sol_good) == true
@@ -447,5 +470,5 @@ function test_ip_management()
     test_ip_update_incumbent_first_solution()
     test_ip_update_incumbent_better_min()
     test_ip_update_incumbent_worse_rejected_min()
-    test_ip_is_strictly_better_max()
+    return test_ip_is_strictly_better_max()
 end

@@ -30,17 +30,13 @@ Return the top `max_candidates` from `candidates` ordered by `rule`.
 Input `candidates` is assumed sorted by fractionality descending.
 """
 function select_candidates(
-    ::MostFractionalRule,
-    candidates::Vector{<:BranchingCandidate},
-    max_candidates::Int
+    ::MostFractionalRule, candidates::Vector{<:BranchingCandidate}, max_candidates::Int
 )
     return candidates[1:min(length(candidates), max_candidates)]
 end
 
 function select_candidates(
-    ::LeastFractionalRule,
-    candidates::Vector{<:BranchingCandidate},
-    max_candidates::Int
+    ::LeastFractionalRule, candidates::Vector{<:BranchingCandidate}, max_candidates::Int
 )
     sorted = sort(candidates; by=c -> c.fractionality)
     return sorted[1:min(length(sorted), max_candidates)]

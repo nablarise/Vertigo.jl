@@ -27,12 +27,10 @@ struct MasterIpPrimalSol
 end
 
 function MasterIpPrimalSol(
-    obj_value::Float64,
-    non_zero_integral::Vector{Tuple{MOI.VariableIndex,Int}}
+    obj_value::Float64, non_zero_integral::Vector{Tuple{MOI.VariableIndex,Int}}
 )
     return MasterIpPrimalSol(
-        obj_value, non_zero_integral,
-        Tuple{MOI.VariableIndex,Float64}[]
+        obj_value, non_zero_integral, Tuple{MOI.VariableIndex,Float64}[]
     )
 end
 
@@ -138,18 +136,20 @@ function ColGenWorkspace(decomp, config::ColGenConfig)
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 end
 
 # A user-overridden subproblem has no model until the user installs a pricer.
 function _check_pricers_installed(decomp)
     for (sp_id, model) in sp_models(decomp)
-        isnothing(model) && error(
-            "Subproblem $sp_id is user-overridden but has no pricer. " *
-            "Install one with `sp_models(decomp)[$sp_id] = pricer` before " *
-            "creating the ColGenWorkspace."
-        )
+        if isnothing(model)
+            error(
+                "Subproblem $sp_id is user-overridden but has no pricer. " *
+                "Install one with `sp_models(decomp)[$sp_id] = pricer` before " *
+                "creating the ColGenWorkspace.",
+            )
+        end
     end
 end
 
@@ -160,18 +160,22 @@ Explicit constructor for callers that need to seed the workspace
 with an existing column pool or artificial variables.
 """
 function ColGenWorkspace(
-    decomp, pool,
-    eq_art_vars, leq_art_vars, geq_art_vars,
-    config::ColGenConfig
+    decomp, pool, eq_art_vars, leq_art_vars, geq_art_vars, config::ColGenConfig
 )
     _check_pricers_installed(decomp)
     return ColGenWorkspace(
-        decomp, pool,
-        eq_art_vars, leq_art_vars, geq_art_vars,
-        nothing, nothing,
-        ActiveBranchingConstraint[], ActiveRobustCut[],
-        config.smoothing_alpha, config.max_cg_iterations,
-        config.max_misprice_iterations
+        decomp,
+        pool,
+        eq_art_vars,
+        leq_art_vars,
+        geq_art_vars,
+        nothing,
+        nothing,
+        ActiveBranchingConstraint[],
+        ActiveRobustCut[],
+        config.smoothing_alpha,
+        config.max_cg_iterations,
+        config.max_misprice_iterations,
     )
 end
 
@@ -182,7 +186,7 @@ max_cg_iterations(ws::ColGenWorkspace) = ws.max_cg_iterations
 
 function set_max_cg_iterations!(ws::ColGenWorkspace, n::Int)
     ws.max_cg_iterations = n
-    return
+    return nothing
 end
 
 function get_master(ws::ColGenWorkspace)
@@ -194,29 +198,32 @@ function get_master(ws::ColGenWorkspace)
         ws.eq_art_vars,
         ws.leq_art_vars,
         ws.geq_art_vars,
-        cc_ids
+        cc_ids,
     )
 end
 
 function get_pricing_subprobs(ws::ColGenWorkspace)
     return Dict{PricingSubproblemId,Any}(
-        sp_id => PricingSubproblem(sp_model(ws.decomp, sp_id))
-        for sp_id in subproblem_ids(ws.decomp)
+        sp_id => PricingSubproblem(sp_model(ws.decomp, sp_id)) for
+        sp_id in subproblem_ids(ws.decomp)
     )
 end
 
 get_reform(ws::ColGenWorkspace) = ws
 
 function _dual_bound_dominated(ws, dual_bound, ip_bound)
-    isnothing(ip_bound) && return false
-    isnothing(dual_bound) && return false
+    if isnothing(ip_bound)
+        return false
+    end
+    if isnothing(dual_bound)
+        return false
+    end
     if is_minimization(ws)
         return dual_bound >= ip_bound - RC_IMPROVING_TOL
     else
         return dual_bound <= ip_bound + RC_IMPROVING_TOL
     end
 end
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # PHASE / STAGE TYPES
@@ -249,7 +256,6 @@ initial_stage(::ColGenStageIterator) = ExactStage()
 stop_colgen(::ColGenWorkspace, ::Nothing) = false
 stop_colgen(::ColGenWorkspace, _) = false
 
-
 # ────────────────────────────────────────────────────────────────────────────────────────
 # SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -264,33 +270,37 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
     for (cstr_id, _rhs) in coupling_constraints(ws.decomp)
         kind = cstr_id.kind
         if kind == SAF_EQ || kind == VI_EQ
-            s_pos = add_variable!(model;
-                lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => 1.0),
-                objective_coeff = cost,
-                name = "s_pos[$(cstr_id.value)]"
+            s_pos = add_variable!(
+                model;
+                lower_bound=0.0,
+                constraint_coeffs=Dict(cstr_id => 1.0),
+                objective_coeff=cost,
+                name="s_pos[$(cstr_id.value)]",
             )
-            s_neg = add_variable!(model;
-                lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => -1.0),
-                objective_coeff = cost,
-                name = "s_neg[$(cstr_id.value)]"
+            s_neg = add_variable!(
+                model;
+                lower_bound=0.0,
+                constraint_coeffs=Dict(cstr_id => -1.0),
+                objective_coeff=cost,
+                name="s_neg[$(cstr_id.value)]",
             )
             ws.eq_art_vars[cstr_id] = (s_pos, s_neg)
         elseif kind == SAF_GEQ || kind == VI_GEQ
-            s_pos = add_variable!(model;
-                lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => 1.0),
-                objective_coeff = cost,
-                name = "s_geq[$(cstr_id.value)]"
+            s_pos = add_variable!(
+                model;
+                lower_bound=0.0,
+                constraint_coeffs=Dict(cstr_id => 1.0),
+                objective_coeff=cost,
+                name="s_geq[$(cstr_id.value)]",
             )
             ws.geq_art_vars[cstr_id] = s_pos
         else  # LEQ
-            s_neg = add_variable!(model;
-                lower_bound = 0.0,
-                constraint_coeffs = Dict(cstr_id => -1.0),
-                objective_coeff = cost,
-                name = "s_leq[$(cstr_id.value)]"
+            s_neg = add_variable!(
+                model;
+                lower_bound=0.0,
+                constraint_coeffs=Dict(cstr_id => -1.0),
+                objective_coeff=cost,
+                name="s_leq[$(cstr_id.value)]",
             )
             ws.leq_art_vars[cstr_id] = s_neg
         end
@@ -298,30 +308,31 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
 
     # Artificial variables for convexity constraints (LessThan UB)
     for (sp_id, cstr_idx) in convexity_ub_pairs(ws.decomp)
-        s_neg = add_variable!(model;
-            lower_bound = 0.0,
-            constraint_coeffs = Dict(cstr_idx => -1.0),
-            objective_coeff = convexity_cost,
-            name = "s_conv_ub[$(sp_id)]"
+        s_neg = add_variable!(
+            model;
+            lower_bound=0.0,
+            constraint_coeffs=Dict(cstr_idx => -1.0),
+            objective_coeff=convexity_cost,
+            name="s_conv_ub[$(sp_id)]",
         )
         ws.leq_art_vars[cstr_idx] = s_neg
     end
 
     # Artificial variables for convexity constraints (GreaterThan LB)
     for (sp_id, cstr_idx) in convexity_lb_pairs(ws.decomp)
-        s_pos = add_variable!(model;
-            lower_bound = 0.0,
-            constraint_coeffs = Dict(cstr_idx => 1.0),
-            objective_coeff = convexity_cost,
-            name = "s_conv_lb[$(sp_id)]"
+        s_pos = add_variable!(
+            model;
+            lower_bound=0.0,
+            constraint_coeffs=Dict(cstr_idx => 1.0),
+            objective_coeff=convexity_cost,
+            name="s_conv_lb[$(sp_id)]",
         )
         ws.geq_art_vars[cstr_idx] = s_pos
     end
 
     # Relax integrality: delete Integer constraints
     integer_constraints = MOI.get(
-        model,
-        MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Integer}()
+        model, MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Integer}()
     )
     for ci in integer_constraints
         MOI.delete(model, ci)
@@ -329,8 +340,7 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
 
     # Relax integrality: delete ZeroOne (binary) constraints, ensure [0,1] bounds
     binary_constraints = MOI.get(
-        model,
-        MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.ZeroOne}()
+        model, MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.ZeroOne}()
     )
     for ci in binary_constraints
         var_idx = MOI.get(model, MOI.ConstraintFunction(), ci)
@@ -339,7 +349,9 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
         if !MOI.is_valid(model, ub_ci)
             MOI.add_constraint(model, var_idx, MOI.LessThan(1.0))
         end
-        lb_ci = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(var_idx.value)
+        lb_ci = MOI.ConstraintIndex{MOI.VariableIndex,MOI.GreaterThan{Float64}}(
+            var_idx.value
+        )
         if !MOI.is_valid(model, lb_ci)
             MOI.add_constraint(model, var_idx, MOI.GreaterThan(0.0))
         end
@@ -391,15 +403,19 @@ function setup_reformulation!(ws::ColGenWorkspace, ::Phase2)
     empty!(ws.geq_art_vars)
 
     for (col_var, rec) in columns(ws.pool)
-        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec)))
+        MOI.modify(
+            model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec))
+        )
     end
     for pmv in pure_master_variables(ws.decomp)
-        MOI.modify(model, obj_type,
-            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)))
+        MOI.modify(
+            model,
+            obj_type,
+            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)),
+        )
     end
     return nothing
 end
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN ITERATION OUTPUT
@@ -425,7 +441,7 @@ function stop_colgen_phase(
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
     ip_primal_sol,
-    iteration
+    iteration,
 )
     master_lp_obj = colgen_iter_output.master_lp_obj
     no_column_added = colgen_iter_output.nb_columns_added == 0
@@ -435,11 +451,8 @@ function stop_colgen_phase(
         !isnothing(incumbent_dual_bound) &&
         abs(master_lp_obj - incumbent_dual_bound) < LP_GAP_TOL
     )
-    ip_pruned = _dual_bound_dominated(
-        ws, incumbent_dual_bound, ws.ip_primal_bound
-    )
-    return iteration_limit || no_column_added ||
-           lp_gap_closed || ip_pruned
+    ip_pruned = _dual_bound_dominated(ws, incumbent_dual_bound, ws.ip_primal_bound)
+    return iteration_limit || no_column_added || lp_gap_closed || ip_pruned
 end
 
 function stop_colgen_phase(
@@ -448,7 +461,7 @@ function stop_colgen_phase(
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
     ip_primal_sol,
-    iteration
+    iteration,
 )
     # Phase1 has no iteration limit — feasibility must reach true convergence
     master_lp_obj = colgen_iter_output.master_lp_obj
@@ -477,11 +490,17 @@ function new_iteration_output(
     master_ip_primal_sol,
     master_lp_dual_sol,
 )
-    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol, infeasible_subproblem)
+    return ColGenIterationOutput(
+        mlp,
+        db,
+        nb_new_cols,
+        master_lp_dual_sol,
+        master_ip_primal_sol,
+        infeasible_subproblem,
+    )
 end
 
 get_dual_bound(output::ColGenIterationOutput) = output.dual_bound
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN PHASE OUTPUT
@@ -502,14 +521,22 @@ colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
 function has_artificial_vars_in_solution(ws::ColGenWorkspace, tol=RC_IMPROVING_TOL)::Bool
     model = master_model(ws.decomp)
     for (_, (s_pos, s_neg)) in ws.eq_art_vars
-        MOI.get(model, MOI.VariablePrimal(), s_pos) > tol && return true
-        MOI.get(model, MOI.VariablePrimal(), s_neg) > tol && return true
+        if MOI.get(model, MOI.VariablePrimal(), s_pos) > tol
+            return true
+        end
+        if MOI.get(model, MOI.VariablePrimal(), s_neg) > tol
+            return true
+        end
     end
     for (_, s) in ws.leq_art_vars
-        MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
+        if MOI.get(model, MOI.VariablePrimal(), s) > tol
+            return true
+        end
     end
     for (_, s) in ws.geq_art_vars
-        MOI.get(model, MOI.VariablePrimal(), s) > tol && return true
+        if MOI.get(model, MOI.VariablePrimal(), s) > tol
+            return true
+        end
     end
     return false
 end
@@ -522,47 +549,65 @@ function new_phase_output(
     stage,
     colgen_iter_output::ColGenIterationOutput,
     iteration,
-    inc_dual_bound
+    inc_dual_bound,
 )
     mlp = colgen_iter_output.master_lp_obj
     lp_gap_closed = (
-        !isnothing(mlp) && !isnothing(inc_dual_bound) &&
+        !isnothing(mlp) &&
+        !isnothing(inc_dual_bound) &&
         abs(mlp - inc_dual_bound) < LP_GAP_TOL
     )
     subprob_inf = colgen_iter_output.subproblem_infeasible
-    converged   = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)
+    converged = lp_gap_closed || (colgen_iter_output.nb_columns_added == 0 && !subprob_inf)
     has_art = has_artificial_vars_in_solution(ws)
-    ip_pruned_flag = _dual_bound_dominated(
-        ws, inc_dual_bound, ws.ip_primal_bound
+    ip_pruned_flag = _dual_bound_dominated(ws, inc_dual_bound, ws.ip_primal_bound)
+    return ColGenPhaseOutput(
+        mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag
     )
-    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag)
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
-    o.subproblem_infeasible && return nothing
-    o.has_artificial_vars   && return Phase1()
-    o.colgen_converged      && return nothing
+    if o.subproblem_infeasible
+        return nothing
+    end
+    if o.has_artificial_vars
+        return Phase1()
+    end
+    if o.colgen_converged
+        return nothing
+    end
     return Phase2()
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase1, o::ColGenPhaseOutput)
-    o.subproblem_infeasible  && return nothing
-    !o.has_artificial_vars   && return Phase2()
-    o.colgen_converged       && return nothing   # infeasible confirmed
+    if o.subproblem_infeasible
+        return nothing
+    end
+    if !o.has_artificial_vars
+        return Phase2()
+    end
+    if o.colgen_converged
+        return nothing   # infeasible confirmed
+    end   # infeasible confirmed
     return Phase1()
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase2, o::ColGenPhaseOutput)
-    o.subproblem_infeasible && return nothing
-    o.has_artificial_vars   && error("Artificial variables detected in Phase2")
-    o.colgen_converged      && return nothing
+    if o.subproblem_infeasible
+        return nothing
+    end
+    if o.has_artificial_vars
+        error("Artificial variables detected in Phase2")
+    end
+    if o.colgen_converged
+        return nothing
+    end
     return nothing   # iteration limit — stop rather than loop
 end
 
 function next_stage(::ColGenStageIterator, ::ExactStage, ::ColGenPhaseOutput)
     return ExactStage()
 end
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN OUTPUT
@@ -580,49 +625,37 @@ colgen_output_type(::ColGenWorkspace) = ColGenOutput
 # An empty pricing round proves optimality only if the dual bound meets the
 # master value (up to the pricing tolerances).
 function _gap_is_open(p::ColGenPhaseOutput)
-    (isnothing(p.master_lp_obj) || isnothing(p.incumbent_dual_bound)) && return false
+    if (isnothing(p.master_lp_obj) || isnothing(p.incumbent_dual_bound))
+        return false
+    end
     gap = abs(p.master_lp_obj - p.incumbent_dual_bound)
     return gap > DUAL_CONSISTENCY_TOL * max(1.0, abs(p.master_lp_obj))
 end
 
-function new_output(
-    ::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput
-)
+function new_output(::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput)
     ip = ws.ip_incumbent
     if p.subproblem_infeasible
-        return ColGenOutput(
-            subproblem_infeasible, nothing, nothing, ip
-        )
+        return ColGenOutput(subproblem_infeasible, nothing, nothing, ip)
     elseif p.has_artificial_vars && p.colgen_converged
-        return ColGenOutput(
-            master_infeasible, nothing, nothing, ip
-        )
+        return ColGenOutput(master_infeasible, nothing, nothing, ip)
     elseif p.ip_pruned
-        return ColGenOutput(
-            ip_pruned, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
-        )
+        return ColGenOutput(ip_pruned, p.master_lp_obj, p.incumbent_dual_bound, ip)
     elseif p.colgen_converged
-        _gap_is_open(p) && @warn(
-            "The subproblems report no improving column, so the run is " *
-            "reported optimal, but the dual bound and the primal bound " *
-            "(master LP value) differ: optimality is not proven. Is the " *
-            "pricing exact?",
-            master_lp_obj = p.master_lp_obj,
-            dual_bound = p.incumbent_dual_bound
-        )
-        return ColGenOutput(
-            optimal, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
-        )
+        if _gap_is_open(p)
+            @warn(
+                "The subproblems report no improving column, so the run is " *
+                    "reported optimal, but the dual bound and the primal bound " *
+                    "(master LP value) differ: optimality is not proven. Is the " *
+                    "pricing exact?",
+                master_lp_obj = p.master_lp_obj,
+                dual_bound = p.incumbent_dual_bound
+            )
+        end
+        return ColGenOutput(optimal, p.master_lp_obj, p.incumbent_dual_bound, ip)
     else
-        return ColGenOutput(
-            iteration_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
-        )
+        return ColGenOutput(iteration_limit, p.master_lp_obj, p.incumbent_dual_bound, ip)
     end
 end
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # ITERATION LOGGING
@@ -636,7 +669,7 @@ function after_colgen_iteration(
     ::NoStabilization,
     colgen_iter_output::ColGenIterationOutput,
     incumbent_dual_bound,
-    ip_primal_sol
+    ip_primal_sol,
 )
     # do nothing
 end
@@ -645,7 +678,6 @@ function is_better_dual_bound(ws::ColGenWorkspace, dual_bound::Float64, incumben
     sense = is_minimization(ws) ? 1 : -1
     return sense * dual_bound > sense * incumbent
 end
-
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # RUN COLUMN GENERATION ENTRY POINTS

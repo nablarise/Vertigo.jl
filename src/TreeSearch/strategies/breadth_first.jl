@@ -20,7 +20,7 @@ select_node!(::BreadthFirstStrategy, queue::Deque) = popfirst!(queue)
 
 function insert_node!(::BreadthFirstStrategy, queue::Deque, node::SearchNode)
     push!(queue, node)
-    return
+    return nothing
 end
 
 is_empty_container(queue::Deque) = isempty(queue)

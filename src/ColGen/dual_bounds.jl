@@ -12,22 +12,16 @@ function _recompute_cost(dual_sol::DualMoiSolution, model)::Float64
     for (tagged, dual_value) in dual_sol.constraint_duals
         with_typed_ci(tagged) do ci
             cset = MOI.get(model, MOI.ConstraintSet(), ci)
-            total_cost += dual_value * _rhs(cset)
+            return total_cost += dual_value * _rhs(cset)
         end
     end
-    obj_fn = MOI.get(
-        model,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    )
+    obj_fn = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
     total_cost += obj_fn.constant
     return total_cost
 end
 
 function compute_dual_bound(
-    ws::ColGenWorkspace,
-    ::CGPhase,
-    sps_db,
-    mast_dual_sol::MasterDualSolution
+    ws::ColGenWorkspace, ::CGPhase, sps_db, mast_dual_sol::MasterDualSolution
 )
     decomp = ws.decomp
     dual_values(cstr) = _dual_value(mast_dual_sol, cstr)
@@ -35,9 +29,9 @@ function compute_dual_bound(
     # Verify dual solution consistency
     recomputed = _recompute_cost(mast_dual_sol.sol, master_model(decomp))
     stored = mast_dual_sol.sol.obj_value
-    abs(recomputed - stored) < DUAL_CONSISTENCY_TOL || error(
-        "Dual cost mismatch: recomputed=$recomputed stored=$stored"
-    )
+    if !(abs(recomputed - stored) < DUAL_CONSISTENCY_TOL)
+        error("Dual cost mismatch: recomputed=$recomputed stored=$stored")
+    end
 
     # 1. Convexity contribution: Σₖ (ν⁺·W̄ₖ + ν⁻·Wₖ)
     convexity_contrib = 0.0
@@ -71,20 +65,15 @@ function compute_dual_bound(
         lb, ub = pure_master_bounds(decomp, y_var)
         lb_ci = TaggedCI(y_var.id.value, VI_GEQ)
         ub_ci = TaggedCI(y_var.id.value, VI_LEQ)
-        lb_dual = get(
-            mast_dual_sol.sol.constraint_duals, lb_ci, 0.0
-        )
-        ub_dual = get(
-            mast_dual_sol.sol.constraint_duals, ub_ci, 0.0
-        )
+        lb_dual = get(mast_dual_sol.sol.constraint_duals, lb_ci, 0.0)
+        ub_dual = get(mast_dual_sol.sol.constraint_duals, ub_ci, 0.0)
         pure_master_bound_contrib += lb_dual * lb + ub_dual * ub
     end
 
     # 4. Pure master variable contribution
-    pure_master_contrib = compute_dual_bound_pure_master_contribution(
-        decomp, dual_values
-    )
+    pure_master_contrib = compute_dual_bound_pure_master_contribution(decomp, dual_values)
 
-    return mast_dual_sol.sol.obj_value - convexity_contrib -
-        pure_master_bound_contrib + sp_contrib + pure_master_contrib
+    return mast_dual_sol.sol.obj_value - convexity_contrib - pure_master_bound_contrib +
+           sp_contrib +
+           pure_master_contrib
 end

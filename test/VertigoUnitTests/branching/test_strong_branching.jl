@@ -2,14 +2,27 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.Branching: SBProbeResult, SBCandidateResult,
-    sb_score, BranchingCandidate, find_fractional_variables,
-    bp_master_model, bp_pool, bp_decomp, bp_branching_constraints,
-    build_branching_terms, add_branching_constraint!,
+using Vertigo.Branching:
+    SBProbeResult,
+    SBCandidateResult,
+    sb_score,
+    BranchingCandidate,
+    find_fractional_variables,
+    bp_master_model,
+    bp_pool,
+    bp_decomp,
+    bp_branching_constraints,
+    build_branching_terms,
+    add_branching_constraint!,
     remove_branching_constraint!,
-    bp_ip_incumbent, bp_ip_primal_bound, run_sb_probe,
-    MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
-    BranchingResult, branching_ok,
+    bp_ip_incumbent,
+    bp_ip_primal_bound,
+    run_sb_probe,
+    MultiPhaseStrongBranching,
+    CGProbePhase,
+    select_branching_variable,
+    BranchingResult,
+    branching_ok,
     DefaultBranchingContext
 using Vertigo.ColGen: max_cg_iterations
 using Vertigo.Reformulation: get_primal_solution
@@ -76,19 +89,13 @@ function test_branching_constraint_add_remove()
         pool = bp_pool(ws)
         decomp = bp_decomp(ws)
         primal = get_primal_solution(backend)
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
         @test !isempty(candidates)
         candidate = first(candidates)
 
-        terms = build_branching_terms(
-            decomp, pool, candidate.orig_var
-        )
+        terms = build_branching_terms(decomp, pool, candidate.orig_var)
         ci = add_branching_constraint!(
-            backend, ws, terms,
-            MOI.LessThan(candidate.floor_val),
-            candidate.orig_var
+            backend, ws, terms, MOI.LessThan(candidate.floor_val), candidate.orig_var
         )
         @test length(bcs) == 1
         @test MOI.is_valid(backend, ci)
@@ -103,28 +110,29 @@ function test_run_sb_probe_returns_dual_bounds()
     @testset "[run_sb_probe] returns dual bounds" begin
         inst = random_gap_instance(2, 5; seed=10)
         decomp = build_gap_decomp(inst)
-        space = BranchCutPriceWorkspace(
-            decomp, BranchCutPriceConfig(node_limit=1)
-        )
+        space = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(node_limit=1))
         ws = space.ws
         cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
         backend = bp_master_model(ws)
         primal = get_primal_solution(backend)
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
         candidate = first(candidates)
 
-        result = run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
+        result = run_sb_probe(
+            DefaultBranchingContext(),
+            CGProbePhase(max_cg_iterations=10),
+            space,
+            candidate,
+            10,
+            parent_lp,
+        )
         @test result isa SBCandidateResult
         @test result.parent_lp_obj ≈ parent_lp
         # Each direction should produce a dual bound or be infeasible
-        @test !isnothing(result.left.dual_bound) ||
-              result.left.is_infeasible
-        @test !isnothing(result.right.dual_bound) ||
-              result.right.is_infeasible
+        @test !isnothing(result.left.dual_bound) || result.left.is_infeasible
+        @test !isnothing(result.right.dual_bound) || result.right.is_infeasible
     end
 end
 
@@ -132,18 +140,14 @@ function test_run_sb_probe_restores_state()
     @testset "[run_sb_probe] restores context state" begin
         inst = random_gap_instance(2, 5; seed=10)
         decomp = build_gap_decomp(inst)
-        space = BranchCutPriceWorkspace(
-            decomp, BranchCutPriceConfig(node_limit=1)
-        )
+        space = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(node_limit=1))
         ws = space.ws
         cg_out = run_column_generation(ws)
         parent_lp = cg_out.master_lp_obj
 
         backend = bp_master_model(ws)
         primal = get_primal_solution(backend)
-        candidates = find_fractional_variables(
-            ws, primal; tol=1e-6
-        )
+        candidates = find_fractional_variables(ws, primal; tol=1e-6)
         candidate = first(candidates)
 
         # Save state before probe
@@ -152,7 +156,14 @@ function test_run_sb_probe_restores_state()
         orig_ip_bound = bp_ip_primal_bound(ws)
         orig_n_bcs = length(bp_branching_constraints(ws))
 
-        run_sb_probe(DefaultBranchingContext(), CGProbePhase(max_cg_iterations=10), space, candidate, 10, parent_lp)
+        run_sb_probe(
+            DefaultBranchingContext(),
+            CGProbePhase(max_cg_iterations=10),
+            space,
+            candidate,
+            10,
+            parent_lp,
+        )
 
         # State must be restored
         @test max_cg_iterations(ws) == orig_max_iter
@@ -172,11 +183,9 @@ function test_multi_phase_sb_e2e()
                 node_limit=100,
                 branching_strategy=MultiPhaseStrongBranching(
                     max_candidates=3,
-                    phases=[CGProbePhase(
-                        max_cg_iterations=5, lookahead=0
-                    )]
-                )
-            )
+                    phases=[CGProbePhase(max_cg_iterations=5, lookahead=0)],
+                ),
+            ),
         )
         output = run_branch_and_price(bcp_ws)
         @test output.status in (:optimal, :node_limit)
@@ -189,21 +198,15 @@ function test_multi_phase_sb_selects_variable()
         inst = random_gap_instance(2, 5; seed=10)
         decomp = build_gap_decomp(inst)
         sb = MultiPhaseStrongBranching(
-            max_candidates=5,
-            phases=[CGProbePhase(
-                max_cg_iterations=10, lookahead=0
-            )]
+            max_candidates=5, phases=[CGProbePhase(max_cg_iterations=10, lookahead=0)]
         )
         space = BranchCutPriceWorkspace(
-            decomp,
-            BranchCutPriceConfig(node_limit=1, branching_strategy=sb)
+            decomp, BranchCutPriceConfig(node_limit=1, branching_strategy=sb)
         )
         run_column_generation(space.ws)
         primal = get_primal_solution(bp_master_model(space.ws))
 
-        result = select_branching_variable(
-            sb, space, nothing, primal
-        )
+        result = select_branching_variable(sb, space, nothing, primal)
         @test result.status == branching_ok
         # Should pick a fractional variable
         frac = result.value - floor(result.value)
@@ -225,5 +228,5 @@ function test_strong_branching()
     test_run_sb_probe_returns_dual_bounds()
     test_run_sb_probe_restores_state()
     test_multi_phase_sb_e2e()
-    test_multi_phase_sb_selects_variable()
+    return test_multi_phase_sb_selects_variable()
 end

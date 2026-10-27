@@ -22,11 +22,7 @@ A robust cut expressed as a linear function of original variables.
 """
 struct SeparatedCut{X}
     coefficients::Dict{X,Float64}
-    set::Union{
-        MOI.LessThan{Float64},
-        MOI.GreaterThan{Float64},
-        MOI.EqualTo{Float64}
-    }
+    set::Union{MOI.LessThan{Float64},MOI.GreaterThan{Float64},MOI.EqualTo{Float64}}
 end
 
 """

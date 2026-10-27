@@ -2,11 +2,18 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.Branching: BranchingLoggerContext, BranchingCandidate,
-    SBProbeResult, SBCandidateResult, LPProbePhase, CGProbePhase,
-    before_branching_selection, after_reliability_skip,
+using Vertigo.Branching:
+    BranchingLoggerContext,
+    BranchingCandidate,
+    SBProbeResult,
+    SBCandidateResult,
+    LPProbePhase,
+    CGProbePhase,
+    before_branching_selection,
+    after_reliability_skip,
     after_candidate_probed,
-    on_both_infeasible, after_phase_filter,
+    on_both_infeasible,
+    after_phase_filter,
     after_branching_selection
 
 function test_logger_before_branching_selection_prints_header()
@@ -29,7 +36,7 @@ function test_logger_after_reliability_skip()
         output = String(take!(buf))
         @test occursin(
             r"^  \[CG\] cand\.  1 branch on 1 \(lhs=2\.3000\): reliable, score = 4\.50  <et=\d+\.\d+>$"m,
-            output
+            output,
         )
     end
 end
@@ -47,7 +54,7 @@ function test_logger_after_candidate_probed()
         output = String(take!(buf))
         @test occursin(
             r"^  \[LP\] cand\.  1 branch on 1 \(lhs=2\.3000\): \[12\.0000, 14\.0000\], score = 3\.20  <et=\d+\.\d+>$"m,
-            output
+            output,
         )
     end
 end
@@ -65,7 +72,7 @@ function test_logger_after_candidate_probed_infeasible_child()
         output = String(take!(buf))
         @test occursin(
             r"^  \[CG\] cand\.  3 branch on 1 \(lhs=2\.3000\): \[12\.0000, infeasible\], score = Inf  <et=\d+\.\d+>$"m,
-            output
+            output,
         )
     end
 end
@@ -106,5 +113,5 @@ function test_branching_logger()
     test_logger_after_candidate_probed_infeasible_child()
     test_logger_on_both_infeasible()
     test_logger_after_phase_filter()
-    test_logger_after_branching_selection()
+    return test_logger_after_branching_selection()
 end

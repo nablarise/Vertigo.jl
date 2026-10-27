@@ -33,16 +33,18 @@ end
 end
 
 # M⁻¹ : (sp_id, sp_var) → original var or nothing
-mapped_original_var(d::DWReformulation, sp_id, sp_var) =
-    _mapped_original_var(d.mapping, sp_id, sp_var)
-_mapped_original_var(m::OneToOneMapping, sp_id, sp_var) =
-    get(m.inverse, (sp_id, sp_var), nothing)
+function mapped_original_var(d::DWReformulation, sp_id, sp_var)
+    return _mapped_original_var(d.mapping, sp_id, sp_var)
+end
+function _mapped_original_var(m::OneToOneMapping, sp_id, sp_var)
+    return get(m.inverse, (sp_id, sp_var), nothing)
+end
 
 # M : orig_var → (sp_id, sp_var) or nothing
-mapped_subproblem_var(d::DWReformulation, orig_var) =
-    _mapped_subproblem_var(d.mapping, orig_var)
-_mapped_subproblem_var(m::OneToOneMapping, orig_var) =
-    get(m.forward, orig_var, nothing)
+function mapped_subproblem_var(d::DWReformulation, orig_var)
+    return _mapped_subproblem_var(d.mapping, orig_var)
+end
+_mapped_subproblem_var(m::OneToOneMapping, orig_var) = get(m.forward, orig_var, nothing)
 
 original_variables(d::DWReformulation) = d.mapping.all_orig_vars
 
@@ -90,9 +92,7 @@ has_convexity_lb(d::DWReformulation, sp_id) = haskey(d.convexity_lb, sp_id)
 convexity_ub_pairs(d::DWReformulation) = d.convexity_ub
 convexity_lb_pairs(d::DWReformulation) = d.convexity_lb
 
-function set_models!(
-    d::DWReformulation, master, sps, conv_ub, conv_lb
-)
+function set_models!(d::DWReformulation, master, sps, conv_ub, conv_lb)
     d.master_model = master
     d.sp_models = sps
     d.convexity_ub = conv_ub
@@ -102,20 +102,19 @@ end
 
 # Typed specialization: returns Dict{X,Float64} instead of Dict{Any,Float64}
 function project_to_original(
-    decomp::DWReformulation{X}, pool::AbstractColumnPool,
-    master_primal_values
+    decomp::DWReformulation{X}, pool::AbstractColumnPool, master_primal_values
 ) where {X}
     x_values = Dict{X,Float64}()
     for (col_var, rec) in columns(pool)
         λ_val = master_primal_values(col_var)
-        iszero(λ_val) && continue
+        if iszero(λ_val)
+            continue
+        end
         sp_id = column_sp_id(rec)
         for (sp_var, z_val) in column_nonzero_entries(rec)
             orig_var = mapped_original_var(decomp, sp_id, sp_var)
             if orig_var !== nothing
-                x_values[orig_var] = get(
-                    x_values, orig_var, 0.0
-                ) + z_val * λ_val
+                x_values[orig_var] = get(x_values, orig_var, 0.0) + z_val * λ_val
             end
         end
     end

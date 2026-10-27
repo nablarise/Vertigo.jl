@@ -11,7 +11,7 @@ function count_linear_constraints(backend)
     F = MOI.ScalarAffineFunction{Float64}
     n = 0
     for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64})
-        n += MOI.get(backend, MOI.NumberOfConstraints{F, S}())
+        n += MOI.get(backend, MOI.NumberOfConstraints{F,S}())
     end
     return n
 end
@@ -22,10 +22,10 @@ Build a local diff pair that activates `cuts` (fwd=activate, bwd=deactivate).
 function _local_activate_diff(cuts::GlobalCut...)
     fwd = GlobalCutPoolDiff(
         Dict(c.id => ActivateGlobalCutChange(c) for c in cuts),
-        Dict{Int, DeactivateGlobalCutChange}(),
+        Dict{Int,DeactivateGlobalCutChange}(),
     )
     bwd = GlobalCutPoolDiff(
-        Dict{Int, ActivateGlobalCutChange}(),
+        Dict{Int,ActivateGlobalCutChange}(),
         Dict(c.id => DeactivateGlobalCutChange(c) for c in cuts),
     )
     return (fwd, bwd)
@@ -36,12 +36,12 @@ Build a local diff pair that deactivates `cuts` (fwd=deactivate, bwd=activate).
 """
 function _local_deactivate_diff(cuts::GlobalCut...)
     fwd = GlobalCutPoolDiff(
-        Dict{Int, ActivateGlobalCutChange}(),
+        Dict{Int,ActivateGlobalCutChange}(),
         Dict(c.id => DeactivateGlobalCutChange(c) for c in cuts),
     )
     bwd = GlobalCutPoolDiff(
         Dict(c.id => ActivateGlobalCutChange(c) for c in cuts),
-        Dict{Int, DeactivateGlobalCutChange}(),
+        Dict{Int,DeactivateGlobalCutChange}(),
     )
     return (fwd, bwd)
 end
@@ -101,8 +101,11 @@ function test_cut_pool_tracker_tree7()
         MOI.add_constraint(m, y, MOI.GreaterThan(0.0))
         MOI.add_constraint(m, z, MOI.GreaterThan(0.0))
         obj = MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y),
-             MOI.ScalarAffineTerm(1.0, z)],
+            [
+                MOI.ScalarAffineTerm(1.0, x),
+                MOI.ScalarAffineTerm(1.0, y),
+                MOI.ScalarAffineTerm(1.0, z),
+            ],
             0.0,
         )
         MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), obj)
@@ -111,19 +114,21 @@ function test_cut_pool_tracker_tree7()
         T(v, c) = MOI.ScalarAffineTerm(c, v)
         tracker = GlobalCutPoolTracker()
 
-        c1  = register_cut!(tracker, [T(x,3.),T(y,3.),T(z,2.)], MOI.GreaterThan(1.0))
-        c2  = register_cut!(tracker, [T(x,3.),T(y,2.),T(z,2.)], MOI.GreaterThan(1.0))
-        c3  = register_cut!(tracker, [T(x,2.),T(y,2.),T(z,2.)], MOI.LessThan(10.0))
-        c4  = register_cut!(tracker, [T(x,2.),T(y,2.),T(z,1.)], MOI.EqualTo(3.0))
-        c5  = register_cut!(tracker, [T(x,1.),T(y,2.),T(z,2.)], MOI.GreaterThan(1.0))
-        c6  = register_cut!(tracker, [T(x,1.),T(y,1.),T(z,2.)], MOI.LessThan(8.0))
-        c7  = register_cut!(tracker, [T(x,1.),T(y,1.),T(z,1.)], MOI.GreaterThan(1.0))
-        c8  = register_cut!(tracker, [T(x,4.),T(y,3.),T(z,4.)], MOI.GreaterThan(1.0))
-        c9  = register_cut!(tracker, [T(x,3.),T(y,4.),T(z,3.)], MOI.LessThan(15.0))
-        c10 = register_cut!(tracker, [T(x,4.),T(y,4.),T(z,4.)], MOI.EqualTo(12.0))
-        c11 = register_cut!(tracker, [T(x,5.),T(y,4.),T(z,5.)], MOI.GreaterThan(1.0))
+        c1 = register_cut!(tracker, [T(x, 3.0), T(y, 3.0), T(z, 2.0)], MOI.GreaterThan(1.0))
+        c2 = register_cut!(tracker, [T(x, 3.0), T(y, 2.0), T(z, 2.0)], MOI.GreaterThan(1.0))
+        c3 = register_cut!(tracker, [T(x, 2.0), T(y, 2.0), T(z, 2.0)], MOI.LessThan(10.0))
+        c4 = register_cut!(tracker, [T(x, 2.0), T(y, 2.0), T(z, 1.0)], MOI.EqualTo(3.0))
+        c5 = register_cut!(tracker, [T(x, 1.0), T(y, 2.0), T(z, 2.0)], MOI.GreaterThan(1.0))
+        c6 = register_cut!(tracker, [T(x, 1.0), T(y, 1.0), T(z, 2.0)], MOI.LessThan(8.0))
+        c7 = register_cut!(tracker, [T(x, 1.0), T(y, 1.0), T(z, 1.0)], MOI.GreaterThan(1.0))
+        c8 = register_cut!(tracker, [T(x, 4.0), T(y, 3.0), T(z, 4.0)], MOI.GreaterThan(1.0))
+        c9 = register_cut!(tracker, [T(x, 3.0), T(y, 4.0), T(z, 3.0)], MOI.LessThan(15.0))
+        c10 = register_cut!(tracker, [T(x, 4.0), T(y, 4.0), T(z, 4.0)], MOI.EqualTo(12.0))
+        c11 = register_cut!(
+            tracker, [T(x, 5.0), T(y, 4.0), T(z, 5.0)], MOI.GreaterThan(1.0)
+        )
 
-        cuts_by_id = Dict(c.id => c for c in [c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11])
+        cuts_by_id = Dict(c.id => c for c in [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11])
         helper = transform_model!(tracker, m)
 
         state_root = root_state(tracker, m)
@@ -215,9 +220,7 @@ function test_cut_pool_tracker_deactivation()
 
         tracker = GlobalCutPoolTracker()
         c_global = register_cut!(
-            tracker,
-            [MOI.ScalarAffineTerm(2.0, x)],
-            MOI.GreaterThan(0.5),
+            tracker, [MOI.ScalarAffineTerm(2.0, x)], MOI.GreaterThan(0.5)
         )
         cuts_by_id = Dict(c_global.id => c_global)
         helper = transform_model!(tracker, m)
@@ -277,11 +280,7 @@ function test_cut_pool_tracker_reactivation()
         MOI.set(m, MOI.ObjectiveSense(), MOI.MIN_SENSE)
 
         tracker = GlobalCutPoolTracker()
-        c_global = register_cut!(
-            tracker,
-            [MOI.ScalarAffineTerm(3.0, x)],
-            MOI.LessThan(9.0),
-        )
+        c_global = register_cut!(tracker, [MOI.ScalarAffineTerm(3.0, x)], MOI.LessThan(9.0))
         cuts_by_id = Dict(c_global.id => c_global)
         helper = transform_model!(tracker, m)
 
@@ -327,5 +326,5 @@ end
 function test_cut_pool_tracker()
     test_cut_pool_tracker_tree7()
     test_cut_pool_tracker_deactivation()
-    test_cut_pool_tracker_reactivation()
+    return test_cut_pool_tracker_reactivation()
 end

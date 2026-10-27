@@ -61,7 +61,7 @@ forward difference of the next state (to advance to the target state).
 """
 function recover_state!(backend, prev_state::ModelState, next_state::ModelState, helper)
     apply_change!(backend, backward(prev_state), helper)
-    apply_change!(backend, forward(next_state), helper)
+    return apply_change!(backend, forward(next_state), helper)
 end
 
 """
@@ -199,7 +199,6 @@ Create a new model state with the given backward and forward differences.
 A new `ModelState` with the specified differences.
 """
 function new_state end
-
 
 ### Default Implementations
 include("var_bounds_state.jl")

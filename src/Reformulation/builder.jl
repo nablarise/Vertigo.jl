@@ -37,7 +37,7 @@ function DWReformulationBuilder{X}(; minimize::Bool=true) where {X}
         Dict{X,Tuple{PricingSubproblemId,_VI}}(),
         Dict{Tuple{PricingSubproblemId,_VI},X}(),
         Set{X}(),
-        Tuple{TaggedCI,Float64}[]
+        Tuple{TaggedCI,Float64}[],
     )
 end
 
@@ -46,7 +46,7 @@ function add_subproblem!(
     sp_id::PricingSubproblemId,
     fixed_cost::Float64,
     conv_lb::Float64,
-    conv_ub::Float64
+    conv_ub::Float64,
 ) where {X}
     b.sp_variables[sp_id] = _VI[]
     b.sp_original_costs[sp_id] = Dict{_VI,Float64}()
@@ -57,8 +57,7 @@ function add_subproblem!(
 end
 
 function add_sp_variable!(
-    b::DWReformulationBuilder, sp_id::PricingSubproblemId,
-    sp_var::_VI, orig_cost::Float64
+    b::DWReformulationBuilder, sp_id::PricingSubproblemId, sp_var::_VI, orig_cost::Float64
 )
     push!(b.sp_variables[sp_id], sp_var)
     b.sp_original_costs[sp_id][sp_var] = orig_cost
@@ -66,17 +65,22 @@ function add_sp_variable!(
 end
 
 function add_coupling_coefficient!(
-    b::DWReformulationBuilder, sp_id::PricingSubproblemId,
-    sp_var::_VI, cstr_id, coeff::Float64
+    b::DWReformulationBuilder,
+    sp_id::PricingSubproblemId,
+    sp_var::_VI,
+    cstr_id,
+    coeff::Float64,
 )
     tagged = TaggedCI(cstr_id)
-    push!(get!(Vector{Tuple{_VI,TaggedCI,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, tagged, coeff))
+    push!(
+        get!(Vector{Tuple{_VI,TaggedCI,Float64}}, b.sp_coupling_entries, sp_id),
+        (sp_var, tagged, coeff),
+    )
     return nothing
 end
 
 function add_mapping!(
-    b::DWReformulationBuilder{X}, orig_var::X,
-    sp_id::PricingSubproblemId, sp_var::_VI
+    b::DWReformulationBuilder{X}, orig_var::X, sp_id::PricingSubproblemId, sp_var::_VI
 ) where {X}
     @assert !haskey(b.forward_map, orig_var) "Duplicate forward mapping for $orig_var"
     @assert !haskey(b.inverse_map, (sp_id, sp_var)) "Duplicate inverse mapping for ($sp_id, $sp_var)"
@@ -92,7 +96,7 @@ function add_pure_master_variable!(
     cost::Float64,
     lb::Float64,
     ub::Float64,
-    is_integer::Bool
+    is_integer::Bool,
 )
     b.pm_data_accum[y_id] = (cost, lb, ub, is_integer)
     b.pm_coupling_accum[y_id] = CouplingEntry[]
@@ -100,16 +104,13 @@ function add_pure_master_variable!(
 end
 
 function add_pure_master_coupling!(
-    b::DWReformulationBuilder, y_id::_VI, cstr_id,
-    coeff::Float64
+    b::DWReformulationBuilder, y_id::_VI, cstr_id, coeff::Float64
 )
     push!(b.pm_coupling_accum[y_id], CouplingEntry(TaggedCI(cstr_id), coeff))
     return nothing
 end
 
-function add_coupling_constraint!(
-    b::DWReformulationBuilder, cstr_id, rhs::Float64
-)
+function add_coupling_constraint!(b::DWReformulationBuilder, cstr_id, rhs::Float64)
     push!(b.coupling_cstrs, (TaggedCI(cstr_id), rhs))
     return nothing
 end
@@ -121,8 +122,7 @@ Compile the accumulated data into an immutable DWReformulation.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
 function _build_coupling_coefficients(
-    variables::Vector{_VI},
-    raw_entries::Vector{Tuple{_VI,TaggedCI,Float64}}
+    variables::Vector{_VI}, raw_entries::Vector{Tuple{_VI,TaggedCI,Float64}}
 )
     entries = CouplingEntry[]
     offsets = Dict{_VI,UnitRange{Int}}()
@@ -136,12 +136,14 @@ function _build_coupling_coefficients(
     # Build CSR in variable-list order (deterministic).
     # Each slice sorted by TaggedCI for merge-based RC computation.
     for sp_var in variables
-        haskey(grouped, sp_var) || continue
+        if !(haskey(grouped, sp_var))
+            continue
+        end
         range_start = length(entries) + 1
         for (cstr_id, coeff) in grouped[sp_var]
             push!(entries, CouplingEntry(cstr_id, coeff))
         end
-        sort!(@view(entries[range_start:end]); by = e -> e.constraint_id)
+        sort!(@view(entries[range_start:end]); by=e -> e.constraint_id)
         offsets[sp_var] = range_start:length(entries)
     end
 
@@ -154,18 +156,17 @@ function build(b::DWReformulationBuilder{X}) where {X}
     for sp_id in keys(b.sp_variables)
         variables = b.sp_variables[sp_id]
         original_costs = b.sp_original_costs[sp_id]
-        raw_entries = get(
-            b.sp_coupling_entries, sp_id,
-            Tuple{_VI,TaggedCI,Float64}[]
-        )
-        coupling_coeffs = _build_coupling_coefficients(
-            variables, raw_entries
-        )
+        raw_entries = get(b.sp_coupling_entries, sp_id, Tuple{_VI,TaggedCI,Float64}[])
+        coupling_coeffs = _build_coupling_coefficients(variables, raw_entries)
         conv_lb, conv_ub = b.sp_conv_bounds[sp_id]
 
         subproblems[sp_id] = SubproblemData(
-            variables, original_costs, coupling_coeffs,
-            b.sp_fixed_costs[sp_id], conv_lb, conv_ub
+            variables,
+            original_costs,
+            coupling_coeffs,
+            b.sp_fixed_costs[sp_id],
+            conv_lb,
+            conv_ub,
         )
     end
 
@@ -175,17 +176,17 @@ function build(b::DWReformulationBuilder{X}) where {X}
         push!(pm_vars, PureMasterVariableData(y_id, cost, lb, ub, is_int, coeffs))
     end
 
-    mapping = OneToOneMapping(
-        b.forward_map,
-        b.inverse_map,
-        collect(b.all_orig_vars_set)
-    )
+    mapping = OneToOneMapping(b.forward_map, b.inverse_map, collect(b.all_orig_vars_set))
 
     return DWReformulation(
-        subproblems, pm_vars, mapping, b.coupling_cstrs, b.minimize,
+        subproblems,
+        pm_vars,
+        mapping,
+        b.coupling_cstrs,
+        b.minimize,
         nothing,
         Dict{PricingSubproblemId,Any}(),
         Dict{PricingSubproblemId,TaggedCI}(),
-        Dict{PricingSubproblemId,TaggedCI}()
+        Dict{PricingSubproblemId,TaggedCI}(),
     )
 end

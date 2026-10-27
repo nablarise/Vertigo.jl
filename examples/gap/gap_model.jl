@@ -60,17 +60,15 @@ function build_gap_model(inst::GAPInstance)
     @variable(model, x[k in K, t in T], Bin)
     @constraint(model, assign[t in T], sum(x[k, t] for k in K) == 1)
     @constraint(
-        model, knapsack[k in K],
+        model,
+        knapsack[k in K],
         sum(inst.weight[k, t] * x[k, t] for t in T) <= inst.capacity[k]
     )
-    @objective(
-        model, Min, sum(inst.cost[k, t] * x[k, t] for k in K, t in T)
-    )
+    @objective(model, Min, sum(inst.cost[k, t] * x[k, t] for k in K, t in T))
 
     decomp, _ = @dantzig_wolfe model begin
-        x[k, _]     => subproblem(k)
-        assign[_]   => master()
-        knapsack[k] => subproblem(k)
+        master() => (constraints = assign[_])
+        subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
     end
     return decomp
 end

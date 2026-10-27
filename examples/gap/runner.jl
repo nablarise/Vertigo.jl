@@ -38,15 +38,23 @@ function load_metadata()
 end
 
 function lookup_opt(meta, name)
-    haskey(meta, name) || return nothing
+    if !(haskey(meta, name))
+        return nothing
+    end
     v = get(meta[name], "opt", nothing)
     return v === nothing ? nothing : Float64(v)
 end
 
 function compute_gap(primal, dual)
-    (primal === nothing || dual === nothing) && return nothing
-    (isfinite(primal) && isfinite(dual)) || return nothing
-    abs(primal) < 1e-9 && return nothing
+    if (primal === nothing || dual === nothing)
+        return nothing
+    end
+    if !(isfinite(primal) && isfinite(dual))
+        return nothing
+    end
+    if abs(primal) < 1e-9
+        return nothing
+    end
     return 100.0 * abs(primal - dual) / abs(primal)
 end
 
@@ -67,15 +75,13 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
     elapsed = @elapsed begin
         try
             decomp = build_gap_model(inst)
-            colgen_config = ColGenConfig(
-                smoothing_alpha=cfg.smoothing_alpha, silent=true
-            )
+            colgen_config = ColGenConfig(smoothing_alpha=cfg.smoothing_alpha, silent=true)
             ws = ColGenWorkspace(decomp, colgen_config)
             bcp_ctx = BranchCutPriceContext(
                 ws;
-                node_limit = cfg.node_limit,
-                rmp_time_limit = cfg.rmp_time_limit,
-                log_level = 0
+                node_limit=cfg.node_limit,
+                rmp_time_limit=cfg.rmp_time_limit,
+                log_level=0,
             )
             output = run_branch_and_price(bcp_ctx)
         catch err
@@ -86,10 +92,19 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
 
     if output === nothing
         return BenchResult(
-            inst.name, inst.n_tasks, inst.n_machines,
-            :error, elapsed,
-            nothing, nothing, nothing, opt,
-            0, nothing, nothing, nothing
+            inst.name,
+            inst.n_tasks,
+            inst.n_machines,
+            :error,
+            elapsed,
+            nothing,
+            nothing,
+            nothing,
+            opt,
+            0,
+            nothing,
+            nothing,
+            nothing,
         )
     end
 
@@ -98,20 +113,38 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
     gap = compute_gap(primal, dual)
 
     return BenchResult(
-        inst.name, inst.n_tasks, inst.n_machines,
-        output.status, elapsed,
-        primal, dual, gap, opt,
+        inst.name,
+        inst.n_tasks,
+        inst.n_machines,
+        output.status,
+        elapsed,
+        primal,
+        dual,
+        gap,
+        opt,
         output.nodes_explored,
-        nothing, nothing, nothing
+        nothing,
+        nothing,
+        nothing,
     )
 end
 
 # ── Output writers ──────────────────────────────────────────────────────
 
 const CSV_HEADER = [
-    "instance", "n", "m", "status", "wall_time_s",
-    "primal_bound", "dual_bound", "gap_pct", "opt_known",
-    "nb_nodes", "nb_columns", "nb_rmp_iters", "root_lp_value"
+    "instance",
+    "n",
+    "m",
+    "status",
+    "wall_time_s",
+    "primal_bound",
+    "dual_bound",
+    "gap_pct",
+    "opt_known",
+    "nb_nodes",
+    "nb_columns",
+    "nb_rmp_iters",
+    "root_lp_value",
 ]
 
 cell(::Nothing) = ""
@@ -124,9 +157,19 @@ function write_csv(results::Vector{BenchResult}, path::String)
         println(io, join(CSV_HEADER, ","))
         for r in results
             row = [
-                r.instance, r.n, r.m, r.status, r.wall_time_s,
-                r.primal_bound, r.dual_bound, r.gap_pct, r.opt_known,
-                r.nb_nodes, r.nb_columns, r.nb_rmp_iters, r.root_lp_value
+                r.instance,
+                r.n,
+                r.m,
+                r.status,
+                r.wall_time_s,
+                r.primal_bound,
+                r.dual_bound,
+                r.gap_pct,
+                r.opt_known,
+                r.nb_nodes,
+                r.nb_columns,
+                r.nb_rmp_iters,
+                r.root_lp_value,
             ]
             println(io, join(cell.(row), ","))
         end
@@ -135,39 +178,61 @@ end
 
 function result_to_dict(r::BenchResult)
     return Dict(
-        "instance" => r.instance, "n" => r.n, "m" => r.m,
-        "status" => String(r.status), "wall_time_s" => r.wall_time_s,
+        "instance" => r.instance,
+        "n" => r.n,
+        "m" => r.m,
+        "status" => String(r.status),
+        "wall_time_s" => r.wall_time_s,
         "primal_bound" => finite_or_nothing(r.primal_bound),
         "dual_bound" => finite_or_nothing(r.dual_bound),
-        "gap_pct" => r.gap_pct, "opt_known" => r.opt_known,
-        "nb_nodes" => r.nb_nodes, "nb_columns" => r.nb_columns,
+        "gap_pct" => r.gap_pct,
+        "opt_known" => r.opt_known,
+        "nb_nodes" => r.nb_nodes,
+        "nb_columns" => r.nb_columns,
         "nb_rmp_iters" => r.nb_rmp_iters,
-        "root_lp_value" => finite_or_nothing(r.root_lp_value)
+        "root_lp_value" => finite_or_nothing(r.root_lp_value),
     )
 end
 
 function write_json(results::Vector{BenchResult}, meta::Dict, path::String)
-    payload = Dict(
-        "metadata" => meta,
-        "results" => [result_to_dict(r) for r in results]
-    )
+    payload = Dict("metadata" => meta, "results" => [result_to_dict(r) for r in results])
     open(path, "w") do io
-        JSON.print(io, payload, 2)
+        return JSON.print(io, payload, 2)
     end
 end
 
 function print_table(results::Vector{BenchResult}, io::IO=stdout)
-    @printf(io, "%-18s %4s %3s %-12s %10s %12s %12s %8s %8s\n",
-        "instance", "n", "m", "status", "time(s)",
-        "primal", "dual", "gap%", "nodes")
+    @printf(
+        io,
+        "%-18s %4s %3s %-12s %10s %12s %12s %8s %8s\n",
+        "instance",
+        "n",
+        "m",
+        "status",
+        "time(s)",
+        "primal",
+        "dual",
+        "gap%",
+        "nodes"
+    )
     println(io, "-"^100)
     for r in results
         primal = r.primal_bound === nothing ? "—" : @sprintf("%.2f", r.primal_bound)
         dual = r.dual_bound === nothing ? "—" : @sprintf("%.2f", r.dual_bound)
         gap = r.gap_pct === nothing ? "—" : @sprintf("%.2f", r.gap_pct)
-        @printf(io, "%-18s %4d %3d %-12s %10.3f %12s %12s %8s %8d\n",
-            r.instance, r.n, r.m, String(r.status), r.wall_time_s,
-            primal, dual, gap, r.nb_nodes)
+        @printf(
+            io,
+            "%-18s %4d %3d %-12s %10.3f %12s %12s %8s %8d\n",
+            r.instance,
+            r.n,
+            r.m,
+            String(r.status),
+            r.wall_time_s,
+            primal,
+            dual,
+            gap,
+            r.nb_nodes
+        )
     end
 end
 
@@ -182,15 +247,19 @@ function git_commit_short()
 end
 
 function run_bench(
-    instance_paths::Vector{String}, cfg::BenchConfig, mode::String;
-    results_dir::String = joinpath(@__DIR__, "results")
+    instance_paths::Vector{String},
+    cfg::BenchConfig,
+    mode::String;
+    results_dir::String=joinpath(@__DIR__, "results"),
 )
     mkpath(results_dir)
     meta_lookup = load_metadata()
 
     println("== Vertigo GAP benchmark ($(mode)) ==")
-    println("instances: $(length(instance_paths))   node_limit: $(cfg.node_limit)   " *
-            "smoothing: $(cfg.smoothing_alpha)")
+    println(
+        "instances: $(length(instance_paths))   node_limit: $(cfg.node_limit)   " *
+        "smoothing: $(cfg.smoothing_alpha)",
+    )
     println()
 
     results = BenchResult[]
@@ -217,8 +286,8 @@ function run_bench(
         "config" => Dict(
             "node_limit" => cfg.node_limit,
             "smoothing_alpha" => cfg.smoothing_alpha,
-            "rmp_time_limit" => cfg.rmp_time_limit
-        )
+            "rmp_time_limit" => cfg.rmp_time_limit,
+        ),
     )
     write_csv(results, csv_path)
     write_json(results, run_meta, json_path)

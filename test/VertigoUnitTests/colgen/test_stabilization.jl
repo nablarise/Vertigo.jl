@@ -2,15 +2,30 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
-    setup_stabilization!, update_stabilization_after_master_optim!,
-    get_stab_dual_sol, update_stabilization_after_pricing_optim!,
-    check_misprice, update_stabilization_after_misprice!,
-    update_stabilization_after_iter!, _convex_combination,
-    MasterDualSolution, DualMoiSolution, GeneratedColumns,
-    PricingPrimalSolution, _SpSolution, get_master,
-    _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
-    Phase0, Phase1, Phase2, TaggedCI
+using Vertigo.ColGen:
+    WentgesSmoothing,
+    NoStabilization,
+    setup_stabilization!,
+    update_stabilization_after_master_optim!,
+    get_stab_dual_sol,
+    update_stabilization_after_pricing_optim!,
+    check_misprice,
+    update_stabilization_after_misprice!,
+    update_stabilization_after_iter!,
+    _convex_combination,
+    MasterDualSolution,
+    DualMoiSolution,
+    GeneratedColumns,
+    PricingPrimalSolution,
+    _SpSolution,
+    get_master,
+    _get_convexity_dual,
+    _dual_value,
+    _compute_sp_reduced_costs,
+    Phase0,
+    Phase1,
+    Phase2,
+    TaggedCI
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -19,11 +34,9 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
 function _make_dual_sol(
     obj::Float64,
     duals::Dict{TaggedCI,Float64}=Dict{TaggedCI,Float64}();
-    cc_ids::Vector{TaggedCI}=TaggedCI[]
+    cc_ids::Vector{TaggedCI}=TaggedCI[],
 )
-    return MasterDualSolution(
-        DualMoiSolution(obj, duals), cc_ids
-    )
+    return MasterDualSolution(DualMoiSolution(obj, duals), cc_ids)
 end
 
 """Build a minimal ColGenWorkspace with smoothing_alpha for testing."""
@@ -46,21 +59,15 @@ function _build_stab_ctx(; alpha=0.5)
         sp_jump = JuMP.Model(HiGHS.Optimizer)
         JuMP.set_silent(sp_jump)
         @variable(sp_jump, z[t in T], Bin)
-        @constraint(sp_jump,
-            sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k]
-        )
+        @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k])
         @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
         sp_models[PricingSubproblemId(k)] = JuMP.backend(sp_jump)
         sp_var_indices[PricingSubproblemId(k)] = [JuMP.index(z[t]) for t in T]
     end
 
     SpVar = MOI.VariableIndex
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(
-        minimize=true
-    )
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
     end
@@ -72,9 +79,7 @@ function _build_stab_ctx(; alpha=0.5)
         add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
     end
     for t in T
-        add_coupling_constraint!(
-            builder, JuMP.index(assignment[t]), 1.0
-        )
+        add_coupling_constraint!(builder, JuMP.index(assignment[t]), 1.0)
     end
     decomp = build(builder)
 
@@ -88,12 +93,14 @@ function _build_stab_ctx(; alpha=0.5)
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
-    config = ColGenConfig(smoothing_alpha=alpha)
-    ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=alpha)
+    ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     return ws
 end
@@ -132,7 +139,7 @@ function test_stabilization()
 end
 
 function test_setup_construction()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
     @test stab isa WentgesSmoothing
@@ -144,22 +151,18 @@ function test_setup_construction()
 end
 
 function test_setup_no_smoothing()
-    ws = _build_stab_ctx(alpha=0.0)
+    ws = _build_stab_ctx(; alpha=0.0)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
     @test stab isa NoStabilization
 end
 
 function test_convex_combination_arithmetic()
-    EqCstr = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
+    EqCstr = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
     d_center = Dict{TaggedCI,Float64}(
         TaggedCI(EqCstr(1)) => 10.0, TaggedCI(EqCstr(2)) => 20.0
     )
-    d_out = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 0.0, TaggedCI(EqCstr(2)) => 0.0
-    )
+    d_out = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 0.0, TaggedCI(EqCstr(2)) => 0.0)
     center = MasterDualSolution(DualMoiSolution(100.0, d_center), TaggedCI[])
     out = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
@@ -170,18 +173,10 @@ function test_convex_combination_arithmetic()
 end
 
 function test_convex_combination_disjoint_types()
-    EqCstr = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-    LtCstr = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}
-    }
-    d_center = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 4.0
-    )
-    d_out = Dict{TaggedCI,Float64}(
-        TaggedCI(LtCstr(1)) => 6.0
-    )
+    EqCstr = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
+    LtCstr = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}
+    d_center = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 4.0)
+    d_out = Dict{TaggedCI,Float64}(TaggedCI(LtCstr(1)) => 6.0)
     center = MasterDualSolution(DualMoiSolution(10.0, d_center), TaggedCI[])
     out = MasterDualSolution(DualMoiSolution(20.0, d_out), TaggedCI[])
 
@@ -195,7 +190,7 @@ function test_convex_combination_disjoint_types()
 end
 
 function test_first_iteration_returns_false()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
     dual = _make_dual_sol(42.0)
@@ -206,7 +201,7 @@ function test_first_iteration_returns_false()
 end
 
 function test_subsequent_iteration_returns_true()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
@@ -221,7 +216,7 @@ function test_subsequent_iteration_returns_true()
 end
 
 function test_phase_change_resets_center()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
@@ -237,7 +232,7 @@ function test_phase_change_resets_center()
 end
 
 function test_bound_improvement_updates_center()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
@@ -249,15 +244,13 @@ function test_bound_improvement_updates_center()
     gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # For minimization, improving means pseudo_db > best_lagrangian_bound
-    update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 10.0, sep_dual
-    )
+    update_stabilization_after_pricing_optim!(stab, ws, gen_cols, master, 10.0, sep_dual)
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center.sol.obj_value ≈ 5.0
 end
 
 function test_no_improvement_keeps_center()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
@@ -268,22 +261,18 @@ function test_no_improvement_keeps_center()
     gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # First call sets bound to 10.0
-    update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 10.0, sep_dual
-    )
+    update_stabilization_after_pricing_optim!(stab, ws, gen_cols, master, 10.0, sep_dual)
 
     # Second call with worse bound (8.0 < 10.0) shouldn't update
     old_center = stab.stab_center
     sep_dual2 = _make_dual_sol(7.0)
-    update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 8.0, sep_dual2
-    )
+    update_stabilization_after_pricing_optim!(stab, ws, gen_cols, master, 8.0, sep_dual2)
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center === old_center
 end
 
 function test_misprice_inactive()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
     stab.cur_smooth_dual_sol_coeff = 0.0
@@ -294,7 +283,7 @@ function test_misprice_inactive()
 end
 
 function test_misprice_deterministic_schedule()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
     stab.smooth_dual_sol_coeff = 0.5
@@ -318,7 +307,7 @@ end
 function test_misprice_hard_cap()
     # Use high alpha (0.95) so the formula alone would allow ~20
     # misprices, but the hard cap (default 10) should kick in first.
-    ws = _build_stab_ctx(alpha=0.95)
+    ws = _build_stab_ctx(; alpha=0.95)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
@@ -335,19 +324,13 @@ function test_misprice_hard_cap()
 end
 
 function test_decrease_alpha()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
-    EqCstr = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-    d_center = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 1.0
-    )
-    d_out = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 3.0
-    )
+    EqCstr = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
+    d_center = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 1.0)
+    d_out = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 3.0)
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
@@ -366,19 +349,13 @@ function test_decrease_alpha()
 end
 
 function test_increase_alpha()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_stab_ctx(; alpha=0.5)
     master = get_master(ws)
     stab = setup_stabilization!(ws, master)
 
-    EqCstr = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-    d_center = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 3.0
-    )
-    d_out = Dict{TaggedCI,Float64}(
-        TaggedCI(EqCstr(1)) => 1.0
-    )
+    EqCstr = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
+    d_center = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 3.0)
+    d_out = Dict{TaggedCI,Float64}(TaggedCI(EqCstr(1)) => 1.0)
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 

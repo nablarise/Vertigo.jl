@@ -20,14 +20,12 @@ function _build_lp_backend()
     ci_x_ub = MOI.add_constraint(m, x, MOI.LessThan(10.0))
     MOI.add_constraint(m, y, MOI.LessThan(10.0))
     obj = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(-1.0, x), MOI.ScalarAffineTerm(-1.0, y)],
-        0.0,
+        [MOI.ScalarAffineTerm(-1.0, x), MOI.ScalarAffineTerm(-1.0, y)], 0.0
     )
     MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), obj)
     MOI.set(m, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     f = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)],
-        0.0,
+        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)], 0.0
     )
     c1 = MOI.add_constraint(m, f, MOI.LessThan(15.0))
     return m, x, y, ci_x_ub, c1
@@ -43,18 +41,15 @@ function _build_three_set_lp_backend()
     MOI.add_constraint(m, x, MOI.GreaterThan(0.0))
     MOI.add_constraint(m, y, MOI.GreaterThan(0.0))
     obj = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)],
-        0.0,
+        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)], 0.0
     )
     MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), obj)
     MOI.set(m, MOI.ObjectiveSense(), MOI.MIN_SENSE)
     f_sum = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)],
-        0.0,
+        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y)], 0.0
     )
     f_diff = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(-1.0, y)],
-        0.0,
+        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(-1.0, y)], 0.0
     )
     MOI.add_constraint(m, f_sum, MOI.GreaterThan(2.0))
     MOI.add_constraint(m, f_sum, MOI.LessThan(10.0))
@@ -131,15 +126,15 @@ end
 function test_lp_basis_tracker_merge_forward_keeps_local()
     @testset "[lp_basis_tracker] merge_forward ignores parent, keeps local" begin
         parent_basis = LPBasisState(
-            Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{TaggedCI, MOI.BasisStatusCode}(),
+            Dict{MOI.VariableIndex,MOI.BasisStatusCode}(),
+            Dict{TaggedCI,MOI.BasisStatusCode}(),
         )
         child_basis = LPBasisState(
-            Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{TaggedCI, MOI.BasisStatusCode}(),
+            Dict{MOI.VariableIndex,MOI.BasisStatusCode}(),
+            Dict{TaggedCI,MOI.BasisStatusCode}(),
         )
         parent_diff = LPBasisDiff(parent_basis)
-        local_diff  = LPBasisDiff(child_basis)
+        local_diff = LPBasisDiff(child_basis)
 
         result = merge_forward_change_diff(parent_diff, local_diff)
 
@@ -150,8 +145,8 @@ end
 function test_lp_basis_tracker_merge_backward_always_noop()
     @testset "[lp_basis_tracker] merge_backward always returns nothing diff" begin
         some_basis = LPBasisState(
-            Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            Dict{TaggedCI, MOI.BasisStatusCode}(),
+            Dict{MOI.VariableIndex,MOI.BasisStatusCode}(),
+            Dict{TaggedCI,MOI.BasisStatusCode}(),
         )
         d1 = LPBasisDiff(some_basis)
         d2 = LPBasisDiff(some_basis)
@@ -178,14 +173,11 @@ function test_lp_basis_tracker_robustness_stale_index()
         # Build a basis with only the stale constraint (no var statuses)
         # to avoid early return from unsupported VariableBasisStatus.
         stale_basis = LPBasisState(
-            Dict{MOI.VariableIndex, MOI.BasisStatusCode}(),
-            basis.constr_status,
+            Dict{MOI.VariableIndex,MOI.BasisStatusCode}(), basis.constr_status
         )
 
         # apply_change! must error on invalid constraint index
-        @test_throws ErrorException apply_change!(
-            m, LPBasisDiff(stale_basis), nothing
-        )
+        @test_throws ErrorException apply_change!(m, LPBasisDiff(stale_basis), nothing)
     end
 end
 
@@ -198,9 +190,9 @@ function test_lp_basis_tracker_three_set_types()
         basis = capture_basis(m)
 
         F = MOI.ScalarAffineFunction{Float64}
-        gt_indices = MOI.get(m, MOI.ListOfConstraintIndices{F, MOI.GreaterThan{Float64}}())
-        lt_indices = MOI.get(m, MOI.ListOfConstraintIndices{F, MOI.LessThan{Float64}}())
-        eq_indices = MOI.get(m, MOI.ListOfConstraintIndices{F, MOI.EqualTo{Float64}}())
+        gt_indices = MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.GreaterThan{Float64}}())
+        lt_indices = MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.LessThan{Float64}}())
+        eq_indices = MOI.get(m, MOI.ListOfConstraintIndices{F,MOI.EqualTo{Float64}}())
 
         @test length(gt_indices) == 1
         @test length(lt_indices) == 1
@@ -224,5 +216,5 @@ function test_lp_basis_tracker()
     test_lp_basis_tracker_merge_forward_keeps_local()
     test_lp_basis_tracker_merge_backward_always_noop()
     test_lp_basis_tracker_robustness_stale_index()
-    test_lp_basis_tracker_three_set_types()
+    return test_lp_basis_tracker_three_set_types()
 end

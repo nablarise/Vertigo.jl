@@ -18,7 +18,7 @@ abstract type AbstractBranchingPhase end
 Return a short string label identifying the phase, used for logging.
 """
 function phase_label(phase::AbstractBranchingPhase)
-    error("phase_label not implemented for $(typeof(phase))")
+    return error("phase_label not implemented for $(typeof(phase))")
 end
 
 """
@@ -67,9 +67,7 @@ struct CGProbePhase <: AbstractBranchingPhase
     lookahead::Int
 
     function CGProbePhase(;
-        max_cg_iterations::Int=10,
-        keep_fraction::Float64=1.0,
-        lookahead::Int=8,
+        max_cg_iterations::Int=10, keep_fraction::Float64=1.0, lookahead::Int=8
     )
         return new(max_cg_iterations, keep_fraction, lookahead)
     end
