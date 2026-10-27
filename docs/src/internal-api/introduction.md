@@ -6,10 +6,12 @@ them.
 The flow chart below follows a call from the user's model to the result. The first two blocks build
 the decomposition; the rest solve it.
 
-1. **Decomposition Modeling Language** (`src/DecompModelLanguage/`). `src/macros/dantzig_wolfe.jl` defines
-   `@dantzig_wolfe`, `UserProblemDescription.jl` parses its block, `partition.jl` decides which part of
-   the JuMP model belongs to the master or to a subproblem, and `BridgeJuMPtoInternal.jl`
-   (`dantzig_wolfe_decomposition`) turns that partition into a decomposition.
+1. **Decomposition Modeling Language** (`src/DecompModelLanguage/`). The
+   `@dantzig_wolfe` macro reads the block written by the user. At run time, each
+   variable and constraint of the JuMP model is assigned to the master or to a
+   subproblem, and the result is turned into a decomposition by
+   `dantzig_wolfe_decomposition`. The [DML page](dml.md) follows these steps
+   file by file.
 2. **Reformulation** (`src/Reformulation/`). `builder.jl` (`DWReformulationBuilder`
    and `build`) assembles the master, the subproblems and the mappings between
    original and internal variables into a `DWReformulation`
