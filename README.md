@@ -38,9 +38,8 @@ set_silent(model)
 
 # Decompose: x and knapsack per machine, assign stays in master
 decomp, sp_map = @dantzig_wolfe model begin
-    x[k, _]      => subproblem(k)
-    assign[_]     => master()
-    knapsack[k]   => subproblem(k)
+    master() => (constraints = assign[_])
+    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
 end
 
 # Solve via column generation
@@ -52,6 +51,16 @@ output = run_column_generation(ctx)
 println("Status: ", output.status)           # optimal
 println("Dual bound: ", output.incumbent_dual_bound)  # 63.0
 ```
+
+## Tests
+
+```julia
+using Pkg; Pkg.test("Vertigo")
+```
+
+`test/VertigoUnitTests/` has one folder per module. `test/VertigoE2eTests/`
+runs column generation and branch-and-price on small GAP instances, including
+decompositions built with `@dantzig_wolfe`.
 
 ## Status
 
