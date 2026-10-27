@@ -2,29 +2,44 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
+# Ownerships written by hand, as `@dantzig_wolfe` would build them.
+function _master_of(name, nindices)
+    return Vertigo.DML.Ownership(
+        name,
+        nindices,
+        true,
+        (idx...) -> (id=nothing, silent=nothing, user_overriden=nothing),
+    )
+end
+function _subproblem_of(name, nindices, id)
+    return Vertigo.DML.Ownership(
+        name,
+        nindices,
+        false,
+        (idx...) -> (id=id(idx...), silent=nothing, user_overriden=nothing),
+    )
+end
+
 function _build_gap_jump_model()
-    cost = [5.0 8.0 14.0 20.0 5.0 4.0 13.0;
-            18.0 14.0 15.0 16.0 3.0 8.0 19.0]
-    weight = [1.0 1.0 1.0 5.0 2.0 1.0 4.0;
-              5.0 3.0 4.0 1.0 4.0 1.0 1.0]
+    cost = [
+        5.0 8.0 14.0 20.0 5.0 4.0 13.0;
+        18.0 14.0 15.0 16.0 3.0 8.0 19.0
+    ]
+    weight = [
+        1.0 1.0 1.0 5.0 2.0 1.0 4.0;
+        5.0 3.0 4.0 1.0 4.0 1.0 1.0
+    ]
     capacity = [11.0, 14.0]
     K = 1:2
     T = 1:7
 
     model = Model()
     @variable(model, x[k in K, t in T], Bin)
+    @constraint(model, assign[t in T], sum(x[k, t] for k in K) == 1)
     @constraint(
-        model, assign[t in T],
-        sum(x[k, t] for k in K) == 1
+        model, knapsack[k in K], sum(weight[k, t] * x[k, t] for t in T) <= capacity[k]
     )
-    @constraint(
-        model, knapsack[k in K],
-        sum(weight[k, t] * x[k, t] for t in T) <= capacity[k]
-    )
-    @objective(
-        model, Min,
-        sum(cost[k, t] * x[k, t] for k in K, t in T)
-    )
+    @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
     return model
 end
 
@@ -33,9 +48,8 @@ function test_dml_macro_basic_gap()
         model = _build_gap_jump_model()
 
         decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k)
-            assign[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            master() => (constraints = assign[_])
         end
 
         # 2 subproblems
@@ -70,14 +84,16 @@ function test_dml_macro_basic_gap()
 end
 
 function test_dml_annotation_function()
-    @testset "[dml] dantzig_wolfe_decomposition with function" begin
+    @testset "[dml] dantzig_wolfe_decomposition with ownerships" begin
         model = _build_gap_jump_model()
 
-        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k)
-        ann(::Val{:assign}, _) = dantzig_wolfe_master()
-        ann(::Val{:knapsack}, k) = dantzig_wolfe_subproblem(k)
+        ownerships = [
+            _subproblem_of(:x, 2, (k, _) -> k),
+            _master_of(:assign, 1),
+            _subproblem_of(:knapsack, 1, k -> k),
+        ]
 
-        decomp, sp_map = dantzig_wolfe_decomposition(model, ann)
+        decomp, sp_map = dantzig_wolfe_decomposition(model, ownerships)
 
         sp_ids = collect(subproblem_ids(decomp))
         @test length(sp_ids) == 2
@@ -91,10 +107,14 @@ end
 
 function test_dml_pure_master_variables()
     @testset "[dml] pure master variables in GAP with penalty" begin
-        cost = [8.0 5.0 11.0 21.0 6.0 5.0 19.0;
-                1.0 12.0 11.0 12.0 14.0 8.0 5.0]
-        weight = [2.0 3.0 3.0 1.0 2.0 1.0 1.0;
-                  5.0 1.0 1.0 3.0 1.0 5.0 4.0]
+        cost = [
+            8.0 5.0 11.0 21.0 6.0 5.0 19.0;
+            1.0 12.0 11.0 12.0 14.0 8.0 5.0
+        ]
+        weight = [
+            2.0 3.0 3.0 1.0 2.0 1.0 1.0;
+            5.0 1.0 1.0 3.0 1.0 5.0 4.0
+        ]
         capacity = [5.0, 8.0]
         penalty = 10.0
         K = 1:2
@@ -103,25 +123,19 @@ function test_dml_pure_master_variables()
         model = Model()
         @variable(model, x[k in K, t in T], Bin)
         @variable(model, u[t in T], Bin)
+        @constraint(model, assign[t in T], sum(x[k, t] for k in K) + u[t] == 1)
         @constraint(
-            model, assign[t in T],
-            sum(x[k, t] for k in K) + u[t] == 1
-        )
-        @constraint(
-            model, knapsack[k in K],
-            sum(weight[k, t] * x[k, t] for t in T) <= capacity[k]
+            model, knapsack[k in K], sum(weight[k, t] * x[k, t] for t in T) <= capacity[k]
         )
         @objective(
-            model, Min,
-            sum(cost[k, t] * x[k, t] for k in K, t in T) +
-            sum(penalty * u[t] for t in T)
+            model,
+            Min,
+            sum(cost[k, t] * x[k, t] for k in K, t in T) + sum(penalty * u[t] for t in T)
         )
 
         decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k)
-            u[_] => master()
-            assign[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            master() => (variables=u[_], constraints=assign[_])
         end
 
         sp_ids = collect(subproblem_ids(decomp))
@@ -130,20 +144,12 @@ function test_dml_pure_master_variables()
         pm_vars = pure_master_variables(decomp)
         @test length(pm_vars) == 7
 
-        @test all(
-            pmv -> pure_master_cost(decomp, pmv) ≈ penalty,
-            pm_vars
-        )
+        @test all(pmv -> pure_master_cost(decomp, pmv) ≈ penalty, pm_vars)
         @test all(pm_vars) do pmv
             lb, ub = pure_master_bounds(decomp, pmv)
             lb ≈ 0.0 && ub ≈ 1.0
         end
-        @test all(
-            pmv -> Vertigo.Reformulation.pure_master_is_integer(
-                decomp, pmv
-            ),
-            pm_vars
-        )
+        @test all(pmv -> Vertigo.Reformulation.pure_master_is_integer(decomp, pmv), pm_vars)
     end
 end
 
@@ -155,18 +161,17 @@ function test_dml_silent()
         model = _build_gap_jump_model()
         set_optimizer(model, HiGHS.Optimizer)
         decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k)
-            assign[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            master() => (constraints = assign[_])
         end
         @test silent(decomp.master_model)
         @test all(silent, values(sp_models(decomp)))
 
         # Explicit choice per model; one rule is enough to decide.
         decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, silent=(k == 2))
-            assign[_] => master(silent=false)
-            knapsack[k] => subproblem(k)
+            subproblem(k, silent=(k == 2)) => (variables = x[k, _])
+            master(silent=false) => (constraints = assign[_])
+            subproblem(k) => (constraints = knapsack[k])
         end
         @test !silent(decomp.master_model)
         @test silent(sp_models(decomp)[sp_map[2]])
@@ -174,9 +179,9 @@ function test_dml_silent()
 
         # Rules assigning to the same model must agree.
         @test_throws ErrorException @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, silent=true)
-            assign[_] => master()
-            knapsack[k] => subproblem(k, silent=false)
+            subproblem(k, silent=true) => (variables = x[k, _])
+            master() => (constraints = assign[_])
+            subproblem(k, silent=false) => (constraints = knapsack[k])
         end
     end
 end
@@ -186,9 +191,9 @@ function test_dml_user_overriden_subproblem()
         model = _build_gap_jump_model()
         set_optimizer(model, HiGHS.Optimizer)
         decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, user_overriden=(k == 1))
-            assign[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k, user_overriden=(k == 1)) => (variables = x[k, _])
+            master() => (constraints = assign[_])
+            subproblem(k) => (constraints = knapsack[k])
         end
 
         @test sp_model(decomp, sp_map[1]) === nothing
@@ -212,10 +217,8 @@ function test_dml_user_overriden_subproblem()
         # Container syntax: options are written once per container.
         decomp, sp_map = @dantzig_wolfe model begin
             master() => (constraints = assign[_])
-            subproblem(k, user_overriden=true) => (
-                variables = [x[k, _]],
-                constraints = knapsack[k]
-            )
+            subproblem(k, user_overriden=true) =>
+                (variables=[x[k, _]], constraints=knapsack[k])
         end
         @test all(isnothing, values(sp_models(decomp)))
         @test length(coupling_constraints(decomp)) == 7
@@ -225,34 +228,24 @@ function test_dml_user_overriden_subproblem()
 
         # Rules assigning to the same subproblem must agree.
         @test_throws ErrorException @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, user_overriden=true)
-            assign[_] => master()
-            knapsack[k] => subproblem(k, user_overriden=false)
+            subproblem(k, user_overriden=true) => (variables = x[k, _])
+            master() => (constraints = assign[_])
+            subproblem(k, user_overriden=false) => (constraints = knapsack[k])
         end
     end
 end
 
-function test_dml_annotation_options()
-    @testset "[dml] annotation options land in their own fields" begin
-        sp = dantzig_wolfe_subproblem(3; user_overriden=true)
-        @test sp.id == 3
-        @test sp.user_overriden === true
-        @test sp.silent === nothing
-
-        sp = dantzig_wolfe_subproblem(:a; silent=false)
-        @test sp.id == :a
-        @test sp.user_overriden === nothing
-        @test sp.silent === false
-
-        sp = dantzig_wolfe_subproblem(1; silent=true, user_overriden=false)
-        @test (sp.user_overriden, sp.silent) == (false, true)
-
-        @test dantzig_wolfe_master().silent === nothing
-        @test dantzig_wolfe_master(silent=false).silent === false
-
-        # No positional constructor: swapping two `Union{Nothing,Bool}` goes unnoticed.
-        @test_throws MethodError Vertigo.DML.SubproblemAnnotation(1, true, false)
-        @test_throws MethodError Vertigo.DML.MasterAnnotation(true)
+function test_dml_unknown_option()
+    @testset "[dml] an option the model does not take is rejected" begin
+        err = try
+            @macroexpand @dantzig_wolfe Model() begin
+                master(user_overriden=true) => (constraints = assign[_])
+            end
+            nothing
+        catch e
+            e
+        end
+        @test occursin("Unknown option `user_overriden` for master", sprint(showerror, err))
     end
 end
 
@@ -270,18 +263,13 @@ function test_dml_pure_master_bounds_and_types()
         @objective(model, Min, sum(x) + 1u + 2v + 3w + 4b)
 
         decomp, _ = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k)
-            u => master()
-            v => master()
-            w => master()
-            b => master()
-            assign[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            master() => (variables=[u, v, w, b], constraints=assign[_])
         end
 
         by_cost = Dict(
-            round(Int, pure_master_cost(decomp, pmv)) => pmv
-            for pmv in pure_master_variables(decomp)
+            round(Int, pure_master_cost(decomp, pmv)) => pmv for
+            pmv in pure_master_variables(decomp)
         )
         @test sort(collect(keys(by_cost))) == [1, 2, 3, 4]
         is_int(c) = Vertigo.Reformulation.pure_master_is_integer(decomp, by_cost[c])
@@ -306,12 +294,11 @@ function test_dml_large_subproblem_objective()
             @objective(model, Min, sum(i * y[i] for i in 1:n))
             return model
         end
-        ann(::Val{:y}, i) = dantzig_wolfe_subproblem(1)
-        ann(::Val{:cover}) = dantzig_wolfe_master()
+        ownerships = [_subproblem_of(:y, 1, i -> 1), _master_of(:cover, 0)]
 
-        dantzig_wolfe_decomposition(build(10), ann)   # compile everything but the size effect
+        dantzig_wolfe_decomposition(build(10), ownerships)   # compile everything but the size effect
         n = 2000
-        elapsed = @elapsed decomp, _ = dantzig_wolfe_decomposition(build(n), ann)
+        elapsed = @elapsed decomp, _ = dantzig_wolfe_decomposition(build(n), ownerships)
         @test length(subproblem_variables(decomp, PricingSubproblemId(1))) == n
         @test elapsed < 10   # tens of seconds with the splat; about a second without
     end
@@ -322,8 +309,11 @@ end
 function _random_gap_instance(rng)
     K, T = rand(rng, 2:3), rand(rng, 4:6)
     return (
-        K=K, T=T,
-        cost=rand(rng, 1:20, K, T), weight=rand(rng, 1:5, K, T), capacity=rand(rng, 5:9, K),
+        K=K,
+        T=T,
+        cost=rand(rng, 1:20, K, T),
+        weight=rand(rng, 1:5, K, T),
+        capacity=rand(rng, 5:9, K),
     )
 end
 
@@ -339,16 +329,24 @@ function _gap_model_for_decomposition(inst, penalty, Ks, Ts, container)
     @variable(model, x[k in Ks, t in Ts], Bin, container = container)
     @variable(model, u[t in Ts], Bin, container = container)
     @constraint(
-        model, assign[t in Ts], sum(x[k, t] for k in Ks) + (penalty ? u[t] : 0) == 1,
+        model,
+        assign[t in Ts],
+        sum(x[k, t] for k in Ks) + (penalty ? u[t] : 0) == 1,
         container = container
     )
-    penalty || @constraint(model, no_penalty[t in Ts], u[t] == 0, container = container)
+    if !(penalty)
+        @constraint(model, no_penalty[t in Ts], u[t] == 0, container = container)
+    end
     @constraint(
-        model, knapsack[k in Ks], sum(weight(k, t) * x[k, t] for t in Ts) <= inst.capacity[kpos[k]],
+        model,
+        knapsack[k in Ks],
+        sum(weight(k, t) * x[k, t] for t in Ts) <= inst.capacity[kpos[k]],
         container = container
     )
     @objective(
-        model, Min, sum(cost(k, t) * x[k, t] for k in Ks, t in Ts) + sum(30 * u[t] for t in Ts)
+        model,
+        Min,
+        sum(cost(k, t) * x[k, t] for k in Ks, t in Ts) + sum(30 * u[t] for t in Ts)
     )
     return model
 end
@@ -358,19 +356,14 @@ function _enumerated_master_optimum(inst, penalty, user_overriden, Ks, Ts, conta
     # Option values are evaluated inside Vertigo.DML, so they cannot name local variables.
     decomp, sp_map = if user_overriden
         @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, user_overriden=true)
-            u[_] => master()
-            assign[_] => master()
-            no_penalty[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k, user_overriden=true) => (variables = x[k, _])
+            master() => (variables=u[_], constraints=[assign[_], no_penalty[_]])
+            subproblem(k) => (constraints = knapsack[k])
         end
     else
         @dantzig_wolfe model begin
-            x[k, _] => subproblem(k)
-            u[_] => master()
-            assign[_] => master()
-            no_penalty[_] => master()
-            knapsack[k] => subproblem(k)
+            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            master() => (variables=u[_], constraints=[assign[_], no_penalty[_]])
         end
     end
     @test Set(keys(sp_map)) == Set(Ks)   # subproblems are named by the declared indices
@@ -379,21 +372,29 @@ function _enumerated_master_optimum(inst, penalty, user_overriden, Ks, Ts, conta
     for (ki, k) in enumerate(Ks)
         sp_id = sp_map[k]
         sp_vars = [last(mapped_subproblem_var(decomp, x[k, t])) for t in Ts]
-        for mask in 0:(2^inst.T - 1)
+        for mask in 0:(2 ^ inst.T - 1)
             positions = [ti for ti in 1:inst.T if (mask >> (ti - 1)) & 1 == 1]
-            sum(inst.weight[ki, ti] for ti in positions; init=0) <= inst.capacity[ki] || continue
+            if !(sum(inst.weight[ki, ti] for ti in positions; init=0) <= inst.capacity[ki])
+                continue
+            end
             sol = Vertigo.Reformulation._SpSolution(
                 sp_id, 0.0, [(sp_vars[ti], 1.0) for ti in positions]
             )
             coeffs = Dict{Vertigo.TaggedCI,Float64}(
-                cid => c for (cid, c) in Vertigo.Reformulation.compute_column_coupling_coefficients(decomp, sp_id, sol)
+                cid => c for
+                (cid, c) in Vertigo.Reformulation.compute_column_coupling_coefficients(
+                    decomp, sp_id, sol
+                )
             )
             coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
             coeffs[convexity_lb_ci(decomp, sp_id)] = 1.0
             Vertigo.ColGen.add_variable!(
                 master;
-                variable_type=MOI.ZeroOne(), constraint_coeffs=coeffs,
-                objective_coeff=Vertigo.Reformulation.compute_column_original_cost(decomp, sp_id, sol),
+                variable_type=MOI.ZeroOne(),
+                constraint_coeffs=coeffs,
+                objective_coeff=Vertigo.Reformulation.compute_column_original_cost(
+                    decomp, sp_id, sol
+                ),
             )
         end
     end
@@ -434,7 +435,11 @@ function test_dml_decomposition_matches_flat_model()
                         inst, penalty, user_overriden, Ks, Ts, container
                     )
                     optimize!(model)
-                    flat_obj = termination_status(model) == MOI.OPTIMAL ? objective_value(model) : nothing
+                    flat_obj = if termination_status(model) == MOI.OPTIMAL
+                        objective_value(model)
+                    else
+                        nothing
+                    end
                     @test isnothing(master_obj) == isnothing(flat_obj)
                     if !isnothing(flat_obj) && !isnothing(master_obj)
                         @test master_obj ≈ flat_obj atol = 1e-6
@@ -456,9 +461,8 @@ function test_dml_rules_see_declared_indices()
         K, T = ["a", "b"], 3:5
         declared = Set((k, t) for k in K for t in T)
         auto = JuMP.Containers.AutoContainerType
-        for container in (
-            auto, JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict
-        )
+        for container in
+            (auto, JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict)
             model = Model()
             @variable(model, x[k in K, t in T], container = container)
             @constraint(model, c[k in K, t in T], x[k, t] <= 1, container = container)
@@ -468,11 +472,13 @@ function test_dml_rules_see_declared_indices()
 
             seen = Dict{Symbol,Vector{Any}}()
             record(name, idx...) = push!(get!(Vector{Any}, seen, name), idx)
-            ann(::Val{:x}, k, t) = (record(:x, k, t); dantzig_wolfe_subproblem(k))
-            ann(::Val{:c}, k, t) = (record(:c, k, t); dantzig_wolfe_subproblem(k))
-            ann(::Val{:s}) = (record(:s); dantzig_wolfe_master())
-            ann(::Val{:scalar_c}) = (record(:scalar_c); dantzig_wolfe_master())
-            dantzig_wolfe_decomposition(model, ann)
+            ownerships = [
+                _subproblem_of(:x, 2, (k, t) -> (record(:x, k, t); k)),
+                _subproblem_of(:c, 2, (k, t) -> (record(:c, k, t); k)),
+                _subproblem_of(:s, 0, () -> (record(:s); "a")),
+                _subproblem_of(:scalar_c, 0, () -> (record(:scalar_c); "a")),
+            ]
+            dantzig_wolfe_decomposition(model, ownerships)
 
             for name in (:x, :c)
                 @test Set(Tuple.(seen[name])) == declared
@@ -487,8 +493,8 @@ function test_dml_rule_errors()
         model = _build_gap_jump_model()
         err = try
             @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                assign[_] => master()
+                subproblem(k) => (variables = x[k, _])
+                master() => (constraints = assign[_])
             end
             nothing
         catch e
@@ -501,8 +507,8 @@ function test_dml_rule_errors()
         model = _build_gap_jump_model()
         err = try
             @dantzig_wolfe model begin
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
+                master() => (constraints = assign[_])
+                subproblem(k) => (constraints = knapsack[k])
             end
             nothing
         catch e
@@ -514,14 +520,16 @@ function test_dml_rule_errors()
 
     @testset "[dml] two rules on one name are rejected" begin
         err = try
-            Core.eval(@__MODULE__, quote
-                @dantzig_wolfe _build_gap_jump_model() begin
-                    x[k, _] => subproblem(k)
-                    x[_, t] => subproblem(t)
-                    assign[_] => master()
-                    knapsack[k] => subproblem(k)
-                end
-            end)
+            Core.eval(
+                @__MODULE__,
+                quote
+                    @dantzig_wolfe _build_gap_jump_model() begin
+                        subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+                        subproblem(t) => (variables = x[_, t])
+                        master() => (constraints = assign[_])
+                    end
+                end,
+            )
             nothing
         catch e
             e
@@ -530,14 +538,79 @@ function test_dml_rule_errors()
         @test occursin("more than one rule", sprint(showerror, err))
     end
 
+    @testset "[dml] check_validity" begin
+        parse = Vertigo.DML.parse_block
+        check = Vertigo.DML.check_validity
+        valid = :(
+            begin
+                master() => (constraints = assign[_])
+                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+            end
+        )
+        @test check(parse(valid)...) === nothing
+
+        # A block with no `master()` line is rejected.
+        err = try
+            parse(:(
+                begin
+                    subproblem(k) => (variables = x[k, _])
+                end
+            ))
+        catch e
+            e
+        end
+        @test occursin("exactly one master()", sprint(showerror, err))
+
+        # Nothing is listed.
+        err = try
+            check(parse(:(
+                begin
+                    master() => ()
+                    subproblem(k) => ()
+                end
+            ))...)
+        catch e
+            e
+        end
+        @test occursin("No slice descriptions specified", sprint(showerror, err))
+
+        # The same name and number of indices in the master and in a subproblem.
+        err = try
+            check(parse(:(
+                begin
+                    master() => (constraints = assign[_])
+                    subproblem(k) => (constraints = assign[k])
+                end
+            ))...)
+        catch e
+            e
+        end
+        @test occursin(
+            "`assign` with 1 index(es) is matched by more than one rule",
+            sprint(showerror, err),
+        )
+
+        # `master()` written twice.
+        err = try
+            parse(:(
+                begin
+                    master() => (constraints = assign[_])
+                    master() => (variables = y)
+                end
+            ))
+        catch e
+            e
+        end
+        @test occursin("exactly one master()", sprint(showerror, err))
+    end
+
     @testset "[dml] unnamed variables and constraints are rejected" begin
         model = _build_gap_jump_model()
         @variable(model, [1:2], lower_bound = 0)
         err = try
             @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
+                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+                master() => (constraints = assign[_])
             end
             nothing
         catch e
@@ -550,9 +623,8 @@ function test_dml_rule_errors()
         @constraint(model, sum(model[:x][1, t] for t in 1:7) <= 3)
         err = try
             @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
+                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+                master() => (constraints = assign[_])
             end
             nothing
         catch e
@@ -565,9 +637,8 @@ function test_dml_rule_errors()
     @testset "[dml] every JuMP container is decomposed by its real indices" begin
         # x[k, t]: two subproblems "a" and "b" over tasks 3:5, linked by cover[t].
         # The decomposition must be the same whatever container JuMP stores them in.
-        for container in (
-            JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict
-        )
+        for container in
+            (JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict)
             model = Model()
             K, T = ["a", "b"], 3:5
             x = @variable(model, [k in K, t in T], base_name = "x", container = container)
@@ -575,14 +646,11 @@ function test_dml_rule_errors()
             model[:cover] = @constraint(
                 model, [t in T], sum(x[k, t] for k in K) == 1, container = container
             )
-            @constraint(
-                model, cap[k in K], sum(x[k, t] for t in T) <= 2, container = Dict
-            )
+            @constraint(model, cap[k in K], sum(x[k, t] for t in T) <= 2, container = Dict)
             @objective(model, Min, sum(x[k, t] for k in K, t in T))
             decomp, sp_map = @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                cover[_] => master()
-                cap[k] => subproblem(k)
+                subproblem(k) => (variables=x[k, _], constraints=cap[k])
+                master() => (constraints = cover[_])
             end
             @test sort(collect(keys(sp_map))) == ["a", "b"]
             for id in subproblem_ids(decomp)
@@ -598,10 +666,9 @@ function test_dml_rule_errors()
         @constraint(model, mixed, model[:x][1, 1] + model[:x][2, 1] <= 1)
         err = try
             @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
-                mixed => subproblem(1)
+                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+                master() => (constraints = assign[_])
+                subproblem(1) => (constraints = mixed)
             end
             nothing
         catch e
@@ -617,11 +684,9 @@ function test_dml_rule_errors()
         @constraint(model, withz, model[:x][1, 1] + z <= 1)
         err = try
             @dantzig_wolfe model begin
-                x[k, _] => subproblem(k)
-                z => master()
-                assign[_] => master()
-                knapsack[k] => subproblem(k)
-                withz => subproblem(1)
+                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
+                master() => (variables=z, constraints=assign[_])
+                subproblem(1) => (constraints = withz)
             end
             nothing
         catch e
@@ -638,10 +703,10 @@ function test_dml()
     test_dml_silent()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
-    test_dml_annotation_options()
+    test_dml_unknown_option()
     test_dml_pure_master_bounds_and_types()
     test_dml_large_subproblem_objective()
     test_dml_decomposition_matches_flat_model()
     test_dml_rule_errors()
-    test_dml_rules_see_declared_indices()
+    return test_dml_rules_see_declared_indices()
 end

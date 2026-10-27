@@ -2,6 +2,12 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
+"""
+    VariableMapping
+
+Maps each variable of the original JuMP model to its copy in the master or in
+a subproblem model, while those models are built.
+"""
 struct VariableMapping
     mapping::Dict{JuMP.VariableRef,JuMP.VariableRef}
 end
@@ -9,11 +15,19 @@ end
 VariableMapping() = VariableMapping(Dict{JuMP.VariableRef,JuMP.VariableRef}())
 
 Base.getindex(m::VariableMapping, k::JuMP.VariableRef) = m.mapping[k]
-Base.setindex!(m::VariableMapping, v::JuMP.VariableRef, k::JuMP.VariableRef) = m.mapping[k] = v
+function Base.setindex!(m::VariableMapping, v::JuMP.VariableRef, k::JuMP.VariableRef)
+    return m.mapping[k] = v
+end
 Base.haskey(m::VariableMapping, k::JuMP.VariableRef) = haskey(m.mapping, k)
 Base.iterate(m::VariableMapping) = iterate(m.mapping)
 Base.iterate(m::VariableMapping, s) = iterate(m.mapping, s)
 
+"""
+    ConstraintMapping
+
+Maps each constraint of the original JuMP model to its copy in the master or
+in a subproblem model, while those models are built.
+"""
 struct ConstraintMapping
     mapping::Dict{JuMP.ConstraintRef,JuMP.ConstraintRef}
 end
@@ -21,7 +35,9 @@ end
 ConstraintMapping() = ConstraintMapping(Dict{JuMP.ConstraintRef,JuMP.ConstraintRef}())
 
 Base.getindex(m::ConstraintMapping, k::JuMP.ConstraintRef) = m.mapping[k]
-Base.setindex!(m::ConstraintMapping, v::JuMP.ConstraintRef, k::JuMP.ConstraintRef) = m.mapping[k] = v
+function Base.setindex!(m::ConstraintMapping, v::JuMP.ConstraintRef, k::JuMP.ConstraintRef)
+    return m.mapping[k] = v
+end
 Base.iterate(m::ConstraintMapping) = iterate(m.mapping)
 Base.iterate(m::ConstraintMapping, s) = iterate(m.mapping, s)
 
@@ -53,49 +69,51 @@ function _original_var_info(original_model, var_name, index)
 end
 
 function _replace_vars_in_func(
-    func::JuMP.AffExpr, target_model,
+    func::JuMP.AffExpr,
+    target_model,
     var_mapping::VariableMapping;
-    preserve_constant::Bool=true
+    preserve_constant::Bool=true,
 )
     # Variables of a user-overridden subproblem have no model, hence no mapping.
     terms = [
-        var_mapping[var] => coeff
-        for (var, coeff) in func.terms
-        if haskey(var_mapping, var) &&
-           JuMP.owner_model(var_mapping[var]) == target_model
+        var_mapping[var] => coeff for (var, coeff) in func.terms if
+        haskey(var_mapping, var) && JuMP.owner_model(var_mapping[var]) == target_model
     ]
     constant = preserve_constant ? func.constant : 0.0
     return JuMP.AffExpr(constant, terms)
 end
 
 function _replace_vars_in_func(
-    single_var::JuMP.VariableRef, target_model,
+    single_var::JuMP.VariableRef,
+    target_model,
     var_mapping::VariableMapping;
-    preserve_constant::Bool=true
+    preserve_constant::Bool=true,
 )
     if haskey(var_mapping, single_var)
         mapped = var_mapping[single_var]
-        JuMP.owner_model(mapped) == target_model && return mapped
+        if JuMP.owner_model(mapped) == target_model
+            return mapped
+        end
     end
     return 0.0
 end
 
 function _register_variables!(
-    reform_model, var_mapping::VariableMapping,
-    original_model, var_infos_by_names
+    reform_model, var_mapping::VariableMapping, original_model, var_infos_by_names
 )
     for (var_name, var_infos_by_indexes) in var_infos_by_names
         _register_variable_object!(
-            reform_model, var_mapping,
-            original_model, var_name, var_infos_by_indexes
+            reform_model, var_mapping, original_model, var_name, var_infos_by_indexes
         )
     end
 end
 
 function _register_variable_object!(
-    reform_model, var_mapping::VariableMapping,
-    original_model, var_name,
-    var_infos_by_indexes::Dict{Tuple{},<:Any}
+    reform_model,
+    var_mapping::VariableMapping,
+    original_model,
+    var_name,
+    var_infos_by_indexes::Dict{Tuple{},<:Any},
 )
     index = ()
     var_info = var_infos_by_indexes[index]
@@ -108,67 +126,64 @@ function _register_variable_object!(
     original_var = get_scalar_object(original_model, var_name, index)
     reform_var = JuMP.add_variable(reform_model, var, jump_var_name)
     var_mapping[original_var] = reform_var
-    reform_model[var_name] = reform_var
+    return reform_model[var_name] = reform_var
 end
 
 function _register_variable_object!(
-    reform_model, var_mapping::VariableMapping,
-    original_model, var_name, var_infos_by_indexes
+    reform_model,
+    var_mapping::VariableMapping,
+    original_model,
+    var_name,
+    var_infos_by_indexes,
 )
     indexes = sort(collect(keys(var_infos_by_indexes)))
     vars = JuMP.Containers.container(
         (index...) -> begin
-            var = JuMP.build_variable(
-                () -> error("todo."),
-                var_infos_by_indexes[index]
-            )
+            var = JuMP.build_variable(() -> error("todo."), var_infos_by_indexes[index])
             jump_var_name = if JuMP.set_string_names_on_creation(reform_model)
                 JuMP.string(var_name, "[", JuMP.string(index), "]")
             else
                 ""
             end
-            original_var = get_scalar_object(
-                original_model, var_name, index
-            )
-            var_mapping[original_var] = JuMP.add_variable(
-                reform_model, var, jump_var_name
-            )
+            original_var = get_scalar_object(original_model, var_name, index)
+            var_mapping[original_var] = JuMP.add_variable(reform_model, var, jump_var_name)
         end,
-        indexes
+        indexes,
     )
-    reform_model[var_name] = vars
+    return reform_model[var_name] = vars
 end
 
 function _register_constraints!(
-    reform_model, constr_mapping::ConstraintMapping,
-    original_model, constr_by_names,
-    var_mapping::VariableMapping
+    reform_model,
+    constr_mapping::ConstraintMapping,
+    original_model,
+    constr_by_names,
+    var_mapping::VariableMapping,
 )
     for (constr_name, constr_by_indexes) in constr_by_names
         _register_constraint_object!(
-            reform_model, constr_mapping,
-            original_model, constr_name,
-            constr_by_indexes, var_mapping
+            reform_model,
+            constr_mapping,
+            original_model,
+            constr_name,
+            constr_by_indexes,
+            var_mapping,
         )
     end
 end
 
 function _register_constraint_object!(
-    reform_model, constr_mapping::ConstraintMapping,
-    original_model, constr_name,
+    reform_model,
+    constr_mapping::ConstraintMapping,
+    original_model,
+    constr_name,
     constr_by_indexes::Set{Tuple{}},
-    var_mapping::VariableMapping
+    var_mapping::VariableMapping,
 )
     index = ()
-    original_constr = get_scalar_object(
-        original_model, constr_name, index
-    )
+    original_constr = get_scalar_object(original_model, constr_name, index)
     original_constr_obj = JuMP.constraint_object(original_constr)
-    mapped_func = _replace_vars_in_func(
-        original_constr_obj.func,
-        reform_model,
-        var_mapping
-    )
+    mapped_func = _replace_vars_in_func(original_constr_obj.func, reform_model, var_mapping)
     constr = JuMP.build_constraint(
         () -> error("todo."), mapped_func, original_constr_obj.set
     )
@@ -177,34 +192,29 @@ function _register_constraint_object!(
     else
         ""
     end
-    reform_constr = JuMP.add_constraint(
-        reform_model, constr, jump_constr_name
-    )
+    reform_constr = JuMP.add_constraint(reform_model, constr, jump_constr_name)
     constr_mapping[original_constr] = reform_constr
-    reform_model[constr_name] = reform_constr
+    return reform_model[constr_name] = reform_constr
 end
 
 function _register_constraint_object!(
-    reform_model, constr_mapping::ConstraintMapping,
-    original_model, constr_name, constr_by_indexes,
-    var_mapping::VariableMapping
+    reform_model,
+    constr_mapping::ConstraintMapping,
+    original_model,
+    constr_name,
+    constr_by_indexes,
+    var_mapping::VariableMapping,
 )
     indexes = sort(collect(constr_by_indexes))
     constrs = JuMP.Containers.container(
         (index...) -> begin
-            original_constr = get_scalar_object(
-                original_model, constr_name, index
-            )
+            original_constr = get_scalar_object(original_model, constr_name, index)
             original_constr_obj = JuMP.constraint_object(original_constr)
             mapped_func = _replace_vars_in_func(
-                original_constr_obj.func,
-                reform_model,
-                var_mapping
+                original_constr_obj.func, reform_model, var_mapping
             )
             constr = JuMP.build_constraint(
-                () -> error("todo."),
-                mapped_func,
-                original_constr_obj.set
+                () -> error("todo."), mapped_func, original_constr_obj.set
             )
             jump_constr_name = if JuMP.set_string_names_on_creation(reform_model)
                 JuMP.string(constr_name, "[", JuMP.string(index), "]")
@@ -215,21 +225,19 @@ function _register_constraint_object!(
                 reform_model, constr, jump_constr_name
             )
         end,
-        indexes
+        indexes,
     )
-    reform_model[constr_name] = constrs
+    return reform_model[constr_name] = constrs
 end
 
 function _register_objective!(
-    reform_model, model, var_mapping::VariableMapping;
-    is_master::Bool=false
+    reform_model, model, var_mapping::VariableMapping; is_master::Bool=false
 )
     original_obj_func = JuMP.objective_function(model)
     original_obj_sense = JuMP.objective_sense(model)
     reform_obj_func = _replace_vars_in_func(
-        original_obj_func, reform_model, var_mapping;
-        preserve_constant=is_master
+        original_obj_func, reform_model, var_mapping; preserve_constant=is_master
     )
     JuMP.set_objective_sense(reform_model, original_obj_sense)
-    JuMP.set_objective_function(reform_model, reform_obj_func)
+    return JuMP.set_objective_function(reform_model, reform_obj_func)
 end

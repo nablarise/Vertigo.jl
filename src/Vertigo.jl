@@ -29,14 +29,13 @@ include("BranchCutPrice/BranchCutPrice.jl")
 using .BranchCutPrice
 
 # ── Decomposition Modeling Language ───────────────────────────────────────────
-include("DML/DML.jl")
+include("DecompModelLanguage/DecompModelLanguage.jl")
 using .DML
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
 # DML (Decomposition Modeling Language)
 export @dantzig_wolfe, dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
 
 # Decomposition builder
 export PricingSubproblemId
@@ -54,7 +53,8 @@ export ColumnPool
 # Context and solver entry point
 export ColGenConfig, ColGenWorkspace, ColGenLoggerWorkspace
 export run_col_gen, run_column_generation, ColGenOutput
-export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
+export ColGenStatus,
+    optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions

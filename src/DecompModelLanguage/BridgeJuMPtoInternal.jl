@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 """
-    dantzig_wolfe_decomposition(model, dw_annotation; optimizer=nothing)
+    dantzig_wolfe_decomposition(model, ownerships; optimizer=nothing)
 
-Decompose a JuMP `model` into a Dantzig-Wolfe reformulation using
-the annotation function `dw_annotation`.
+Decompose a JuMP `model` into a Dantzig-Wolfe reformulation. `ownerships` is a
+vector of [`Ownership`](@ref) saying which model owns each variable and
+constraint; `@dantzig_wolfe` builds it from its block.
 
 Returns `(decomp::DWReformulation, sp_id_map::Dict)` where `sp_id_map`
 maps user-provided subproblem identifiers to `PricingSubproblemId`.
@@ -22,9 +23,8 @@ model = Model()
 @objective(model, Min, sum(x))
 
 decomp, sp_map = @dantzig_wolfe model begin
-    x[m, _] => subproblem(m)
-    assign[_] => master()
-    cap[m] => subproblem(m)
+    master() => (constraints = assign[_])
+    subproblem(m) => (variables = x[m, _], constraints = cap[m])
 end
 
 length(collect(subproblem_ids(decomp)))
@@ -70,106 +70,76 @@ sp_models(decomp)[sp_map[1]] === nothing
 true
 ```
 """
-function dantzig_wolfe_decomposition(
-    model::JuMP.Model, dw_annotation;
-    optimizer=nothing
-)
+function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=nothing)
+    table = _ownership_table(ownerships)
     _check_all_objects_named(model)
-    master_vars = _master_variables(model, dw_annotation)
-    sp_vars_partition = _partition_subproblem_variables(
-        model, dw_annotation
-    )
-    master_constrs = _master_constraints(model, dw_annotation)
-    sp_constrs_partition = _partition_subproblem_constraints(
-        model, dw_annotation
-    )
-    _check_no_foreign_variables(
-        model, master_vars, sp_vars_partition, sp_constrs_partition
-    )
+    master_vars = _master_variables(model, table)
+    sp_vars_partition = _partition_subproblem_variables(model, table)
+    master_constrs = _master_constraints(model, table)
+    sp_constrs_partition = _partition_subproblem_constraints(model, table)
+    _check_no_foreign_variables(model, master_vars, sp_vars_partition, sp_constrs_partition)
 
     # Create master JuMP model
     master_model = JuMP.Model()
-    JuMP.set_objective_sense(
-        master_model, JuMP.objective_sense(model)
-    )
+    JuMP.set_objective_sense(master_model, JuMP.objective_sense(model))
 
     var_mapping = VariableMapping()
     constr_mapping = ConstraintMapping()
 
     # Register master variables
     master_var_infos = Dict(
-        var_name => Dict(
-            idx => _original_var_info(model, var_name, idx)
-            for idx in indexes
-        )
-        for (var_name, indexes) in master_vars
+        var_name =>
+            Dict(idx => _original_var_info(model, var_name, idx) for idx in indexes) for
+        (var_name, indexes) in master_vars
     )
-    _register_variables!(
-        master_model, var_mapping, model, master_var_infos
-    )
+    _register_variables!(master_model, var_mapping, model, master_var_infos)
 
     # Create subproblem JuMP models, except for user-overridden subproblems,
     # which are solved by the user's own algorithm and have no model.
     user_sp_ids = collect(keys(sp_vars_partition))
     sp_objects(sp_id) = Iterators.flatten((
-        get(sp_vars_partition, sp_id, ()),
-        get(sp_constrs_partition, sp_id, ())
+        get(sp_vars_partition, sp_id, ()), get(sp_constrs_partition, sp_id, ())
     ))
     user_overriden_sp_ids = Set(
-        sp_id for sp_id in user_sp_ids
-        if _requested_option(
-            sp_objects(sp_id), dw_annotation, :user_overriden, false,
-            "subproblem $sp_id"
+        sp_id for sp_id in user_sp_ids if _requested_option(
+            sp_objects(sp_id), table, :user_overriden, false, "subproblem $sp_id"
         )
     )
     sp_jump_models = Dict(
-        sp_id => JuMP.Model()
-        for sp_id in user_sp_ids if !(sp_id in user_overriden_sp_ids)
+        sp_id => JuMP.Model() for sp_id in user_sp_ids if !(sp_id in user_overriden_sp_ids)
     )
 
     # Register subproblem variables
     sp_var_infos = Dict(
         sp_id => Dict(
             var_name => Dict(
-                idx => _original_var_info(model, var_name, idx)
-                for idx in indexes
-            )
-            for (var_name, indexes) in sp_vars_partition[sp_id]
-        )
-        for sp_id in keys(sp_jump_models)
+                idx => _original_var_info(model, var_name, idx) for idx in indexes
+            ) for (var_name, indexes) in sp_vars_partition[sp_id]
+        ) for sp_id in keys(sp_jump_models)
     )
 
     for (sp_id, var_infos_by_names) in sp_var_infos
-        _register_variables!(
-            sp_jump_models[sp_id], var_mapping,
-            model, var_infos_by_names
-        )
+        _register_variables!(sp_jump_models[sp_id], var_mapping, model, var_infos_by_names)
     end
 
     # Register subproblem constraints
     for (sp_id, constr_by_names) in sp_constrs_partition
-        sp_id in user_overriden_sp_ids && continue
+        if sp_id in user_overriden_sp_ids
+            continue
+        end
         _register_constraints!(
-            sp_jump_models[sp_id], constr_mapping,
-            model, constr_by_names, var_mapping
+            sp_jump_models[sp_id], constr_mapping, model, constr_by_names, var_mapping
         )
     end
 
     # Register master (coupling) constraints
-    _register_constraints!(
-        master_model, constr_mapping,
-        model, master_constrs, var_mapping
-    )
+    _register_constraints!(master_model, constr_mapping, model, master_constrs, var_mapping)
 
     # Register objectives
     for sp_model in values(sp_jump_models)
-        _register_objective!(
-            sp_model, model, var_mapping; is_master=false
-        )
+        _register_objective!(sp_model, model, var_mapping; is_master=false)
     end
-    _register_objective!(
-        master_model, model, var_mapping; is_master=true
-    )
+    _register_objective!(master_model, model, var_mapping; is_master=true)
 
     # Resolve optimizer: explicit kwarg > original model's optimizer
     opt = optimizer
@@ -179,32 +149,31 @@ function dantzig_wolfe_decomposition(
 
     if opt !== nothing
         JuMP.set_optimizer(master_model, opt)
-        _requested_option(
+        if _requested_option(
             Iterators.flatten((master_vars, master_constrs)),
-            dw_annotation, :silent, true, "the master"
-        ) && JuMP.set_silent(master_model)
+            table,
+            :silent,
+            true,
+            "the master",
+        )
+            JuMP.set_silent(master_model)
+        end
         for (sp_id, sp_model) in sp_jump_models
             JuMP.set_optimizer(sp_model, opt)
             _requested_option(
-                sp_objects(sp_id), dw_annotation, :silent, true,
-                "subproblem $sp_id"
+                sp_objects(sp_id), table, :silent, true, "subproblem $sp_id"
             ) && JuMP.set_silent(sp_model)
         end
     end
 
     # Deterministic sp_id mapping
     sorted_ids = sort(collect(user_sp_ids))
-    sp_id_map = Dict(
-        id => PricingSubproblemId(i)
-        for (i, id) in enumerate(sorted_ids)
-    )
+    sp_id_map = Dict(id => PricingSubproblemId(i) for (i, id) in enumerate(sorted_ids))
 
     # Build DWReformulation via builder
     sense = JuMP.objective_sense(model)
     minimize = (sense == MOI.MIN_SENSE)
-    builder = DWReformulationBuilder{JuMP.VariableRef}(
-        minimize=minimize
-    )
+    builder = DWReformulationBuilder{JuMP.VariableRef}(; minimize=minimize)
 
     for id in sorted_ids
         add_subproblem!(builder, sp_id_map[id], 0.0, 1.0, 1.0)
@@ -233,15 +202,25 @@ function dantzig_wolfe_decomposition(
 
     # Register coupling constraints and coefficients
     _register_coupling_data!(
-        builder, model, master_model, master_constrs,
-        constr_mapping, sp_id_map, sp_var_index
+        builder,
+        model,
+        master_model,
+        master_constrs,
+        constr_mapping,
+        sp_id_map,
+        sp_var_index,
     )
 
     # Register pure master variables
     _register_pure_master_data!(
-        builder, model, master_model, master_vars,
-        master_constrs, constr_mapping, var_mapping,
-        orig_costs
+        builder,
+        model,
+        master_model,
+        master_vars,
+        master_constrs,
+        constr_mapping,
+        var_mapping,
+        orig_costs,
     )
 
     decomp = build(builder)
@@ -261,33 +240,75 @@ function dantzig_wolfe_decomposition(
     # Wire MOI backends
     # A user-overridden subproblem has no backend: the user installs a pricer.
     sp_backends = Dict{PricingSubproblemId,Any}(
-        sp_id_map[id] => (
-            haskey(sp_jump_models, id) ?
-            JuMP.backend(sp_jump_models[id]) : nothing
-        )
-        for id in user_sp_ids
+        sp_id_map[id] =>
+            (haskey(sp_jump_models, id) ? JuMP.backend(sp_jump_models[id]) : nothing) for
+        id in user_sp_ids
     )
-    set_models!(
-        decomp, JuMP.backend(master_model),
-        sp_backends, conv_ub_map, conv_lb_map
-    )
+    set_models!(decomp, JuMP.backend(master_model), sp_backends, conv_ub_map, conv_lb_map)
 
     return (decomp, sp_id_map)
 end
 
-# Value of annotation option `option` for the model gathering `objects`
-# (name => indexes pairs). Rules that don't say are ignored; rules that do
-# must agree, and `default` applies when none does.
-function _requested_option(objects, dw_annotation, option, default, target)
+"""
+    check_validity(master, subproblems)
+
+Check that the descriptions of a `@dantzig_wolfe` block make a valid
+decomposition, and throw an error if they do not. `master` is the
+[`MasterProblemUserDescription`](@ref) and `subproblems` the collection of its
+[`SubproblemUserDescription`](@ref)s.
+
+The decomposition is valid when:
+- at least one variable or constraint slice description is listed, in the master or in a
+  subproblem;
+- no two slice descriptions, in any model, have the same name and the same number of
+  indices. Slice descriptions hold only index names, so such descriptions match the same
+  objects, and each variable or constraint must be owned by exactly one model.
+
+Returns `nothing`. The check reads the descriptions only: that every slice description
+names an object of the JuMP model is not part of it.
+
+# Example
+```julia
+check_validity(master, subproblems)  # throws if `x` is listed twice with 2 indices
+```
+"""
+function check_validity(master::MasterProblemUserDescription, subproblems)
+    descriptions = Iterators.flatten(((master,), subproblems))
+    if all(d -> isempty(_owned_slices(d)), descriptions)
+        error("No slice descriptions specified in @dantzig_wolfe block")
+    end
+    # Slice descriptions only hold index names, so two of them with the same name and
+    # number of indices match the same elements.
+    seen = Set{Tuple{Symbol,Int}}()
+    for d in descriptions, p in _owned_slices(d)
+        key = (p.name, length(p.indices))
+        if key in seen
+            error(
+                "`$(p.name)` with $(length(p.indices)) index(es) is matched by more " *
+                "than one rule in @dantzig_wolfe; each variable or constraint " *
+                "needs exactly one",
+            )
+        end
+        push!(seen, key)
+    end
+    return nothing
+end
+
+# Value of `option` for the model gathering `objects` (name => indexes pairs).
+# Rules that don't say are ignored; rules that do must agree, and `default`
+# applies when none does.
+function _requested_option(objects, table, option, default, target)
     values = Set{Bool}()
     for (name, indexes) in objects, idx in indexes
-        value = getproperty(dw_annotation(Val(name), idx...), option)
+        value = getproperty(_ownership(table, :object, name, idx).resolve(idx...), option)
         value === nothing || push!(values, value)
     end
-    length(values) > 1 && error(
-        "Conflicting `$option` settings for $target: " *
-        "all rules assigning to it must agree."
-    )
+    if length(values) > 1
+        error(
+            "Conflicting `$option` settings for $target: " *
+            "all rules assigning to it must agree.",
+        )
+    end
     return isempty(values) ? default : only(values)
 end
 
@@ -321,23 +342,21 @@ function _get_optimizer(model::JuMP.Model)
         opt = be.optimizer
         if opt !== nothing
             inner = _unwrap_optimizer(opt)
-            inner !== nothing && return typeof(inner)
+            if inner !== nothing
+                return typeof(inner)
+            end
         end
     end
     return nothing
 end
 
 _unwrap_optimizer(opt) = opt
-function _unwrap_optimizer(
-    opt::MOI.Bridges.LazyBridgeOptimizer
-)
+function _unwrap_optimizer(opt::MOI.Bridges.LazyBridgeOptimizer)
     return opt.model
 end
 
 function _extract_costs(obj::JuMP.AffExpr)
-    return Dict{JuMP.VariableRef,Float64}(
-        var => coeff for (var, coeff) in obj.terms
-    )
+    return Dict{JuMP.VariableRef,Float64}(var => coeff for (var, coeff) in obj.terms)
 end
 
 function _extract_costs(obj::JuMP.VariableRef)
@@ -349,14 +368,11 @@ function _extract_costs(obj)
 end
 
 function _register_coupling_data!(
-    builder, model, master_model, master_constrs,
-    constr_mapping, sp_id_map, sp_var_index
+    builder, model, master_model, master_constrs, constr_mapping, sp_id_map, sp_var_index
 )
     for (constr_name, constr_indexes) in master_constrs
         for idx in sort(collect(constr_indexes))
-            orig_constr = get_scalar_object(
-                model, constr_name, idx
-            )
+            orig_constr = get_scalar_object(model, constr_name, idx)
             reform_constr = constr_mapping[orig_constr]
             cstr_moi = JuMP.index(reform_constr)
             rhs = JuMP.normalized_rhs(reform_constr)
@@ -366,8 +382,7 @@ function _register_coupling_data!(
             # constraint (uses original variables)
             orig_constr_obj = JuMP.constraint_object(orig_constr)
             _add_coupling_from_func!(
-                builder, orig_constr_obj.func, cstr_moi,
-                sp_var_index, sp_id_map
+                builder, orig_constr_obj.func, cstr_moi, sp_var_index, sp_id_map
             )
         end
     end
@@ -384,10 +399,9 @@ function _add_coupling_from_func!(
 end
 
 function _add_coupling_from_func!(
-    builder, single_var::JuMP.VariableRef, cstr_moi,
-    sp_var_index, sp_id_map
+    builder, single_var::JuMP.VariableRef, cstr_moi, sp_var_index, sp_id_map
 )
-    _add_coupling_coefficient!(
+    return _add_coupling_coefficient!(
         builder, single_var, 1.0, cstr_moi, sp_var_index, sp_id_map
     )
 end
@@ -396,19 +410,26 @@ end
 function _add_coupling_coefficient!(
     builder, orig_var, coeff, cstr_moi, sp_var_index, sp_id_map
 )
-    haskey(sp_var_index, orig_var) || return
+    if !(haskey(sp_var_index, orig_var))
+        return nothing
+    end
     user_id, moi_idx = sp_var_index[orig_var]
-    add_coupling_coefficient!(
-        builder, sp_id_map[user_id], moi_idx, cstr_moi, coeff
-    )
+    return add_coupling_coefficient!(builder, sp_id_map[user_id], moi_idx, cstr_moi, coeff)
 end
 
 function _register_pure_master_data!(
-    builder, model, master_model, master_vars,
-    master_constrs, constr_mapping, var_mapping,
-    orig_costs
+    builder,
+    model,
+    master_model,
+    master_vars,
+    master_constrs,
+    constr_mapping,
+    var_mapping,
+    orig_costs,
 )
-    isempty(master_vars) && return
+    if isempty(master_vars)
+        return nothing
+    end
 
     for (var_name, indexes) in master_vars
         for idx in sort(collect(indexes))
@@ -426,28 +447,18 @@ function _register_pure_master_data!(
                 ub = 1.0
             end
 
-            add_pure_master_variable!(
-                builder, moi_idx, cost, lb, ub, is_int
-            )
+            add_pure_master_variable!(builder, moi_idx, cost, lb, ub, is_int)
 
             # Find coupling constraints involving this variable
             for (constr_name, constr_indexes) in master_constrs
                 for cidx in constr_indexes
-                    orig_constr = get_scalar_object(
-                        model, constr_name, cidx
-                    )
-                    orig_constr_obj = JuMP.constraint_object(
-                        orig_constr
-                    )
-                    coeff = _get_coeff_in_func(
-                        orig_constr_obj.func, orig_var
-                    )
+                    orig_constr = get_scalar_object(model, constr_name, cidx)
+                    orig_constr_obj = JuMP.constraint_object(orig_constr)
+                    coeff = _get_coeff_in_func(orig_constr_obj.func, orig_var)
                     if !iszero(coeff)
                         reform_constr = constr_mapping[orig_constr]
                         cstr_moi = JuMP.index(reform_constr)
-                        add_pure_master_coupling!(
-                            builder, moi_idx, cstr_moi, coeff
-                        )
+                        add_pure_master_coupling!(builder, moi_idx, cstr_moi, coeff)
                     end
                 end
             end

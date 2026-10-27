@@ -16,20 +16,27 @@ _is_container(obj) = obj isa Union{AbstractArray,AbstractDict}
 # Whether `obj` is a JuMP object of kind `R` (`JuMP.AbstractVariableRef` or
 # `JuMP.ConstraintRef`), alone or in a container.
 function _holds(obj, ::Type{R}) where {R}
-    obj isa R && return true
-    _is_container(obj) || return false
-    isempty(obj) && return false
+    if obj isa R
+        return true
+    end
+    if !(_is_container(obj))
+        return false
+    end
+    if isempty(obj)
+        return false
+    end
     return first(values(obj)) isa R
 end
 
 # `(name, idx)` for every `R` in the model, `idx` being `()` for a scalar.
 function _named_objects(model, ::Type{R}) where {R}
     return (
-        (name, idx)
-        for (name, obj) in JuMP.object_dictionary(model) if _holds(obj, R)
-        for idx in (obj isa R ? ((),) : _index_tuples(obj))
+        (name, idx) for (name, obj) in JuMP.object_dictionary(model) if _holds(obj, R) for
+        idx in (obj isa R ? ((),) : _index_tuples(obj))
     )
 end
 
-JuMP.Containers.default_container(::Vector{Tuple{Int64,Int64}}) = JuMP.Containers.SparseAxisArray
+function JuMP.Containers.default_container(::Vector{Tuple{Int64,Int64}})
+    return JuMP.Containers.SparseAxisArray
+end
 JuMP.Containers.default_container(::Vector{<:Tuple}) = JuMP.Containers.SparseAxisArray

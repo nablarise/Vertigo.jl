@@ -5,7 +5,7 @@
 """
     DML — Decomposition Modeling Language
 
-High-level annotation-based syntax for Dantzig-Wolfe decomposition.
+High-level declarative syntax for Dantzig-Wolfe decomposition.
 Partitions a JuMP model into master + subproblems and builds a
 `DWReformulation` automatically.
 """
@@ -16,15 +16,14 @@ using MathOptInterface
 const MOI = MathOptInterface
 using ..Reformulation
 
-include("annotations.jl")
 include("indexes.jl")
 include("partition.jl")
 include("models.jl")
-include("bridge.jl")
-include("macro.jl")
+include("UserProblemDescription.jl")
+include("BridgeJuMPtoInternal.jl")
+include("../macros/dantzig_wolfe.jl")
 
 export @dantzig_wolfe
 export dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
 
 end # module DML
