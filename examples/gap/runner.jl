@@ -67,17 +67,16 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
     elapsed = @elapsed begin
         try
             decomp = build_gap_model(inst)
-            colgen_config = ColGenConfig(
-                smoothing_alpha=cfg.smoothing_alpha, silent=true
-            )
-            ws = ColGenWorkspace(decomp, colgen_config)
-            bcp_ctx = BranchCutPriceContext(
-                ws;
+            config = BranchCutPriceConfig(
+                colgen = ColGenConfig(
+                    smoothing_alpha=cfg.smoothing_alpha, silent=true
+                ),
                 node_limit = cfg.node_limit,
                 rmp_time_limit = cfg.rmp_time_limit,
                 log_level = 0
             )
-            output = run_branch_and_price(bcp_ctx)
+            bcp_ws = BranchCutPriceWorkspace(decomp, config)
+            output = run_branch_and_price(bcp_ws)
         catch err
             @warn "instance $(inst.name) failed" exception=(err, catch_backtrace())
             output = nothing
