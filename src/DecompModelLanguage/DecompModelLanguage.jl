@@ -21,7 +21,7 @@ include("UserProblemDescription.jl")
 include("partition.jl")
 include("models.jl")
 include("BridgeJuMPtoInternal.jl")
-include("../macros/dantzig_wolfe.jl")
+include("macros/dantzig_wolfe.jl")
 
 export @dantzig_wolfe
 export dantzig_wolfe_decomposition

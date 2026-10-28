@@ -33,7 +33,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
                            v
 += STAGE 1: macro expansion (syntax only, no JuMP model yet) ================+
 |                                                                            |
-|  @dantzig_wolfe(model, block)             src/macros/dantzig_wolfe.jl      |
+|  @dantzig_wolfe(model, block)             macros/dantzig_wolfe.jl          |
 |        |                                                                   |
 |        v                                                                   |
 |  parse_decomposition_description(block)   UserProblemDescription.jl        |
@@ -211,7 +211,7 @@ The chart above, in words.
 | File | Role |
 |------|------|
 | `UserProblemDescription.jl` | parses the block into user descriptions and `JuMPSliceDescription`s |
-| `src/macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro itself; included by the DML module |
+| `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro itself; included by the DML module |
 | `indexes.jl` | enumerates the real index tuples of any JuMP container (`Array`, `DenseAxisArray`, `SparseAxisArray`, `Dict`) |
 | `partition.jl` | `Ownership`, and the functions that generate the code building them; the `Ownership` table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
 | `models.jl` | the variable and constraint mappings, and the functions that copy variables, constraints and the objective into the new JuMP models |
