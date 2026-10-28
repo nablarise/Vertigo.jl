@@ -19,7 +19,7 @@ variable and constraint of `model` must be owned by exactly one line.
   symbol bound by a slice description
 - Both accept `silent=true|false` to silence (or not) the solver of the
   model. Unset, a model is silent.
-- `subproblem` also accepts `user_overriden=true` for a subproblem solved by
+- `subproblem` also accepts `user_overridden=true` for a subproblem solved by
   your own algorithm: no MOI model is built for it. Its constraints are not modeled
   (the algorithm enforces them), its variables get a `MOI.VariableIndex`
   (see `mapped_subproblem_var`), and `sp_models(decomp)[sp_id]` is `nothing`
@@ -38,7 +38,7 @@ both are optional:
 ```julia
 @dantzig_wolfe model begin
     master() => (constraints = coverage[_])
-    subproblem(m, user_overriden=true) => (
+    subproblem(m, user_overridden=true) => (
         variables = [x[m, _]],
         constraints = knapsack[m]
     )

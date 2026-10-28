@@ -304,7 +304,7 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
 end
 
 # Brute-force knapsack pricing oracle for one GAP machine: it stands in for the
-# MOI model of a `user_overriden=true` subproblem, receiving the reduced costs through
+# MOI model of a `user_overridden=true` subproblem, receiving the reduced costs through
 # `MOI.modify` like a model would.
 mutable struct KnapsackPricer
     vars::Vector{MOI.VariableIndex}   # vars[t]: subproblem variable of task t
@@ -366,7 +366,7 @@ function Vertigo.ColGen.optimize_pricing_problem!(
     )
 end
 
-function test_dml_user_overriden_subproblem()
+function test_dml_user_overridden_subproblem()
     @testset "[dml] GAP with user-overridden knapsack pricers dual ≈ 63.0" begin
         cost = [
             5.0 8.0 14.0 20.0 5.0 4.0 13.0;
@@ -389,7 +389,7 @@ function test_dml_user_overriden_subproblem()
         @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
         decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k, user_overriden=true) => (variables = x[k, _])
+            subproblem(k, user_overridden=true) => (variables = x[k, _])
             subproblem(k) => (constraints = knapsack[k])
             master() => (constraints = assign[_])
         end
@@ -511,7 +511,7 @@ end
 
 function test_dml_e2e()
     test_dml_bp_over_containers()
-    test_dml_user_overriden_subproblem()
+    test_dml_user_overridden_subproblem()
     for smoothing_alpha in (0.0, 0.5)
         test_dml_gap_converges(; smoothing_alpha)
         test_dml_gap_converges2(; smoothing_alpha)

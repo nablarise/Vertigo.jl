@@ -23,12 +23,12 @@ end
     MasterProblemUserDescription(options, owned_vars, owned_constrs)
 
 What a `master(key=value, ...) => (variables = ..., constraints = ...)` line
-says about the master, kept as unevaluated syntax. `options` are the
-`key=value` keywords (`silent`). `owned_vars` and `owned_constrs` are the
+says about the master, kept as unevaluated syntax. `options` maps the name of each
+`key=value` keyword (`silent`) to the expression written for it. `owned_vars` and `owned_constrs` are the
 slice descriptions listed under `variables` and `constraints`.
 """
 struct MasterProblemUserDescription
-    options::Vector{Expr}
+    options::Dict{Symbol,Any}
     owned_vars::Vector{JuMPSliceDescription}
     owned_constrs::Vector{JuMPSliceDescription}
 end
@@ -39,9 +39,9 @@ end
 What a `subproblem(id, key=value, ...) => (variables = ..., constraints = ...)`
 line says about one subproblem, kept as unevaluated syntax. `id_expr` is the id
 expression as written; it may use an index symbol bound by a slice description, which
-only gets a value when the generated method runs. `options` are the
-`key=value` keywords (`silent`, `user_overriden`); their values may use the
-index symbols too. `owned_vars` and `owned_constrs` are the slice descriptions listed
+only gets a value when the generated method runs. `options` maps the name of each
+`key=value` keyword (`silent`, `user_overridden`) to the expression written for it,
+which may use the index symbols too. `owned_vars` and `owned_constrs` are the slice descriptions listed
 under `variables` and `constraints`.
 
 The macro turns each owned slice description into an [`Ownership`](@ref), whose function
@@ -49,7 +49,7 @@ gives the id and options of the matching object.
 """
 struct SubproblemUserDescription
     id_expr::Any
-    options::Vector{Expr}   # `key=value` keywords, as written
+    options::Dict{Symbol,Any}
     owned_vars::Vector{JuMPSliceDescription}
     owned_constrs::Vector{JuMPSliceDescription}
 end
@@ -144,7 +144,7 @@ Each assignment holds one slice description (`x[k, _]`) or a vector of them
 (`[x[k, _], y]`). The slice descriptions are read by [`parse_slice_description`](@ref).
 
 Returns a [`MasterProblemUserDescription`](@ref) or a [`SubproblemUserDescription`](@ref).
-The options are `silent` for both, and `user_overriden` for a subproblem only.
+The options are `silent` for both, and `user_overridden` for a subproblem only.
 
 Throws an error for an assignment that is neither `variables = ...` nor `constraints = ...`,
 for an unknown option, for a `subproblem` without exactly one positional argument (its
@@ -179,13 +179,18 @@ function parse_problem_description(call::Expr, contents)
     end
 
     func_name = call.args[1]
-    positional, options = split_call_args(call.args[2:end])
-    allowed = func_name == :master ? (:silent,) : (:silent, :user_overriden)
+    # `key = value` in a call is parsed as `:kw`; every other argument is positional.
+    is_option(arg) = arg isa Expr && arg.head == :kw
+    options = Dict{Symbol,Any}(
+        arg.args[1] => arg.args[2] for arg in call.args[2:end] if is_option(arg)
+    )
+    positional = filter(!is_option, call.args[2:end])
+    allowed = func_name == :master ? (:silent,) : (:silent, :user_overridden)
 
-    for o in options
-        if !(o.args[1] in allowed)
+    for name in keys(options)
+        if !(name in allowed)
             error(
-                "Unknown option `$(o.args[1])` for $func_name in @dantzig_wolfe, " *
+                "Unknown option `$name` for $func_name in @dantzig_wolfe, " *
                 "expected one of: $(join(allowed, ", "))",
             )
         end
@@ -251,25 +256,8 @@ function parse_slice_description(slice)
     end
 end
 
-# Splits call arguments into positional ones and `key=value` options.
-# Handles both `f(a, key=x)` and `f(a; key=x)`.
-function split_call_args(args)
-    positional = Any[]
-    options = Expr[]
-    for arg in args
-        for a in (arg isa Expr && arg.head == :parameters ? arg.args : [arg])
-            if a isa Expr && a.head in (:kw, :(=))
-                push!(options, Expr(:kw, a.args[1], a.args[2]))
-            else
-                push!(positional, a)
-            end
-        end
-    end
-    return positional, options
-end
-
 # One `Ownership` per owned slice description. Its function takes the index values of an
-# object and returns `(id, silent, user_overriden)`: the options may use the
+# object and returns `(id, silent, user_overridden)`: the options may use the
 # indices, so they are evaluated per object, like the id.
 function generate_ownerships(master, subproblems)
     return [
@@ -290,23 +278,13 @@ function generate_ownership(slice::JuMPSliceDescription, description)
     )
 end
 
-# The value written for option `name`, or `nothing` when the line does not say.
-function _option_expr(options, name)
-    for o in options
-        if o.args[1] == name
-            return o.args[2]
-        end
-    end
-    return nothing
-end
-
 function generate_resolved_expr(d::SubproblemUserDescription)
-    silent = _option_expr(d.options, :silent)
-    user_overriden = _option_expr(d.options, :user_overriden)
-    return :((id=($(d.id_expr)), silent=($silent), user_overriden=($user_overriden)))
+    silent = get(d.options, :silent, nothing)
+    user_overridden = get(d.options, :user_overridden, nothing)
+    return :((id=($(d.id_expr)), silent=($silent), user_overridden=($user_overridden)))
 end
 
 function generate_resolved_expr(d::MasterProblemUserDescription)
-    silent = _option_expr(d.options, :silent)
-    return :((id=nothing, silent=($silent), user_overriden=nothing))
+    silent = get(d.options, :silent, nothing)
+    return :((id=nothing, silent=($silent), user_overridden=nothing))
 end

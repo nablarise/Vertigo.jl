@@ -53,9 +53,7 @@ number of indices are rejected.
 | Option | Applies to | Effect |
 |--------|------------|--------|
 | `silent=true\|false` | master, subproblem | silence the solver of that model; unset means silent |
-| `user_overriden=true` | subproblem | the subproblem is solved by your own algorithm; no MOI model is built |
-
-(`user_overriden` is spelled as the code spells it.)
+| `user_overridden=true` | subproblem | the subproblem is solved by your own algorithm; no MOI model is built |
 
 ```julia
 subproblem(k, silent = false) => (variables = x[k, _], constraints = knapsack[k])
@@ -68,7 +66,7 @@ all rules assigning to it must agree.*
 
 ### User-overridden subproblems
 
-With `user_overriden=true`, the constraints assigned to the subproblem are not
+With `user_overridden=true`, the constraints assigned to the subproblem are not
 modelled, since your algorithm enforces them. The variables still get a
 `MOI.VariableIndex`, available through `mapped_subproblem_var`, and
 `sp_models(decomp)[sp_id]` is `nothing` until you install your pricer there.

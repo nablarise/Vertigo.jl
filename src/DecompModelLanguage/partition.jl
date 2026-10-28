@@ -9,7 +9,7 @@ _label(name, idx) = isempty(idx) ? string(name) : string(name, "[", join(idx, ",
 
 Says which model owns the objects of the container `name` with `nindices`
 indices. `resolve(idx...)` takes the index values of one object and returns
-`(id, silent, user_overriden)`: the id of its subproblem (`nothing` for the
+`(id, silent, user_overridden)`: the id of its subproblem (`nothing` for the
 master) and the options of its model, `nothing` for an option the rule does
 not set. `@dantzig_wolfe` builds one per owned slice description.
 """

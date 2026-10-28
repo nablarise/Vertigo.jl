@@ -4,7 +4,7 @@ By default Vertigo builds a MathOptInterface model for every subproblem and solv
 optimiser of your JuMP model. Each of these subproblems is overridable by the user to allow ad-hoc
 algorithms. This is particularly interesting when the subproblems have particular structures:
 knapsack problems, shortest path with resource contraints problems, etc. When a subproblem is
-overriden, Vertigo.jl builds no model for it, and the user's algorithm is responsible for generating
+overridden, Vertigo.jl builds no model for it, and the user's algorithm is responsible for generating
 the columns.
 
 This tutorial replaces the knapsack subproblems of the [GAP tutorial](gap.md) with a greedy
@@ -14,7 +14,7 @@ ensure optimality.
 !!! warning
 
     Vertigo.jl stops executing once no reduced cost columns are returned by the subproblems. In the
-    case of overriden subproblems, the user is responsible of ensuring his algorithm allows
+    case of overridden subproblems, the user is responsible of ensuring his algorithm allows
     Vertigo.jl to prove optimaly if desired. The user is also responsible of ensuring that his
     algorithm generates columns that satisfy the subproblem's constraints.
 
@@ -57,12 +57,12 @@ algorithm.
 
 ## 2. Declaring the override
 
-Add `user_overriden=true` to the subproblems to override:
+Add `user_overridden=true` to the subproblems to override:
 
 ```julia
 decomp, sp_map = @dantzig_wolfe model begin
     master() => (constraints = assign[_])
-    subproblem(k, user_overriden = true) => (
+    subproblem(k, user_overridden = true) => (
         variables = x[k, _],
         constraints = knapsack[k]
     )

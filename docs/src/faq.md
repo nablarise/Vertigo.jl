@@ -51,7 +51,7 @@ No. They use the optimiser of the model you decompose
 
 ### Can I solve a subproblem with my own algorithm?
 
-Yes: `subproblem(id, user_overriden=true)`. See the
+Yes: `subproblem(id, user_overridden=true)`. See the
 [tutorial](tutorials/overriding-subproblems.md) and
 [Decomposition rules](user-api/decomposition.md).
 
@@ -60,4 +60,4 @@ Yes: `subproblem(id, user_overriden=true)`. See the
 ### Which spelling does the documentation use?
 
 British English: *generalised*, *optimiser*, *modelling*. Identifiers keep the
-spelling of the code (`user_overriden`).
+spelling of the code (`user_overridden`).

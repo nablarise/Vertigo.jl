@@ -38,7 +38,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |        v                                                                   |
 |  parse_decomposition_description(block)   UserProblemDescription.jl        |
 |        |   for each line:                                                  |
-|        |     parse_problem_description --> split_call_args  (options)      |
+|        |     parse_problem_description                                     |
 |        |                             \-> parse_slice_description (each)    |
 |        v                                                                   |
 |  master      ::MasterProblemUserDescription                                |
@@ -73,7 +73,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |  partition                                                  partition.jl   |
 |        |   for each named variable and constraint (name, idx):             |
 |        |     _ownership(table, ...)       finds its Ownership              |
-|        |     owner.resolve(idx...)      gives (id, silent, user_overriden) |
+|        |     owner.resolve(idx...)      gives (id, silent, user_overridden) |
 |        |   _master_variables, _partition_subproblem_variables,             |
 |        |   _master_constraints, _partition_subproblem_constraints          |
 |        v                                                                   |
@@ -81,7 +81,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |        |                                                                   |
 |        v                                                                   |
 |  copy the objects into JuMP master and subproblem models    models.jl      |
-|        |   _requested_option reads user_overriden (no model if true)       |
+|        |   _requested_option reads user_overridden (no model if true)       |
 |        |   _register_variables!, _register_constraints!,                   |
 |        |   _register_objective!   (VariableMapping, ConstraintMapping)     |
 |        |   _requested_option reads silent; the optimiser is set            |
@@ -111,7 +111,7 @@ one such line, kept as unevaluated syntax:
 | Field | `MasterProblemUserDescription` | `SubproblemUserDescription` |
 |-------|-------------------------------|-----------------------------|
 | `id_expr` | none: the master has no id | the expression of the subproblem id; it may use an index symbol bound by a slice description |
-| `options` | the `key=value` options written in `master(...)` | the `key=value` options written in `subproblem(...)`, forwarded as written |
+| `options` | a dictionary: the name of each `key=value` option written in `master(...)`, and the expression written for it | the same for `subproblem(...)` |
 | `owned_vars` | the slice descriptions listed under `variables` | the same |
 | `owned_constrs` | the slice descriptions listed under `constraints` | the same |
 
@@ -142,13 +142,13 @@ variable slice description, `x[k, _]`, and one constraint slice description, `kn
 - The macro turns each owned slice description into an **`Ownership`**
   (`partition.jl`): the slice description's name and number of indices, whether the
   model is the master, and a function `resolve(idx...)`. Called with the index
-  values of one object, `resolve` returns `(id, silent, user_overriden)`: the
+  values of one object, `resolve` returns `(id, silent, user_overridden)`: the
   id of its subproblem (`nothing` for the master) and the options of its model,
   `nothing` for an option the line does not set. For `x[k, _]` above it is,
   roughly:
 
   ```julia
-  Ownership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overriden = nothing))
+  Ownership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
   ```
 
   The id and the options are evaluated per object because they may use the
@@ -192,7 +192,7 @@ The chart above, in words.
    function takes one argument per index. An `_` index is an
    unnamed argument, so it matches every value; a named index is bound and can
    be used in `subproblem(id)` and in the options. An option a model does not
-   take (`user_overriden` on `master()`) is rejected here.
+   take (`user_overridden` on `master()`) is rejected here.
 3. **Asking the rules** (stage 2). `dantzig_wolfe_decomposition(model, ownerships)`
    rejects an empty list of ownerships and two ownerships with the same name and number
    of indices. It then lists every named variable and constraint of the model and looks up its
@@ -224,10 +224,10 @@ The chart above, in words.
   user declared them for every JuMP container.
 - **Scalars.** A scalar object keeps an index set of `Set{Tuple{}}`; the model
   builder dispatches on it.
-- **Options left unset.** `silent` and `user_overriden` are `nothing` until a
+- **Options left unset.** `silent` and `user_overridden` are `nothing` until a
   rule sets them. Two rules assigning to the same model must agree; unset means
   the default (silent, built as a MOI model).
-- **Overridden subproblems.** For `user_overriden=true`, no model is built and
+- **Overridden subproblems.** For `user_overridden=true`, no model is built and
   the variables get fresh `MOI.VariableIndex` values `1, 2, …` (names in
   alphabetical order, then sorted indices). See `_subproblem_variable_indices`
   in `BridgeJuMPtoInternal.jl`.

@@ -35,7 +35,7 @@ length(collect(subproblem_ids(decomp)))
 ```
 
 # User-overridden subproblems
-A subproblem declared with `user_overriden=true` gets no MOI model: it is
+A subproblem declared with `user_overridden=true` gets no MOI model: it is
 solved by an algorithm of your own. Its variables are still numbered `1..n`
 and still appear in the coupling constraints of the master. Install a pricer
 for each such subproblem before creating the `ColGenWorkspace`, otherwise
@@ -56,7 +56,7 @@ model = Model()
 
 decomp, sp_map = @dantzig_wolfe model begin
     master() => (constraints = assign[_])
-    subproblem(m, user_overriden=true) => (
+    subproblem(m, user_overridden=true) => (
         variables = x[m, _],
         constraints = cap[m]
     )
@@ -103,13 +103,13 @@ function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=no
     sp_objects(sp_id) = Iterators.flatten((
         get(sp_vars_partition, sp_id, ()), get(sp_constrs_partition, sp_id, ())
     ))
-    user_overriden_sp_ids = Set(
+    user_overridden_sp_ids = Set(
         sp_id for sp_id in user_sp_ids if _requested_option(
-            sp_objects(sp_id), table, :user_overriden, false, "subproblem $sp_id"
+            sp_objects(sp_id), table, :user_overridden, false, "subproblem $sp_id"
         )
     )
     sp_jump_models = Dict(
-        sp_id => JuMP.Model() for sp_id in user_sp_ids if !(sp_id in user_overriden_sp_ids)
+        sp_id => JuMP.Model() for sp_id in user_sp_ids if !(sp_id in user_overridden_sp_ids)
     )
 
     # Register subproblem variables
@@ -127,7 +127,7 @@ function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=no
 
     # Register subproblem constraints
     for (sp_id, constr_by_names) in sp_constrs_partition
-        if sp_id in user_overriden_sp_ids
+        if sp_id in user_overridden_sp_ids
             continue
         end
         _register_constraints!(
@@ -188,7 +188,7 @@ function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=no
 
     # Register subproblem variables and coupling coefficients
     sp_var_index = _subproblem_variable_indices(
-        model, sp_vars_partition, var_mapping, user_overriden_sp_ids
+        model, sp_vars_partition, var_mapping, user_overridden_sp_ids
     )
     for (user_id, var_by_names) in sp_vars_partition
         sp_id = sp_id_map[user_id]
@@ -274,7 +274,7 @@ end
 # A user-overridden subproblem has no model to hand out indexes, so it numbers its
 # variables 1, 2, ... like a fresh MOI model would.
 function _subproblem_variable_indices(
-    model, sp_vars_partition, var_mapping, user_overriden_sp_ids
+    model, sp_vars_partition, var_mapping, user_overridden_sp_ids
 )
     sp_var_index = Dict{JuMP.VariableRef,Tuple{Any,MOI.VariableIndex}}()
     for (user_id, var_by_names) in sp_vars_partition
@@ -282,7 +282,7 @@ function _subproblem_variable_indices(
         for var_name in sort(collect(keys(var_by_names)))
             for idx in sort(collect(var_by_names[var_name]))
                 orig_var = get_scalar_object(model, var_name, idx)
-                moi_idx = if user_id in user_overriden_sp_ids
+                moi_idx = if user_id in user_overridden_sp_ids
                     MOI.VariableIndex(next_index += 1)
                 else
                     JuMP.index(var_mapping[orig_var])

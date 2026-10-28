@@ -8,7 +8,7 @@ function _master_of(name, nindices)
         name,
         nindices,
         true,
-        (idx...) -> (id=nothing, silent=nothing, user_overriden=nothing),
+        (idx...) -> (id=nothing, silent=nothing, user_overridden=nothing),
     )
 end
 function _subproblem_of(name, nindices, id)
@@ -16,7 +16,7 @@ function _subproblem_of(name, nindices, id)
         name,
         nindices,
         false,
-        (idx...) -> (id=id(idx...), silent=nothing, user_overriden=nothing),
+        (idx...) -> (id=id(idx...), silent=nothing, user_overridden=nothing),
     )
 end
 
@@ -186,12 +186,12 @@ function test_dml_silent()
     end
 end
 
-function test_dml_user_overriden_subproblem()
+function test_dml_user_overridden_subproblem()
     @testset "[dml] user-overridden subproblem has no model" begin
         model = _build_gap_jump_model()
         set_optimizer(model, HiGHS.Optimizer)
         decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k, user_overriden=(k == 1)) => (variables = x[k, _])
+            subproblem(k, user_overridden=(k == 1)) => (variables = x[k, _])
             master() => (constraints = assign[_])
             subproblem(k) => (constraints = knapsack[k])
         end
@@ -217,7 +217,7 @@ function test_dml_user_overriden_subproblem()
         # Container syntax: options are written once per container.
         decomp, sp_map = @dantzig_wolfe model begin
             master() => (constraints = assign[_])
-            subproblem(k, user_overriden=true) =>
+            subproblem(k, user_overridden=true) =>
                 (variables=[x[k, _]], constraints=knapsack[k])
         end
         @test all(isnothing, values(sp_models(decomp)))
@@ -228,9 +228,9 @@ function test_dml_user_overriden_subproblem()
 
         # Rules assigning to the same subproblem must agree.
         @test_throws ErrorException @dantzig_wolfe model begin
-            subproblem(k, user_overriden=true) => (variables = x[k, _])
+            subproblem(k, user_overridden=true) => (variables = x[k, _])
             master() => (constraints = assign[_])
-            subproblem(k, user_overriden=false) => (constraints = knapsack[k])
+            subproblem(k, user_overridden=false) => (constraints = knapsack[k])
         end
     end
 end
@@ -239,13 +239,15 @@ function test_dml_unknown_option()
     @testset "[dml] an option the model does not take is rejected" begin
         err = try
             @macroexpand @dantzig_wolfe Model() begin
-                master(user_overriden=true) => (constraints = assign[_])
+                master(user_overridden=true) => (constraints = assign[_])
             end
             nothing
         catch e
             e
         end
-        @test occursin("Unknown option `user_overriden` for master", sprint(showerror, err))
+        @test occursin(
+            "Unknown option `user_overridden` for master", sprint(showerror, err)
+        )
     end
 end
 
@@ -351,12 +353,12 @@ function _gap_model_for_decomposition(inst, penalty, Ks, Ts, container)
     return model
 end
 
-function _enumerated_master_optimum(inst, penalty, user_overriden, Ks, Ts, container)
+function _enumerated_master_optimum(inst, penalty, user_overridden, Ks, Ts, container)
     model = _gap_model_for_decomposition(inst, penalty, Ks, Ts, container)
     # Option values are evaluated inside Vertigo.DML, so they cannot name local variables.
-    decomp, sp_map = if user_overriden
+    decomp, sp_map = if user_overridden
         @dantzig_wolfe model begin
-            subproblem(k, user_overriden=true) => (variables = x[k, _])
+            subproblem(k, user_overridden=true) => (variables = x[k, _])
             master() => (variables=u[_], constraints=[assign[_], no_penalty[_]])
             subproblem(k) => (constraints = knapsack[k])
         end
@@ -427,12 +429,12 @@ function test_dml_decomposition_matches_flat_model()
     @testset "[dml] master over enumerated columns has the original optimum" begin
         rng = Random.MersenneTwister(20261022)
         feasible = 0
-        for _ in 1:3, penalty in (false, true), user_overriden in (false, true)
+        for _ in 1:3, penalty in (false, true), user_overridden in (false, true)
             inst = _random_gap_instance(rng)
             for (label, Ks, Ts, container) in _gap_index_cases(inst)
                 @testset "$label" begin
                     master_obj, model = _enumerated_master_optimum(
-                        inst, penalty, user_overriden, Ks, Ts, container
+                        inst, penalty, user_overridden, Ks, Ts, container
                     )
                     optimize!(model)
                     flat_obj = if termination_status(model) == MOI.OPTIMAL
@@ -688,7 +690,7 @@ function test_dml_rule_errors()
 end
 
 function test_dml()
-    test_dml_user_overriden_subproblem()
+    test_dml_user_overridden_subproblem()
     test_dml_macro_basic_gap()
     test_dml_silent()
     test_dml_annotation_function()

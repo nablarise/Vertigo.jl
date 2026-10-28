@@ -16,7 +16,7 @@ the offending object.
 | An object has no name | `ArgumentError`: *variable `…` has no name the rules can address* | declare it with a name: `@variable(model, y[1:3])` |
 | A subproblem constraint uses a variable of another model | `ArgumentError`: *constraint `mixed` belongs to subproblem 1 but uses variable `x[2,1]` of subproblem 2…* | move the constraint to the master, or the variable to the same subproblem |
 | A line is not `master()` or `subproblem(id)` followed by `=> (variables = ..., constraints = ...)` | `ErrorException` while parsing | fix the line |
-| A `user_overriden` subproblem has no pricer | error from `ColGenWorkspace(decomp, config)`: *has no pricer* | install a pricer in `sp_models(decomp)` |
+| A `user_overridden` subproblem has no pricer | error from `ColGenWorkspace(decomp, config)`: *has no pricer* | install a pricer in `sp_models(decomp)` |
 
 ## Notes
 
