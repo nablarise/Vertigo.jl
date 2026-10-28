@@ -20,6 +20,81 @@ struct Ownership
     resolve::Function
 end
 
+_owned_slices(d) = Iterators.flatten((d.owned_vars, d.owned_constrs))
+
+"""
+    generate_ownerships(master, subproblems) -> Vector{Expr}
+
+Generate the code that builds the [`Ownership`](@ref)s of a `@dantzig_wolfe` block: one
+expression per slice description of the master and of each subproblem, in that order.
+The expressions are not evaluated here. The macro puts them in the call to
+`dantzig_wolfe_decomposition`, so they run when the script reaches the block, when the
+JuMP model and the values of the user's own variables exist.
+
+# Example
+```julia
+master, subproblems = parse_decomposition_description(:(
+    begin
+        master() => (constraints = assign[_])
+        subproblem(k) => (variables = x[k, _])
+    end
+))
+generate_ownerships(master, subproblems)  # two expressions, `Ownership(:assign, ...)`
+                                          # and `Ownership(:x, ...)`
+```
+"""
+function generate_ownerships(master, subproblems)
+    return [
+        generate_ownership(p, d) for d in Iterators.flatten(((master,), subproblems)) for
+        p in _owned_slices(d)
+    ]
+end
+
+"""
+    generate_ownership(slice, description) -> Expr
+
+Generate the call `Ownership(name, nindices, is_master, resolve)` for one slice description
+`slice` of the master or subproblem `description`. `resolve` is an anonymous function with
+one argument per index symbol of `slice`, whose body is made by
+[`generate_resolved_expr`](@ref):
+
+```julia
+# subproblem(k) => (variables = x[k, _])
+Ownership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
+```
+"""
+function generate_ownership(slice::JuMPSliceDescription, description)
+    resolve = Expr(:->, Expr(:tuple, slice.indices...), generate_resolved_expr(description))
+    return Expr(
+        :call,
+        GlobalRef(@__MODULE__, :Ownership),
+        QuoteNode(slice.name),
+        length(slice.indices),
+        description isa MasterProblemUserDescription,
+        resolve,
+    )
+end
+
+"""
+    generate_resolved_expr(description) -> Expr
+
+Generate the named tuple `(id = ..., silent = ..., user_overridden = ...)` returned by
+the `resolve` function of an [`Ownership`](@ref). The expressions written in `description`
+are pasted in unevaluated: the id expression of a subproblem and the values of its
+options, which may use the index symbols that `resolve` takes as arguments. An option the
+line does not set is `nothing`, and so is the id of the master, which has none.
+"""
+function generate_resolved_expr(d::SubproblemUserDescription)
+    silent = get(d.options, :silent, nothing)
+    user_overridden = get(d.options, :user_overridden, nothing)
+    return :((id=($(d.id_expr)), silent=($silent), user_overridden=($user_overridden)))
+end
+
+function generate_resolved_expr(d::MasterProblemUserDescription)
+    silent = get(d.options, :silent, nothing)
+    return :((id=nothing, silent=($silent), user_overridden=nothing))
+end
+
 # At most one `Ownership` per container name and number of indices.
 function _ownership_table(ownerships)
     table = Dict{Tuple{Symbol,Int},Ownership}()

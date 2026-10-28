@@ -54,8 +54,6 @@ struct SubproblemUserDescription
     owned_constrs::Vector{JuMPSliceDescription}
 end
 
-_owned_slices(d) = Iterators.flatten((d.owned_vars, d.owned_constrs))
-
 """
     parse_decomposition_description(block) -> (master, subproblems)
 
@@ -254,37 +252,4 @@ function parse_slice_description(slice)
     else
         error("Expected name[indices] or name, got: $slice")
     end
-end
-
-# One `Ownership` per owned slice description. Its function takes the index values of an
-# object and returns `(id, silent, user_overridden)`: the options may use the
-# indices, so they are evaluated per object, like the id.
-function generate_ownerships(master, subproblems)
-    return [
-        generate_ownership(p, d) for d in Iterators.flatten(((master,), subproblems)) for
-        p in _owned_slices(d)
-    ]
-end
-
-function generate_ownership(slice::JuMPSliceDescription, description)
-    resolve = Expr(:->, Expr(:tuple, slice.indices...), generate_resolved_expr(description))
-    return Expr(
-        :call,
-        GlobalRef(@__MODULE__, :Ownership),
-        QuoteNode(slice.name),
-        length(slice.indices),
-        description isa MasterProblemUserDescription,
-        resolve,
-    )
-end
-
-function generate_resolved_expr(d::SubproblemUserDescription)
-    silent = get(d.options, :silent, nothing)
-    user_overridden = get(d.options, :user_overridden, nothing)
-    return :((id=($(d.id_expr)), silent=($silent), user_overridden=($user_overridden)))
-end
-
-function generate_resolved_expr(d::MasterProblemUserDescription)
-    silent = get(d.options, :silent, nothing)
-    return :((id=nothing, silent=($silent), user_overridden=nothing))
 end

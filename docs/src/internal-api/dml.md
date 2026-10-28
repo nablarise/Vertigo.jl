@@ -45,7 +45,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |  subproblems ::Vector{SubproblemUserDescription}                           |
 |        |                                                                   |
 |        v                                                                   |
-|  generate_ownerships                                                       |
+|  generate_ownerships                      partition.jl                     |
 |        |   generate_ownership        one call per JuMPSliceDescription     |
 |        |   generate_resolved_expr    the id and options, as code           |
 |        v                                                                   |
@@ -210,10 +210,10 @@ The chart above, in words.
 
 | File | Role |
 |------|------|
-| `UserProblemDescription.jl` | parses the block into user descriptions and `JuMPSliceDescription`s, builds the `Ownership`s |
+| `UserProblemDescription.jl` | parses the block into user descriptions and `JuMPSliceDescription`s |
 | `src/macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro itself; included by the DML module |
 | `indexes.jl` | enumerates the real index tuples of any JuMP container (`Array`, `DenseAxisArray`, `SparseAxisArray`, `Dict`) |
-| `partition.jl` | `Ownership` and its table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
+| `partition.jl` | `Ownership`, and the functions that generate the code building them; the `Ownership` table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
 | `models.jl` | the variable and constraint mappings, and the functions that copy variables, constraints and the objective into the new JuMP models |
 | `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the run-time entry point: it runs the checks and the partition, builds the master and subproblem models, and registers everything in the `DWReformulation` |
 

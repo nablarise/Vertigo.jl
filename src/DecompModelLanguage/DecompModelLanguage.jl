@@ -17,9 +17,9 @@ const MOI = MathOptInterface
 using ..Reformulation
 
 include("indexes.jl")
+include("UserProblemDescription.jl")
 include("partition.jl")
 include("models.jl")
-include("UserProblemDescription.jl")
 include("BridgeJuMPtoInternal.jl")
 include("../macros/dantzig_wolfe.jl")
 
