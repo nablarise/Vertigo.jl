@@ -1,8 +1,7 @@
 # Decomposition Modeling Language
 
-Exported names of `Vertigo.DML`, re-exported by `Vertigo`.
+Documented names of `Vertigo.DML`, exported or not, re-exported by `Vertigo`.
 
 ```@autodocs
 Modules = [Vertigo.DML]
-Private = false
 ```

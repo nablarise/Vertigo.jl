@@ -1,8 +1,7 @@
 # Branch-and-price
 
-Exported names of `Vertigo.BranchCutPrice`.
+Documented names of `Vertigo.BranchCutPrice`, exported or not.
 
 ```@autodocs
 Modules = [Vertigo.BranchCutPrice]
-Private = false
 ```

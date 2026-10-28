@@ -1,8 +1,7 @@
 # Branching
 
-Exported names of `Vertigo.Branching`.
+Documented names of `Vertigo.Branching`, exported or not.
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Private = false
 ```

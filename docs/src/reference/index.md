@@ -1,7 +1,7 @@
 # Overview
 
-Reference generated from the docstrings of the exported names of each module.
-Names that are exported but have no docstring yet do not appear.
+Reference generated from the docstrings of the exported and non-exported names of each module.
+Names that have no docstring yet do not appear.
 
 | Page | Module |
 |------|--------|

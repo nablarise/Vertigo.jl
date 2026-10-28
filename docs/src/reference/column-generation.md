@@ -1,8 +1,7 @@
 # Column generation
 
-Exported names of `Vertigo.ColGen`.
+Documented names of `Vertigo.ColGen`, exported or not.
 
 ```@autodocs
 Modules = [Vertigo.ColGen]
-Private = false
 ```

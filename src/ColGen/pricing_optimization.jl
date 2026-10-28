@@ -41,7 +41,7 @@ Raw optimizer output for a single pricing subproblem call.
 Captures termination information (`is_infeasible`, `is_unbounded`),
 objective bounds, and every primal solution found by the optimizer.
 A `PricingSolution` is transient: it is produced by
-[`optimize_pricing_problem!`](@ref), inspected once, and discarded.
+`optimize_pricing_problem!`, inspected once, and discarded.
 
 ## Bound semantics
 
@@ -59,7 +59,7 @@ where the solver returns a feasible solution without proving optimality.
 These bounds are used differently at the master level:
 
 - `dual_bound` → feeds the *valid* master dual bound via
-  [`compute_dual_bound`](@ref). This bound is tight and drives the
+  `compute_dual_bound`. This bound is tight and drives the
   convergence test (LP gap closed?).
 - `primal_bound` → feeds the *pseudo* dual bound, which is weaker
   (uses feasible SP values instead of proven optima). The pseudo bound
@@ -98,7 +98,7 @@ subproblem call (including infeasibility flags and bounds),
 improving. These are the columns that will be inserted into the
 restricted master problem.
 
-Columns are added via [`push_in_set!`](@ref), which silently discards
+Columns are added via `push_in_set!`, which silently discards
 non-improving solutions.
 """
 struct GeneratedColumns
@@ -124,8 +124,8 @@ end
 
 Exact pricing optimizer that solves the subproblem via `MOI.optimize!`.
 
-Selected by [`get_pricing_subprob_optimizer`](@ref) for the
-[`ExactStage`](@ref) pricing stage.
+Selected by `get_pricing_subprob_optimizer` for the
+`ExactStage` pricing stage.
 """
 struct SubproblemMoiOptimizer end
 

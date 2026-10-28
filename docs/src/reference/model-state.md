@@ -1,8 +1,7 @@
 # Model state
 
-Exported names of `Vertigo.MathOptState`.
+Documented names of `Vertigo.MathOptState`, exported or not.
 
 ```@autodocs
 Modules = [Vertigo.MathOptState]
-Private = false
 ```

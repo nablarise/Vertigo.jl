@@ -1,8 +1,7 @@
 # Tree search
 
-Exported names of `Vertigo.TreeSearch`.
+Documented names of `Vertigo.TreeSearch`, exported or not.
 
 ```@autodocs
 Modules = [Vertigo.TreeSearch]
-Private = false
 ```
