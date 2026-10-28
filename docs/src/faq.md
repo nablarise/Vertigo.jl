@@ -1,5 +1,9 @@
 # FAQ
 
+!!! warning
+
+    This page is experimental and has not been reviewed.
+
 ## Known limitations
 
 ### Why is the dual bound `-Inf` and the status `:node_limit` after an optimal run?

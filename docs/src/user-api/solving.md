@@ -1,5 +1,9 @@
 # Solving
 
+!!! warning
+
+    This page is experimental and has not been reviewed.
+
 Both solvers follow one pattern: build a config, build a workspace from the
 decomposition and the config, run it.
 

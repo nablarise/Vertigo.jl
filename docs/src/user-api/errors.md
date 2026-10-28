@@ -1,5 +1,9 @@
 # Errors
 
+!!! warning
+
+    This page is experimental and has not been reviewed.
+
 `@dantzig_wolfe` checks the model before building anything. Each message names
 the offending object.
 
