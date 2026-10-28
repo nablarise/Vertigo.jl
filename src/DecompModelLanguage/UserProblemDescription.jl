@@ -141,7 +141,7 @@ written in one of three ways:
 - `(variables = ..., constraints = ...)`: both.
 
 Each assignment holds one slice description (`x[k, _]`) or a vector of them
-(`[x[k, _], y]`). The slice descriptions are read by `parse_slice_description`.
+(`[x[k, _], y]`). The slice descriptions are read by [`parse_slice_description`](@ref).
 
 Returns a [`MasterProblemUserDescription`](@ref) or a [`SubproblemUserDescription`](@ref).
 The options are `silent` for both, and `user_overriden` for a subproblem only.
@@ -208,6 +208,26 @@ function parse_problem_description(call::Expr, contents)
     end
 end
 
+"""
+    parse_slice_description(slice) -> JuMPSliceDescription
+
+Read one slice description of a `@dantzig_wolfe` block, as unevaluated syntax. `slice`
+is either a symbol naming a scalar variable or constraint (`z`), or an indexed name
+`name[i1, i2, ...]` whose indices are symbols: `_`, or a name bound to the index value.
+
+Returns a [`JuMPSliceDescription`](@ref) with the name and the index symbols. Nothing is
+checked against a JuMP model, which does not exist yet when the macro expands.
+
+Throws an error if `slice` is neither of the two forms, if the name of an indexed slice
+description is not a symbol, or if an index is not a symbol (`x[1, _]` and `x[k + 1, _]`
+are rejected).
+
+# Example
+```julia
+parse_slice_description(:(x[k, _]))  # JuMPSliceDescription(:x, [:k, :_])
+parse_slice_description(:z)          # JuMPSliceDescription(:z, Symbol[])
+```
+"""
 function parse_slice_description(slice)
     if slice isa Symbol
         return JuMPSliceDescription(slice, Symbol[])
@@ -216,6 +236,7 @@ function parse_slice_description(slice)
         if !(name isa Symbol)
             error("Name of a slice description must be a symbol, got: $name")
         end
+
         index_symbols = Symbol[]
         for idx in slice.args[2:end]
             if !(idx isa Symbol)
@@ -223,6 +244,7 @@ function parse_slice_description(slice)
             end
             push!(index_symbols, idx)
         end
+
         return JuMPSliceDescription(name, index_symbols)
     else
         error("Expected name[indices] or name, got: $slice")
