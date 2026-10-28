@@ -1,5 +1,9 @@
 # Decomposition rules
 
+!!! warning
+
+    This page is experimental and has not been reviewed.
+
 `@dantzig_wolfe` turns a JuMP model into a `DWReformulation`. You list what the
 master and each subproblem contain:
 
@@ -22,10 +26,10 @@ Each line has the form `model => (variables = ..., constraints = ...)`.
 | `subproblem(id)` | the subproblem identified by `id`, any expression of the captured indices |
 | `master()` | the master problem; written exactly once |
 
-Each section, `variables` and `constraints`, takes one slice description or a vector of
-slice descriptions, for example `variables = [x[k, _], y[k]]`. Both sections are
+Each assignment, `variables` and `constraints`, takes one slice description or a vector of
+slice descriptions, for example `variables = [x[k, _], y[k]]`. Both assignments are
 optional, and they only help the reader: a slice description is assigned to the model
-whichever section it is in.
+whichever assignment it is in.
 
 ## Slice descriptions
 

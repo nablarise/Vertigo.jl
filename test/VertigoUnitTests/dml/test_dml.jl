@@ -538,8 +538,8 @@ function test_dml_rule_errors()
         @test occursin("more than one rule", sprint(showerror, err))
     end
 
-    @testset "[dml] parse_block" begin
-        parse = Vertigo.DML.parse_block
+    @testset "[dml] parse_decomposition_description" begin
+        parse = Vertigo.DML.parse_decomposition_description
 
         # A block with no `master()` line is rejected.
         err = try

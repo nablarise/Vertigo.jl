@@ -36,10 +36,10 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |  @dantzig_wolfe(model, block)             src/macros/dantzig_wolfe.jl      |
 |        |                                                                   |
 |        v                                                                   |
-|  parse_block(block)                       UserProblemDescription.jl        |
+|  parse_decomposition_description(block)   UserProblemDescription.jl        |
 |        |   for each line:                                                  |
-|        |     parse_description --> split_call_args  (the options)          |
-|        |                       \-> parse_slice (a slice description each)  |
+|        |     parse_problem_description --> split_call_args  (options)      |
+|        |                             \-> parse_slice_description (each)    |
 |        v                                                                   |
 |  master      ::MasterProblemUserDescription                                |
 |  subproblems ::Vector{SubproblemUserDescription}                           |

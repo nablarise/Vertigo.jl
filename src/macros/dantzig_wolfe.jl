@@ -48,7 +48,7 @@ end
 Returns `(decomp::DWReformulation, sp_id_map::Dict)`.
 """
 macro dantzig_wolfe(model, block)
-    master, subproblems = parse_block(block)
+    master, subproblems = parse_decomposition_description(block)
     ownerships = generate_ownerships(master, subproblems)
     return quote
         dantzig_wolfe_decomposition($(esc(model)), $(esc(Expr(:vect, ownerships...))))
