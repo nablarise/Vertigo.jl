@@ -26,6 +26,7 @@ makedocs(;
         "Internal API" => [
             "internal-api/introduction.md",
             "internal-api/dml.md",
+            "internal-api/reformulation.md",
             "internal-api/master.md",
             "internal-api/subproblem.md",
             "internal-api/column-generation.md",
