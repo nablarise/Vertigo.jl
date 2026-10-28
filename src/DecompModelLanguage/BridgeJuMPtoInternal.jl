@@ -71,6 +71,9 @@ true
 ```
 """
 function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=nothing)
+    if isempty(ownerships)
+        throw(ArgumentError("No slice descriptions specified in @dantzig_wolfe block"))
+    end
     table = _ownership_table(ownerships)
     _check_all_objects_named(model)
     master_vars = _master_variables(model, table)
@@ -247,51 +250,6 @@ function dantzig_wolfe_decomposition(model::JuMP.Model, ownerships; optimizer=no
     set_models!(decomp, JuMP.backend(master_model), sp_backends, conv_ub_map, conv_lb_map)
 
     return (decomp, sp_id_map)
-end
-
-"""
-    check_validity(master, subproblems)
-
-Check that the descriptions of a `@dantzig_wolfe` block make a valid
-decomposition, and throw an error if they do not. `master` is the
-[`MasterProblemUserDescription`](@ref) and `subproblems` the collection of its
-[`SubproblemUserDescription`](@ref)s.
-
-The decomposition is valid when:
-- at least one variable or constraint slice description is listed, in the master or in a
-  subproblem;
-- no two slice descriptions, in any model, have the same name and the same number of
-  indices. Slice descriptions hold only index names, so such descriptions match the same
-  objects, and each variable or constraint must be owned by exactly one model.
-
-Returns `nothing`. The check reads the descriptions only: that every slice description
-names an object of the JuMP model is not part of it.
-
-# Example
-```julia
-check_validity(master, subproblems)  # throws if `x` is listed twice with 2 indices
-```
-"""
-function check_validity(master::MasterProblemUserDescription, subproblems)
-    descriptions = Iterators.flatten(((master,), subproblems))
-    if all(d -> isempty(_owned_slices(d)), descriptions)
-        error("No slice descriptions specified in @dantzig_wolfe block")
-    end
-    # Slice descriptions only hold index names, so two of them with the same name and
-    # number of indices match the same elements.
-    seen = Set{Tuple{Symbol,Int}}()
-    for d in descriptions, p in _owned_slices(d)
-        key = (p.name, length(p.indices))
-        if key in seen
-            error(
-                "`$(p.name)` with $(length(p.indices)) index(es) is matched by more " *
-                "than one rule in @dantzig_wolfe; each variable or constraint " *
-                "needs exactly one",
-            )
-        end
-        push!(seen, key)
-    end
-    return nothing
 end
 
 # Value of `option` for the model gathering `objects` (name => indexes pairs).

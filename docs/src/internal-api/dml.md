@@ -45,9 +45,6 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |  subproblems ::Vector{SubproblemUserDescription}                           |
 |        |                                                                   |
 |        v                                                                   |
-|  check_validity(master, subproblems)  empty? duplicate slice description?  |
-|        |                                                                   |
-|        v                                                                   |
 |  generate_ownerships                                                       |
 |        |   generate_ownership        one call per JuMPSliceDescription     |
 |        |   generate_resolved_expr    the id and options, as code           |
@@ -62,6 +59,9 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 += STAGE 2: run time (the JuMP model is known) ==============================+
 |                                                                            |
 |  dantzig_wolfe_decomposition(model, ownerships)    BridgeJuMPtoInternal.jl |
+|        |                                                                   |
+|        v                                                                   |
+|  empty ownerships?     ArgumentError                                       |
 |        |                                                                   |
 |        v                                                                   |
 |  _ownership_table      (name, number of indices) --> Ownership             |
@@ -134,8 +134,8 @@ variable slice description, `x[k, _]`, and one constraint slice description, `kn
   is called on each of them. It is syntax because the macro expands before any
   index has a value: `k` is not bound yet and `_` has no value.
 - Only the name and the number of indices identify the objects a slice description
-  covers: `x[k, _]` and `x[_, t]` cover the same objects. The macro therefore
-  rejects two slice descriptions with the same name and the same number of indices, so
+  covers: `x[k, _]` and `x[_, t]` cover the same objects. `dantzig_wolfe_decomposition` therefore
+  rejects two ownerships with the same name and the same number of indices, so
   that each variable or constraint is owned by exactly one model.
 - `owned_vars` and `owned_constrs` are both handled alike for now: a
   constraint listed under `variables` is accepted.
@@ -172,15 +172,7 @@ Every structure of the DML, with the stage that creates it:
 | `Ownership` | `partition.jl` | the code is generated in stage 1, the objects are built in stage 2 | a slice description's name and number of indices, `is_master`, and `resolve` |
 | `VariableMapping`, `ConstraintMapping` | `models.jl` | stage 2 | the link between each original object and its copy |
 
-```@docs
-Vertigo.DML.MasterProblemUserDescription
-Vertigo.DML.SubproblemUserDescription
-Vertigo.DML.JuMPSliceDescription
-Vertigo.DML.check_validity
-Vertigo.DML.Ownership
-Vertigo.DML.VariableMapping
-Vertigo.DML.ConstraintMapping
-```
+The docstrings of these structures are in the [API Reference](../reference/dml.md).
 
 In short, parsing turns text into user descriptions that own `JuMPSliceDescription`s,
 compilation turns each slice description into an `Ownership`, and calling its function
@@ -190,21 +182,20 @@ on the model's objects gives the ids and options that decide the partition.
 
 The chart above, in words.
 
-1. **Parsing and validity** (stage 1). The macro reads each line of the block into a
+1. **Parsing** (stage 1). The macro reads each line of the block into a
    user description (`master()` or `subproblem(id)`, with its options) that owns
    a `JuMPSliceDescription` for every variable and constraint it lists. A line that does
    not have the form `master() => (...)` or `subproblem(id) => (...)` is
-   rejected, and so is a missing or a second `master()` line. `check_validity(master,
-   subproblems)` then rejects a block that lists no slice description, and two slice descriptions
-   with the same name and number of indices.
+   rejected, and so is a missing or a second `master()` line.
 2. **Slice descriptions become ownerships** (stage 1). For each owned slice description the macro
    generates the code that builds an `Ownership` when the script runs. Its
    function takes one argument per index. An `_` index is an
    unnamed argument, so it matches every value; a named index is bound and can
    be used in `subproblem(id)` and in the options. An option a model does not
    take (`user_overriden` on `master()`) is rejected here.
-3. **Asking the rules** (stage 2). `dantzig_wolfe_decomposition(model, ownerships)` lists
-   every named variable and constraint of the model and looks up its
+3. **Asking the rules** (stage 2). `dantzig_wolfe_decomposition(model, ownerships)`
+   rejects an empty list of ownerships and two ownerships with the same name and number
+   of indices. It then lists every named variable and constraint of the model and looks up its
    `Ownership` by name and number of indices. A missing one is reported as an
    `ArgumentError` naming the object. An error raised by an id or option
    expression of your own is not caught.
@@ -224,7 +215,7 @@ The chart above, in words.
 | `indexes.jl` | enumerates the real index tuples of any JuMP container (`Array`, `DenseAxisArray`, `SparseAxisArray`, `Dict`) |
 | `partition.jl` | `Ownership` and its table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
 | `models.jl` | the variable and constraint mappings, and the functions that copy variables, constraints and the objective into the new JuMP models |
-| `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the run-time entry point, and `check_validity`, which rejects an empty or ambiguous decomposition (the macro calls it while expanding); the entry point runs the checks and the partition, builds the master and subproblem models, and registers everything in the `DWReformulation` |
+| `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the run-time entry point: it runs the checks and the partition, builds the master and subproblem models, and registers everything in the `DWReformulation` |
 
 ## Details worth knowing
 

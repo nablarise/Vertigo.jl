@@ -7,7 +7,8 @@ the offending object.
 |-----------|-------|------------|
 | A variable or constraint matches no rule | `ArgumentError`: *no rule assigns constraint `knapsack[1]` to the master or to a subproblem* | add a rule covering it |
 | `master()` is missing or written more than once | *@dantzig_wolfe needs exactly one master() line, got 0…* | write one `master()` line listing everything the master owns |
-| Two rules match the same name and index count | *`x` with 2 index(es) is matched by more than one rule…* | keep one rule |
+| Two rules match the same name and index count | `ArgumentError`: *`x` with 2 index(es) is matched by more than one rule…* | keep one rule |
+| The block lists no variable or constraint | `ArgumentError`: *No slice descriptions specified in @dantzig_wolfe block* | list what each model owns |
 | An object has no name | `ArgumentError`: *variable `…` has no name the rules can address* | declare it with a name: `@variable(model, y[1:3])` |
 | A subproblem constraint uses a variable of another model | `ArgumentError`: *constraint `mixed` belongs to subproblem 1 but uses variable `x[2,1]` of subproblem 2…* | move the constraint to the master, or the variable to the same subproblem |
 | A line is not `master()` or `subproblem(id)` followed by `=> (variables = ..., constraints = ...)` | `ErrorException` while parsing | fix the line |

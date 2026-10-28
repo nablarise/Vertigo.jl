@@ -56,6 +56,31 @@ end
 
 _owned_slices(d) = Iterators.flatten((d.owned_vars, d.owned_constrs))
 
+"""
+    parse_block(block) -> (master, subproblems)
+
+Read the `begin ... end` block of a `@dantzig_wolfe` call, as unevaluated syntax. Each
+line must have the form `master(...) => contents` or `subproblem(id, ...) => contents`;
+it is read by [`parse_description`](@ref).
+
+Returns the [`MasterProblemUserDescription`](@ref) and the vector of
+[`SubproblemUserDescription`](@ref)s, in the order they are written. The block must
+contain exactly one `master()` line.
+
+Throws an error if `block` is not a `begin ... end` block, if a line has another form
+(the form `x[k, _] => subproblem(k)` is not accepted), or if `master()` is missing or
+written more than once.
+
+# Example
+```julia
+master, subproblems = parse_block(:(
+    begin
+        master() => (constraints = assign[_])
+        subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
+    end
+))
+```
+"""
 function parse_block(block::Expr)
     if block.head != :block
         error("Expected begin...end block")
@@ -70,6 +95,7 @@ function parse_block(block::Expr)
         end
 
         # Detect `f() => ...` structure
+        # line.args is a tuple of the form (:(=>), f(), ...).
         if (
             line isa Expr &&
             line.head == :call &&
@@ -105,12 +131,28 @@ function parse_block(block::Expr)
     return master, subproblems
 end
 
-# `master(opts) => (variables = ..., constraints = ...)`: each section holds
-# one slice description or a vector of them, and both are optional.
+"""
+    parse_description(call, contents)
+
+Read one line `call => contents` of a `@dantzig_wolfe` block. `call` is the expression
+`master(options)` or `subproblem(id, options)`, and `contents` the expression after `=>`:
+a tuple `(variables = ..., constraints = ...)`, or a single such section. Each section
+holds one slice description or a vector of them, and both sections are optional. The
+slice descriptions are read by `parse_slice`.
+
+Returns a [`MasterProblemUserDescription`](@ref) or a [`SubproblemUserDescription`](@ref).
+The options are `silent` for both, and `user_overriden` for a subproblem only.
+
+Throws an error for a section that is neither `variables = ...` nor `constraints = ...`,
+for an unknown option, for a `subproblem` without exactly one positional argument (its
+id), for a `master` with a positional argument, and for any other function name.
+"""
 function parse_description(call::Expr, contents)
     sections = contents isa Expr && contents.head == :tuple ? contents.args : [contents]
+
     owned_vars = JuMPSliceDescription[]
     owned_constrs = JuMPSliceDescription[]
+
     for section in sections
         if !(
             section isa Expr &&
@@ -128,9 +170,11 @@ function parse_description(call::Expr, contents)
             push!(owned, parse_slice(slice))
         end
     end
+
     func_name = call.args[1]
     positional, options = split_call_args(call.args[2:end])
     allowed = func_name == :master ? (:silent,) : (:silent, :user_overriden)
+
     for o in options
         if !(o.args[1] in allowed)
             error(
@@ -139,6 +183,7 @@ function parse_description(call::Expr, contents)
             )
         end
     end
+
     if func_name == :subproblem
         if !(length(positional) == 1)
             error("subproblem() requires exactly one positional argument")

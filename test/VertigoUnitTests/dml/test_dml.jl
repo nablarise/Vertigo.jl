@@ -538,16 +538,8 @@ function test_dml_rule_errors()
         @test occursin("more than one rule", sprint(showerror, err))
     end
 
-    @testset "[dml] check_validity" begin
+    @testset "[dml] parse_block" begin
         parse = Vertigo.DML.parse_block
-        check = Vertigo.DML.check_validity
-        valid = :(
-            begin
-                master() => (constraints = assign[_])
-                subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            end
-        )
-        @test check(parse(valid)...) === nothing
 
         # A block with no `master()` line is rejected.
         err = try
@@ -561,35 +553,6 @@ function test_dml_rule_errors()
         end
         @test occursin("exactly one master()", sprint(showerror, err))
 
-        # Nothing is listed.
-        err = try
-            check(parse(:(
-                begin
-                    master() => ()
-                    subproblem(k) => ()
-                end
-            ))...)
-        catch e
-            e
-        end
-        @test occursin("No slice descriptions specified", sprint(showerror, err))
-
-        # The same name and number of indices in the master and in a subproblem.
-        err = try
-            check(parse(:(
-                begin
-                    master() => (constraints = assign[_])
-                    subproblem(k) => (constraints = assign[k])
-                end
-            ))...)
-        catch e
-            e
-        end
-        @test occursin(
-            "`assign` with 1 index(es) is matched by more than one rule",
-            sprint(showerror, err),
-        )
-
         # `master()` written twice.
         err = try
             parse(:(
@@ -602,6 +565,33 @@ function test_dml_rule_errors()
             e
         end
         @test occursin("exactly one master()", sprint(showerror, err))
+    end
+
+    @testset "[dml] no ownership is rejected" begin
+        err = try
+            dantzig_wolfe_decomposition(_build_gap_jump_model(), [])
+        catch e
+            e
+        end
+        @test err isa ArgumentError
+        @test occursin("No slice descriptions specified", err.msg)
+    end
+
+    @testset "[dml] a master and a subproblem rule on one name are rejected" begin
+        err = try
+            Core.eval(@__MODULE__, quote
+                @dantzig_wolfe _build_gap_jump_model() begin
+                    master() => (constraints = assign[_])
+                    subproblem(k) => (constraints = assign[k])
+                end
+            end)
+        catch e
+            e
+        end
+        @test occursin(
+            "`assign` with 1 index(es) is matched by more than one rule",
+            sprint(showerror, err),
+        )
     end
 
     @testset "[dml] unnamed variables and constraints are rejected" begin
