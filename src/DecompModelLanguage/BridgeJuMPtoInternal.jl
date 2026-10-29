@@ -6,7 +6,7 @@
     dantzig_wolfe_decomposition(model, ownerships; optimizer=nothing)
 
 Decompose a JuMP `model` into a Dantzig-Wolfe reformulation. `ownerships` is a
-vector of [`Ownership`](@ref) saying which model owns each variable and
+vector of [`VarConstrOwnership`](@ref) saying which model owns each variable and
 constraint; `@dantzig_wolfe` builds it from its block.
 
 Returns `(decomp::DWReformulation, sp_id_map::Dict)` where `sp_id_map`

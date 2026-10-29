@@ -4,7 +4,7 @@
 
 # Ownerships written by hand, as `@dantzig_wolfe` would build them.
 function _master_of(name, nindices)
-    return Vertigo.DML.Ownership(
+    return Vertigo.DML.VarConstrOwnership(
         name,
         nindices,
         true,
@@ -12,7 +12,7 @@ function _master_of(name, nindices)
     )
 end
 function _subproblem_of(name, nindices, id)
-    return Vertigo.DML.Ownership(
+    return Vertigo.DML.VarConstrOwnership(
         name,
         nindices,
         false,

@@ -5,7 +5,7 @@
 _label(name, idx) = isempty(idx) ? string(name) : string(name, "[", join(idx, ", "), "]")
 
 """
-    Ownership(name, nindices, is_master, resolve)
+    VarConstrOwnership(name, nindices, is_master, resolve)
 
 Says which model owns the objects of the container `name` with `nindices`
 indices. `resolve(idx...)` takes the index values of one object and returns
@@ -13,7 +13,7 @@ indices. `resolve(idx...)` takes the index values of one object and returns
 master) and the options of its model, `nothing` for an option the rule does
 not set. `@dantzig_wolfe` builds one per owned slice description.
 """
-struct Ownership
+struct VarConstrOwnership
     name::Symbol
     nindices::Int
     is_master::Bool
@@ -25,7 +25,7 @@ _owned_slices(d) = Iterators.flatten((d.owned_vars, d.owned_constrs))
 """
     generate_ownerships(master, subproblems) -> Vector{Expr}
 
-Generate the code that builds the [`Ownership`](@ref)s of a `@dantzig_wolfe` block: one
+Generate the code that builds the [`VarConstrOwnership`](@ref)s of a `@dantzig_wolfe` block: one
 expression per slice description of the master and of each subproblem, in that order.
 The expressions are not evaluated here. The macro puts them in the call to
 `dantzig_wolfe_decomposition`, so they run when the script reaches the block, when the
@@ -39,8 +39,8 @@ master, subproblems = parse_decomposition_description(:(
         subproblem(k) => (variables = x[k, _])
     end
 ))
-generate_ownerships(master, subproblems)  # two expressions, `Ownership(:assign, ...)`
-                                          # and `Ownership(:x, ...)`
+generate_ownerships(master, subproblems)  # two expressions, `VarConstrOwnership(:assign, ...)`
+                                          # and `VarConstrOwnership(:x, ...)`
 ```
 """
 function generate_ownerships(master, subproblems)
@@ -53,21 +53,21 @@ end
 """
     generate_ownership(slice, description) -> Expr
 
-Generate the call `Ownership(name, nindices, is_master, resolve)` for one slice description
+Generate the call `VarConstrOwnership(name, nindices, is_master, resolve)` for one slice description
 `slice` of the master or subproblem `description`. `resolve` is an anonymous function with
 one argument per index symbol of `slice`, whose body is made by
 [`generate_resolved_expr`](@ref):
 
 ```julia
 # subproblem(k) => (variables = x[k, _])
-Ownership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
+VarConstrOwnership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
 ```
 """
 function generate_ownership(slice::JuMPSliceDescription, description)
     resolve = Expr(:->, Expr(:tuple, slice.indices...), generate_resolved_expr(description))
     return Expr(
         :call,
-        GlobalRef(@__MODULE__, :Ownership),
+        GlobalRef(@__MODULE__, :VarConstrOwnership),
         QuoteNode(slice.name),
         length(slice.indices),
         description isa MasterProblemUserDescription,
@@ -79,7 +79,7 @@ end
     generate_resolved_expr(description) -> Expr
 
 Generate the named tuple `(id = ..., silent = ..., user_overridden = ...)` returned by
-the `resolve` function of an [`Ownership`](@ref). The expressions written in `description`
+the `resolve` function of an [`VarConstrOwnership`](@ref). The expressions written in `description`
 are pasted in unevaluated: the id expression of a subproblem and the values of its
 options, which may use the index symbols that `resolve` takes as arguments. An option the
 line does not set is `nothing`, and so is the id of the master, which has none.
@@ -95,9 +95,9 @@ function generate_resolved_expr(d::MasterProblemUserDescription)
     return :((id=nothing, silent=($silent), user_overridden=nothing))
 end
 
-# At most one `Ownership` per container name and number of indices.
+# At most one `VarConstrOwnership` per container name and number of indices.
 function _ownership_table(ownerships)
-    table = Dict{Tuple{Symbol,Int},Ownership}()
+    table = Dict{Tuple{Symbol,Int},VarConstrOwnership}()
     for o in ownerships
         key = (o.name, o.nindices)
         if haskey(table, key)
@@ -113,7 +113,7 @@ function _ownership_table(ownerships)
     return table
 end
 
-# The `Ownership` of `name[idx...]`.
+# The `VarConstrOwnership` of `name[idx...]`.
 function _ownership(table, kind::Symbol, name::Symbol, idx::Tuple)
     return get(table, (name, length(idx))) do
         return throw(

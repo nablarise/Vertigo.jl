@@ -20,7 +20,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 | When | the macro is expanded, before the script runs | the script reaches the `@dantzig_wolfe` line |
 | What is known | the text of the block: names, index symbols, option expressions | the JuMP model, with its objects and their real indices |
 | What is not known | the model, the index values; `model` is only an expression | ---     |
-| Result | the code `dantzig_wolfe_decomposition(model, [Ownership(...), ...])` | `(decomp, sp_id_map)` |
+| Result | the code `dantzig_wolfe_decomposition(model, [VarConstrOwnership(...), ...])` | `(decomp, sp_id_map)` |
 
 ```text
  the user's script
@@ -47,7 +47,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |        |   writes the code that splits variables and constraints by problem                |
 |        v                                                                                   |
 |  returns the code:                                                                         |
-|    dantzig_wolfe_decomposition(model, [Ownership(...), Ownership(...)])                    |
+|    dantzig_wolfe_decomposition(model, [VarConstrOwnership(...), VarConstrOwnership(...)])  |
 +====================================|=======================================================+
                                      |
                                      |  the script runs this code;
@@ -61,7 +61,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |  empty ownerships?     ArgumentError                                                       |
 |        |                                                                                   |
 |        v                                                                                   |
-|  _ownership_table      (name, number of indices) --> Ownership                             |
+|  _ownership_table      (name, number of indices) --> VarConstrOwnership                    |
 |        |                                                                                   |
 |        v                                                                                   |
 |  _check_all_objects_named(model)                                                indexes.jl |
@@ -69,7 +69,7 @@ metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
 |        v                                                                                   |
 |  partition                                                                    partition.jl |
 |        |   for each named variable and constraint (name, idx):                             |
-|        |     _ownership(table, ...)       finds its Ownership                              |
+|        |     _ownership(table, ...)       finds its VarConstrOwnership                     |
 |        |     owner.resolve(idx...)      gives (id, silent, user_overridden)                |
 |        |   _master_variables, _partition_subproblem_variables,                             |
 |        |   _master_constraints, _partition_subproblem_constraints                          |
@@ -139,7 +139,7 @@ variable slice description, `x[k, _]`, and one constraint slice description, `kn
   that each variable or constraint is owned by exactly one model.
 - `owned_vars` and `owned_constrs` are both handled alike for now: a
   constraint listed under `variables` is accepted.
-- The macro turns each owned slice description into an **`Ownership`**
+- The macro turns each owned slice description into an **`VarConstrOwnership`**
   (`partition.jl`): the slice description's name and number of indices, whether the
   model is the master, and a function `resolve(idx...)`. Called with the index
   values of one object, `resolve` returns `(id, silent, user_overridden)`: the
@@ -148,7 +148,7 @@ variable slice description, `x[k, _]`, and one constraint slice description, `kn
   roughly:
 
   ```julia
-  Ownership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
+  VarConstrOwnership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
   ```
 
   The id and the options are evaluated per object because they may use the
@@ -169,13 +169,13 @@ Every structure of the DML, with the stage that creates it:
 | `JuMPSliceDescription` | `UserProblemDescription.jl` | stage 1 | the name and the index symbols of one slice description |
 | `MasterProblemUserDescription` | `UserProblemDescription.jl` | stage 1 | the options and the slice descriptions of the master line |
 | `SubproblemUserDescription` | `UserProblemDescription.jl` | stage 1 | the id expression, the options and the slice descriptions of one subproblem line |
-| `Ownership` | `partition.jl` | the code is generated in stage 1, the objects are built in stage 2 | a slice description's name and number of indices, `is_master`, and `resolve` |
+| `VarConstrOwnership` | `partition.jl` | the code is generated in stage 1, the objects are built in stage 2 | a slice description's name and number of indices, `is_master`, and `resolve` |
 | `VariableMapping`, `ConstraintMapping` | `models.jl` | stage 2 | the link between each original object and its copy |
 
 The docstrings of these structures are in the [API Reference](../reference/dml.md).
 
 In short, parsing turns text into user descriptions that own `JuMPSliceDescription`s,
-compilation turns each slice description into an `Ownership`, and calling its function
+compilation turns each slice description into an `VarConstrOwnership`, and calling its function
 on the model's objects gives the ids and options that decide the partition.
 
 ## Steps
@@ -188,7 +188,7 @@ The chart above, in words.
    not have the form `master() => (...)` or `subproblem(id) => (...)` is
    rejected, and so is a missing or a second `master()` line.
 2. **Slice descriptions become ownerships** (stage 1). For each owned slice description the macro
-   generates the code that builds an `Ownership` when the script runs. Its
+   generates the code that builds an `VarConstrOwnership` when the script runs. Its
    function takes one argument per index. An `_` index is an
    unnamed argument, so it matches every value; a named index is bound and can
    be used in `subproblem(id)` and in the options. An option a model does not
@@ -196,7 +196,7 @@ The chart above, in words.
 3. **Asking the rules** (stage 2). `dantzig_wolfe_decomposition(model, ownerships)`
    rejects an empty list of ownerships and two ownerships with the same name and number
    of indices. It then lists every named variable and constraint of the model and looks up its
-   `Ownership` by name and number of indices. A missing one is reported as an
+   `VarConstrOwnership` by name and number of indices. A missing one is reported as an
    `ArgumentError` naming the object. An error raised by an id or option
    expression of your own is not caught.
 4. **Checks** (stage 2). Before building anything, the DML checks that every variable and
@@ -213,7 +213,7 @@ The chart above, in words.
 | `UserProblemDescription.jl` | parses the block into user descriptions and `JuMPSliceDescription`s |
 | `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro itself; included by the DML module |
 | `indexes.jl` | enumerates the real index tuples of any JuMP container (`Array`, `DenseAxisArray`, `SparseAxisArray`, `Dict`) |
-| `partition.jl` | `Ownership`, and the functions that generate the code building them; the `Ownership` table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
+| `partition.jl` | `VarConstrOwnership`, and the functions that generate the code building them; the `VarConstrOwnership` table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
 | `models.jl` | the variable and constraint mappings, and the functions that copy variables, constraints and the objective into the new JuMP models |
 | `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the run-time entry point: it runs the checks and the partition, builds the master and subproblem models, and registers everything in the `DWReformulation` |
 

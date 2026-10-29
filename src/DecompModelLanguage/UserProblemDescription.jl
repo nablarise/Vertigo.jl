@@ -44,7 +44,7 @@ only gets a value when the generated method runs. `options` maps the name of eac
 which may use the index symbols too. `owned_vars` and `owned_constrs` are the slice descriptions listed
 under `variables` and `constraints`.
 
-The macro turns each owned slice description into an [`Ownership`](@ref), whose function
+The macro turns each owned slice description into an [`VarConstrOwnership`](@ref), whose function
 gives the id and options of the matching object.
 """
 struct SubproblemUserDescription
