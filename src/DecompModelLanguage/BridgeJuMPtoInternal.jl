@@ -84,8 +84,8 @@ function dantzig_wolfe_decomposition(
     if isempty(subproblems)
         throw(ArgumentError("At least one subproblem is needed to decompose the model"))
     end
-    check_subproblem_ids(subproblems)
-    check_ownerships(model, master, subproblems)
+    _check_subproblem_ids(subproblems)
+    _check_ownerships(model, master, subproblems)
 
     master_vars = _in_model_order(master.owned_vars)
     master_constrs = _in_model_order(master.owned_constrs)
@@ -101,7 +101,7 @@ function dantzig_wolfe_decomposition(
     constr_mapping = ConstraintMapping()
 
     # Register master variables
-    copy_variables!(master_model, var_mapping, master_vars)
+    _copy_variables!(master_model, var_mapping, master_vars)
 
     # Create subproblem JuMP models, except for user-overridden subproblems,
     # which are solved by the user's own algorithm and have no model.
@@ -115,22 +115,22 @@ function dantzig_wolfe_decomposition(
 
     # Register subproblem variables
     for (sp_id, sp_model) in sp_jump_models
-        copy_variables!(sp_model, var_mapping, sp_vars[sp_id])
+        _copy_variables!(sp_model, var_mapping, sp_vars[sp_id])
     end
 
     # Register subproblem constraints
     for (sp_id, sp_model) in sp_jump_models
-        copy_constraints!(sp_model, constr_mapping, sp_constrs[sp_id], var_mapping)
+        _copy_constraints!(sp_model, constr_mapping, sp_constrs[sp_id], var_mapping)
     end
 
     # Register master (coupling) constraints
-    copy_constraints!(master_model, constr_mapping, master_constrs, var_mapping)
+    _copy_constraints!(master_model, constr_mapping, master_constrs, var_mapping)
 
     # Register objectives
     for sp_model in values(sp_jump_models)
-        copy_objective!(sp_model, model, var_mapping; is_master=false)
+        _copy_objective!(sp_model, model, var_mapping; is_master=false)
     end
-    copy_objective!(master_model, model, var_mapping; is_master=true)
+    _copy_objective!(master_model, model, var_mapping; is_master=true)
 
     # Resolve optimizer: explicit kwarg > original model's optimizer
     opt = optimizer

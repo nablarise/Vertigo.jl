@@ -31,13 +31,13 @@ everything after it works on MathOptInterface models and indices.
 | dantzig_wolfe_decomposition(model, master, subproblems)            BridgeJuMPtoInternal.jl |
 |       |                                                                                    |
 |       v                                                                                    |
-| check_subproblem_ids; check_ownerships                                          Checker.jl |
+| _check_subproblem_ids; _check_ownerships                                        Checker.jl |
+|       |                                                                                    |
+|       v                                                                                    |
+| create the mappings between the flat model and the decomposed models           Mappings.jl |
 |       |                                                                                    |
 |       v                                                                                    |
 | copy the objects into JuMP master and subproblem models                      Transition.jl |
-|       |   the options say whether a model is built (user_overridden) and if it is silent   |
-|       |   copy_variables!, copy_constraints!, copy_objective!                              |
-|       |   (VariableMapping, ConstraintMapping); the optimiser is set                       |
 |                                                                                            |
 +====================================|=======================================================+
                                      |
@@ -99,7 +99,7 @@ The chart above, in words.
    subproblem. Nothing is checked against the model yet, except that `variables` holds variable
    references and `constraints` constraint references.
 2. **Checking** (`Checker.jl`). `dantzig_wolfe_decomposition` rejects an empty collection of
-   subproblems and two subproblems with the same id. `check_ownerships` then goes through the
+   subproblems and two subproblems with the same id. `_check_ownerships` then goes through the
    descriptions: every reference must belong to the decomposed model and be owned once; every
    variable and constraint of the model must be owned; and a subproblem constraint may use the
    variables of its own subproblem only. A failure is an `ArgumentError` naming the object. See

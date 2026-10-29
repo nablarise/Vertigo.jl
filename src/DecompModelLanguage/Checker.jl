@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: MIT
 
 """
-    check_subproblem_ids(subproblems)
+    _check_subproblem_ids(subproblems)
 
 Check that no two subproblem descriptions have the same id.
 
 Throws an `ArgumentError` naming the id otherwise.
 """
-function check_subproblem_ids(subproblems)
+function _check_subproblem_ids(subproblems)
     ids = Set{Any}()
     for description in subproblems
         if description.id in ids
@@ -26,7 +26,7 @@ function check_subproblem_ids(subproblems)
 end
 
 """
-    check_ownerships(model, master, subproblems)
+    _check_ownerships(model, master, subproblems)
 
 Check that the descriptions split the variables and the constraints of `model` between the
 master and the subproblems:
@@ -40,7 +40,7 @@ master and the subproblems:
 
 Throws an `ArgumentError` naming the offending object.
 """
-function check_ownerships(model, master, subproblems)
+function _check_ownerships(model, master, subproblems)
     descriptions = Iterators.flatten(((master,), subproblems))
     var_owner = Dict{JuMP.VariableRef,Any}()
     constr_owner = Dict{JuMP.ConstraintRef,Any}()

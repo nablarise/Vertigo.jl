@@ -3,6 +3,80 @@
 # SPDX-License-Identifier: MIT
 
 """
+    _copy_variables!(reformulated_model, var_mapping, original_vars)
+
+Add to `reformulated_model` a copy of each variable of `original_vars`, with the same bounds, fixed
+value, start value and integrality, and record it in `var_mapping`. The copies keep the name
+of the originals.
+"""
+function _copy_variables!(reformulated_model, var_mapping::VariableMapping, original_vars)
+    for original_var in original_vars
+        var = JuMP.build_variable(() -> error("todo."), _original_var_info(original_var))
+        name = if JuMP.set_string_names_on_creation(reformulated_model)
+            JuMP.name(original_var)
+        else
+            ""
+        end
+        var_mapping[original_var] = JuMP.add_variable(reformulated_model, var, name)
+    end
+    return nothing
+end
+
+"""
+    _copy_constraints!(reformulated_model, constr_mapping, original_constrs, var_mapping)
+
+Add to `reformulated_model` a copy of each constraint of `original_constrs`, with the same set and
+the function rewritten over the copies of `var_mapping` (see `_replace_vars_in_func`), and
+record it in `constr_mapping`. The variables of the constraints have to be registered first.
+The copies keep the name of the originals.
+"""
+function _copy_constraints!(
+    reformulated_model,
+    constr_mapping::ConstraintMapping,
+    original_constrs,
+    var_mapping::VariableMapping,
+)
+    for original_constr in original_constrs
+        original_constr_obj = JuMP.constraint_object(original_constr)
+        mapped_func = _replace_vars_in_func(
+            original_constr_obj.func, reformulated_model, var_mapping
+        )
+        constr = JuMP.build_constraint(
+            () -> error("todo."), mapped_func, original_constr_obj.set
+        )
+        name = if JuMP.set_string_names_on_creation(reformulated_model)
+            JuMP.name(original_constr)
+        else
+            ""
+        end
+        constr_mapping[original_constr] = JuMP.add_constraint(
+            reformulated_model, constr, name
+        )
+    end
+    return nothing
+end
+
+"""
+    _copy_objective!(reformulated_model, model, var_mapping; is_master = false)
+
+Give `reformulated_model` the objective of `model`: the same sense, and the objective function
+rewritten over the copies of `var_mapping`, so only the terms on the variables of
+`reformulated_model` are kept. The constant of the objective is kept in the master (`is_master =
+true`) only.
+"""
+function _copy_objective!(
+    reformulated_model, model, var_mapping::VariableMapping; is_master::Bool=false
+)
+    original_obj_func = JuMP.objective_function(model)
+    original_obj_sense = JuMP.objective_sense(model)
+    reformulated_obj_func = _replace_vars_in_func(
+        original_obj_func, reformulated_model, var_mapping; preserve_constant=is_master
+    )
+    JuMP.set_objective_sense(reformulated_model, original_obj_sense)
+    return JuMP.set_objective_function(reformulated_model, reformulated_obj_func)
+end
+
+"""
     _original_var_info(original_var) -> JuMP.VariableInfo
 
 Read the bounds, the fixed value, the start value and the integrality (binary or integer) of
@@ -33,7 +107,7 @@ Rewrite the function `func` of the original model over the variables of `target_
 variable of `func` is replaced by its copy in `var_mapping`. A term on a variable that has no
 copy in `target_model` is dropped: the variable belongs to another model, or to a
 user-overridden subproblem, which has no model. This is why
-[`check_ownerships`](@ref) rejects a subproblem constraint on a foreign variable beforehand.
+[`_check_ownerships`](@ref) rejects a subproblem constraint on a foreign variable beforehand.
 
 `func` is an `AffExpr` or a single `JuMP.VariableRef`. With `preserve_constant = false`, the
 constant of an `AffExpr` is left out, so that it is counted once, in the master. A single
@@ -67,78 +141,4 @@ function _replace_vars_in_func(
         end
     end
     return 0.0
-end
-
-"""
-    copy_variables!(reformulated_model, var_mapping, original_vars)
-
-Add to `reformulated_model` a copy of each variable of `original_vars`, with the same bounds, fixed
-value, start value and integrality, and record it in `var_mapping`. The copies keep the name
-of the originals.
-"""
-function copy_variables!(reformulated_model, var_mapping::VariableMapping, original_vars)
-    for original_var in original_vars
-        var = JuMP.build_variable(() -> error("todo."), _original_var_info(original_var))
-        name = if JuMP.set_string_names_on_creation(reformulated_model)
-            JuMP.name(original_var)
-        else
-            ""
-        end
-        var_mapping[original_var] = JuMP.add_variable(reformulated_model, var, name)
-    end
-    return nothing
-end
-
-"""
-    copy_constraints!(reformulated_model, constr_mapping, original_constrs, var_mapping)
-
-Add to `reformulated_model` a copy of each constraint of `original_constrs`, with the same set and
-the function rewritten over the copies of `var_mapping` (see `_replace_vars_in_func`), and
-record it in `constr_mapping`. The variables of the constraints have to be registered first.
-The copies keep the name of the originals.
-"""
-function copy_constraints!(
-    reformulated_model,
-    constr_mapping::ConstraintMapping,
-    original_constrs,
-    var_mapping::VariableMapping,
-)
-    for original_constr in original_constrs
-        original_constr_obj = JuMP.constraint_object(original_constr)
-        mapped_func = _replace_vars_in_func(
-            original_constr_obj.func, reformulated_model, var_mapping
-        )
-        constr = JuMP.build_constraint(
-            () -> error("todo."), mapped_func, original_constr_obj.set
-        )
-        name = if JuMP.set_string_names_on_creation(reformulated_model)
-            JuMP.name(original_constr)
-        else
-            ""
-        end
-        constr_mapping[original_constr] = JuMP.add_constraint(
-            reformulated_model, constr, name
-        )
-    end
-    return nothing
-end
-
-"""
-    copy_objective!(reformulated_model, model, var_mapping; is_master = false)
-
-Give `reformulated_model` the objective of `model`: the same sense, and the objective function
-rewritten over the copies of `var_mapping`, so only the terms on the variables of
-`reformulated_model` are kept. The constant of the objective is kept in the master (`is_master =
-true`) only.
-"""
-function copy_objective!(
-    reformulated_model, model, var_mapping::VariableMapping; is_master::Bool=false
-)
-    original_obj_func = JuMP.objective_function(model)
-    original_obj_sense = JuMP.objective_sense(model)
-    reformulated_obj_func = _replace_vars_in_func(
-        original_obj_func, reformulated_model, var_mapping; preserve_constant=is_master
-    )
-    JuMP.set_objective_sense(reformulated_model, original_obj_sense)
-    return JuMP.set_objective_function(reformulated_model, reformulated_obj_func)
 end
