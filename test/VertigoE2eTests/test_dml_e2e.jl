@@ -8,6 +8,31 @@ function _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha::Float64
     return ColGenLoggerWorkspace(workspace)
 end
 
+# The GAP model (`x`, `assign`, `knapsack`) decomposed by machine: the master keeps `assign`,
+# and also `variables` and `constraints`. `Ks` and `Ts` are the index sets of `x`.
+function _dml_gap(
+    model;
+    variables=(),
+    constraints=(),
+    options=k -> SubproblemOptions(),
+    Ks=axes(model[:x], 1),
+    Ts=axes(model[:x], 2),
+)
+    x, assign, knapsack = model[:x], model[:assign], model[:knapsack]
+    return dantzig_wolfe_decomposition(
+        model,
+        MasterProblemUserDescription(variables=variables, constraints=[assign, constraints]),
+        [
+            SubproblemUserDescription(
+                k;
+                variables=[x[k, t] for t in Ts],
+                constraints=knapsack[k],
+                options=options(k),
+            ) for k in Ks
+        ],
+    )
+end
+
 function test_dml_gap_basic(; smoothing_alpha=0.0)
     @testset "[dml] basic GAP (2m, 7t) dual bound ≈ 63.0" begin
         cost = [
@@ -30,10 +55,7 @@ function test_dml_gap_basic(; smoothing_alpha=0.0)
         )
         @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            master() => (constraints = assign[_])
-        end
+        decomp, sp_map = _dml_gap(model)
 
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
@@ -65,10 +87,7 @@ function _build_dml_gap(cost, weight, capacity; sense=JuMP.MIN_SENSE)
     )
     @objective(model, sense, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
-    return @dantzig_wolfe model begin
-        subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-        master() => (constraints = assign[_])
-    end
+    return _dml_gap(model)
 end
 
 function test_dml_gap_converges(; smoothing_alpha=0.0)
@@ -168,10 +187,7 @@ function test_dml_with_penalty(; smoothing_alpha=0.0)
             sum(cost[k, t] * x[k, t] for k in K, t in T) + sum(penalty * u[t] for t in T)
         )
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            master() => (variables=u[_], constraints=assign[_])
-        end
+        decomp, sp_map = _dml_gap(model; variables=u)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
         ws = _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha)
@@ -213,10 +229,7 @@ function test_dml_with_penalty_cardinality(; smoothing_alpha=0.0)
             sum(cost[k, t] * x[k, t] for k in K, t in T) + sum(penalty * u[t] for t in T)
         )
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            master() => (variables=u[_], constraints=[assign[_], max_unassign])
-        end
+        decomp, sp_map = _dml_gap(model; variables=u, constraints=max_unassign)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
         ws = _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha)
@@ -251,10 +264,7 @@ function test_dml_fixed_master_cost(; smoothing_alpha=0.0)
         )
         @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T) + fixed_cost)
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            master() => (constraints = assign[_])
-        end
+        decomp, sp_map = _dml_gap(model)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
         ws = _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha)
@@ -290,10 +300,7 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
         @constraint(model, link, x[1, 1] + y == 1)
         @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T) + 2.0 * y)
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-            master() => (variables=y, constraints=[assign[_], link])
-        end
+        decomp, sp_map = _dml_gap(model; variables=y, constraints=link)
         _set_optimizer_on_models!(decomp, HiGHS.Optimizer)
 
         ws = _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha)
@@ -388,11 +395,7 @@ function test_dml_user_overridden_subproblem()
         )
         @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
-        decomp, sp_map = @dantzig_wolfe model begin
-            subproblem(k, user_overridden=true) => (variables = x[k, _])
-            subproblem(k) => (constraints = knapsack[k])
-            master() => (constraints = assign[_])
-        end
+        decomp, sp_map = _dml_gap(model; options=k -> SubproblemOptions(user_overridden=true))
 
         # No model was built; the user installs a pricer per subproblem.
         for k in K
@@ -477,10 +480,7 @@ function test_dml_bp_over_containers()
                 @test termination_status(model) == MOI.OPTIMAL
                 flat_optimum = objective_value(model)
 
-                decomp, sp_map = @dantzig_wolfe model begin
-                    subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-                    master() => (constraints = assign[_])
-                end
+                decomp, sp_map = _dml_gap(model; Ks, Ts)
                 @test Set(keys(sp_map)) == Set(Ks)
 
                 bcp_ws = BranchCutPriceWorkspace(

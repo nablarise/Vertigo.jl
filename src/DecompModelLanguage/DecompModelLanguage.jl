@@ -16,14 +16,14 @@ using MathOptInterface
 const MOI = MathOptInterface
 using ..Reformulation
 
-include("indexes.jl")
 include("UserProblemDescription.jl")
-include("partition.jl")
-include("models.jl")
+include("Checker.jl")
+include("Mappings.jl")
+include("Transition.jl")
 include("BridgeJuMPtoInternal.jl")
-include("macros/dantzig_wolfe.jl")
 
-export @dantzig_wolfe
 export dantzig_wolfe_decomposition
+export MasterProblemUserDescription, SubproblemUserDescription
+export MasterProblemOptions, SubproblemOptions
 
 end # module DML

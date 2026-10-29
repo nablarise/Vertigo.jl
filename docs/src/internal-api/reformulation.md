@@ -5,7 +5,7 @@ decomposed problem. It holds what column generation needs: the subproblems, the
 coefficients that couple them to the master, the pure master variables, and the
 mapping between the variables of the user's model and those of the
 subproblems. It uses MathOptInterface only: it knows nothing about JuMP or about
-the `@dantzig_wolfe` macro. The [DML](dml.md) depends on it, and not the other
+the descriptions of the user. The [DML](dml.md) depends on it, and not the other
 way round.
 
 ## From the builder to the algorithms

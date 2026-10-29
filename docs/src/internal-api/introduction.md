@@ -7,10 +7,10 @@ The flow chart below follows a call from the user's model to the result. The fir
 the decomposition; the rest solve it.
 
 1. **Decomposition Modeling Language** (`src/DecompModelLanguage/`). The
-   `@dantzig_wolfe` macro reads the block written by the user. At run time, each
-   variable and constraint of the JuMP model is assigned to the master or to a
-   subproblem, and the result is turned into a decomposition by
-   `dantzig_wolfe_decomposition`. The [DML page](dml.md) follows these steps
+   user describes the master and the subproblems with the JuMP variables and
+   constraints each one owns. `dantzig_wolfe_decomposition` checks that every
+   variable and constraint has exactly one owner and turns the result into a
+   decomposition. The [DML page](dml.md) follows these steps
    file by file.
 2. **Reformulation** (`src/Reformulation/`). `builder.jl` (`DWReformulationBuilder`
    and `build`) assembles the master, the subproblems and the mappings between
@@ -33,7 +33,7 @@ the decomposition; the rest solve it.
 |              (User API)               |
 | Decomposition Modeling Language       |
 | - Entry point: JuMP compact model     |
-| and @dantzig_wolfe macro              |
+| and master and subproblem descriptions|
 +---------------------------------------+
                     |
                     v

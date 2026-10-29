@@ -39,10 +39,14 @@ set_silent(model)
 @constraint(model, knapsack[k in K], sum(weight[k, t] * x[k, t] for t in T) <= capacity[k])
 @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
-decomp, sp_map = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 ```
 
 At each column generation iteration, Vertigo.jl solves the master problem and gets its dual values.
@@ -57,16 +61,21 @@ algorithm.
 
 ## 2. Declaring the override
 
-Add `user_overridden=true` to the subproblems to override:
+Give the subproblems the option `user_overridden = true` to override them:
 
 ```julia
-decomp, sp_map = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k, user_overridden = true) => (
-        variables = x[k, _],
-        constraints = knapsack[k]
-    )
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(
+            k;
+            variables = x[k, :],
+            constraints = knapsack[k],
+            options = SubproblemOptions(user_overridden = true),
+        ) for k in K
+    ],
+)
 ```
 
 !!! note

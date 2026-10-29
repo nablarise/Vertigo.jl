@@ -1,233 +1,131 @@
 # Decomposition Modeling Language
 
-The DML (`src/DecompModelLanguage/`) turns a JuMP model and a set of rules into a
-`DWReformulation`. It is the only part of Vertigo that reads JuMP objects;
+The DML (`src/DecompModelLanguage/`) turns a JuMP model and a description of the master and of the
+subproblems into a `DWReformulation`. It is the only part of Vertigo that reads JuMP objects;
 everything after it works on MathOptInterface models and indices.
 
 !!! note
 
-    The DML and the internals are being reworked.
+    The DML and the internals are being reworked. The `@dantzig_wolfe` macro is not part of the
+    build at the moment; it will be adapted to build the descriptions described below.
 
-## From the macro to the reformulation
-
-`@dantzig_wolfe` works in two stages, and the difference between them is what makes the DML hard to
-follow. The macro itself first expands to rewrite Julia syntax at compile time, a form of
-metaprogramming. Then, at runtime, the code runs based on the user's JuMP model.
-
-
-| Aspect | Stage 1: macro expansion | Stage 2: run time |
-|--------|--------------------------|-------------------|
-| When | the macro is expanded, before the script runs | the script reaches the `@dantzig_wolfe` line |
-| What is known | the text of the block: names, index symbols, option expressions | the JuMP model, with its objects and their real indices |
-| What is not known | the model, the index values; `model` is only an expression | ---     |
-| Result | the code `dantzig_wolfe_decomposition(model, [VarConstrOwnership(...), ...])` | `(decomp, sp_id_map)` |
+## From the descriptions to the reformulation
 
 ```text
- the user's script
- -----------------
-   model = Model(); @variable(model, ...); @constraint(model, ...)
-   decomp, sp_map = @dantzig_wolfe model begin ... end
-                           |
-                           |  the macro receives the expression `model`
-                           |  and the unevaluated block
-                           v
-+= STAGE 1: macro expansion (syntax only, no JuMP model yet) ================================+
++= the user's script ========================================================================+
 |                                                                                            |
-|  @dantzig_wolfe(model, block)                                      macros/dantzig_wolfe.jl |
-|        |                                                                                   |
-|        v                                                                                   |
-|  parse_decomposition_description(block)                          UserProblemDescription.jl |
-|        |   reads every line, and every slice description in it                             |
-|        v                                                                                   |
-|  master      ::MasterProblemUserDescription                                                |
-|  subproblems ::Vector{SubproblemUserDescription}                                           |
-|        |                                                                                   |
-|        v                                                                                   |
-|  generate_ownerships                                                          partition.jl |
-|        |   writes the code that splits variables and constraints by problem                |
-|        v                                                                                   |
-|  returns the code:                                                                         |
-|    dantzig_wolfe_decomposition(model, [VarConstrOwnership(...), VarConstrOwnership(...)])  |
+| model = Model(); @variable(model, ...); @constraint(model, ...)                            |
+|       |                                                                                    |
+|       v                                                                                    |
+| describe the master and each subproblem, with their options      UserProblemDescription.jl |
+|       |   master      = MasterProblemUserDescription(variables = ..., constraints = ...)   |
+|       |   subproblems = [SubproblemUserDescription(id; variables = ..., ...), ...]         |
+|       v                                                                                    |
+| decomp, sp_map = dantzig_wolfe_decomposition(model, master, subproblems)                   |
+|                                                                                            |
 +====================================|=======================================================+
                                      |
-                                     |  the script runs this code;
-                                     |  `model` is now a JuMP.Model
                                      v
-+= STAGE 2: run time (the JuMP model is known) ==============================================+
++= dantzig_wolfe_decomposition ==============================================================+
 |                                                                                            |
-|  dantzig_wolfe_decomposition(model, ownerships)                    BridgeJuMPtoInternal.jl |
-|        |                                                                                   |
-|        v                                                                                   |
-|  empty ownerships?     ArgumentError                                                       |
-|        |                                                                                   |
-|        v                                                                                   |
-|  _ownership_table      (name, number of indices) --> VarConstrOwnership                    |
-|        |                                                                                   |
-|        v                                                                                   |
-|  _check_all_objects_named(model)                                                indexes.jl |
-|        |   uses _named_objects, _holds and _index_tuples                                   |
-|        v                                                                                   |
-|  partition                                                                    partition.jl |
-|        |   for each named variable and constraint (name, idx):                             |
-|        |     _ownership(table, ...)       finds its VarConstrOwnership                     |
-|        |     owner.resolve(idx...)      gives (id, silent, user_overridden)                |
-|        |   _master_variables, _partition_subproblem_variables,                             |
-|        |   _master_constraints, _partition_subproblem_constraints                          |
-|        v                                                                                   |
-|  _check_no_foreign_variables                                                               |
-|        |                                                                                   |
-|        v                                                                                   |
-|  copy the objects into JuMP master and subproblem models                         models.jl |
-|        |   _requested_option reads user_overridden (no model if true)                      |
-|        |   _register_variables!, _register_constraints!,                                   |
-|        |   _register_objective!   (VariableMapping, ConstraintMapping)                     |
-|        |   _requested_option reads silent; the optimiser is set                            |
-|        v                                                                                   |
-|  hand the data over to the Reformulation module                              Reformulation |
-|        v                                                                                   |
-|  convexity constraints in the master, then set_models!                                     |
+| dantzig_wolfe_decomposition(model, master, subproblems)            BridgeJuMPtoInternal.jl |
+|       |                                                                                    |
+|       v                                                                                    |
+| check_subproblem_ids; check_ownerships                                          Checker.jl |
+|       |                                                                                    |
+|       v                                                                                    |
+| copy the objects into JuMP master and subproblem models                      Transition.jl |
+|       |   the options say whether a model is built (user_overridden) and if it is silent   |
+|       |   _register_variables!, _register_constraints!, _register_objective!               |
+|       |   (VariableMapping, ConstraintMapping); the optimiser is set                       |
+|                                                                                            |
 +====================================|=======================================================+
                                      |
+                                     |  hand the data over to the Reformulation module
                                      v
                   (decomp::DWReformulation, sp_id_map)
-                                     |
-                                     v
-             goes on in the Reformulation module (see the Reformulation page)
 ```
 
 The [Reformulation page](reformulation.md) follows the flow from the hand-over on.
 
 ## Basic structures
 
-A line of the `@dantzig_wolfe` block says what one model contains:
+The user describes what each model contains with the JuMP objects themselves:
 
 ```julia
-subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
+SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k])
 ```
 
-**User descriptions** (`UserProblemDescription.jl`) hold
-one such line, kept as unevaluated syntax:
+**User descriptions** (`UserProblemDescription.jl`) hold one model each:
 
 | Field | `MasterProblemUserDescription` | `SubproblemUserDescription` |
 |-------|-------------------------------|-----------------------------|
-| `id_expr` | none: the master has no id | the expression of the subproblem id; it may use an index symbol bound by a slice description |
-| `options` | a dictionary: the name of each `key=value` option written in `master(...)`, and the expression written for it | the same for `subproblem(...)` |
-| `owned_vars` | the slice descriptions listed under `variables` | the same |
-| `owned_constrs` | the slice descriptions listed under `constraints` | the same |
+| `id` | none: the master has no id | the identifier of the subproblem; any value that can be sorted |
+| `options` | a `MasterProblemOptions` | a `SubproblemOptions` |
+| `owned_vars` | the `JuMP.VariableRef`s of the model that it owns | the same |
+| `owned_constrs` | the `JuMP.ConstraintRef`s of the model that it owns | the same |
 
-**`JuMPSliceDescription`** is one entry of `owned_vars` or `owned_constrs`: a variable
-or constraint of the JuMP model as the user writes it. The line above has one
-variable slice description, `x[k, _]`, and one constraint slice description, `knapsack[k]`.
+The keyword constructors take `variables` and `constraints` as a reference, a container of
+references or a nested vector of them, and flatten them into `owned_vars` and `owned_constrs`.
+A reference of the wrong kind is rejected there, by `_collect_varconstrs_refs!`.
 
-| Slice description | `name` | `indices` |
-|---------|--------|-----------|
-| `x[k, _]` | `:x` | `[:k, :_]` |
-| `knapsack[k]` | `:knapsack` | `[:k]` |
+**Options** (`UserProblemDescription.jl`) are plain structures with defaults, one value per model:
 
-- `name` is the name of the JuMP variable or constraint container, and
-  `indices` the symbols written in the brackets, empty for a scalar object.
-  A symbol is either `_`, a wildcard that matches every value of that
-  position, or a name that is bound to the index value and can be used in
-  `id_expr`.
-- A `JuMPSliceDescription` holds no object of the model. It only describes which
-  objects it covers; the objects are found later, when the generated function
-  is called on each of them. It is syntax because the macro expands before any
-  index has a value: `k` is not bound yet and `_` has no value.
-- Only the name and the number of indices identify the objects a slice description
-  covers: `x[k, _]` and `x[_, t]` cover the same objects. `dantzig_wolfe_decomposition` therefore
-  rejects two ownerships with the same name and the same number of indices, so
-  that each variable or constraint is owned by exactly one model.
-- `owned_vars` and `owned_constrs` are both handled alike for now: a
-  constraint listed under `variables` is accepted.
-- The macro turns each owned slice description into an **`VarConstrOwnership`**
-  (`partition.jl`): the slice description's name and number of indices, whether the
-  model is the master, and a function `resolve(idx...)`. Called with the index
-  values of one object, `resolve` returns `(id, silent, user_overridden)`: the
-  id of its subproblem (`nothing` for the master) and the options of its model,
-  `nothing` for an option the line does not set. For `x[k, _]` above it is,
-  roughly:
+| Structure | Fields |
+|-----------|--------|
+| `MasterProblemOptions` | `silent = true` |
+| `SubproblemOptions` | `silent = true`, `user_overridden = false` |
 
-  ```julia
-  VarConstrOwnership(:x, 2, false, (k, _) -> (id = k, silent = nothing, user_overridden = nothing))
-  ```
-
-  The id and the options are evaluated per object because they may use the
-  index symbols, as in `subproblem(k, silent = (k == 2))`.
-
-`dantzig_wolfe_decomposition(model, ownerships)` looks an object up by name and
-number of indices, so two ownerships with the same name and number of indices
-are rejected.
-
-**Mappings** (`models.jl`) `VariableMapping` and `ConstraintMapping` link each
+**Mappings** (`Mappings.jl`) `VariableMapping` and `ConstraintMapping` link each
 object of the original JuMP model to its copy in the master or a subproblem
 model while the new models are built.
 
-Every structure of the DML, with the stage that creates it:
+Every structure of the DML:
 
-| Structure | Defined in | Created in | Holds |
-|-----------|------------|------------|-------|
-| `JuMPSliceDescription` | `UserProblemDescription.jl` | stage 1 | the name and the index symbols of one slice description |
-| `MasterProblemUserDescription` | `UserProblemDescription.jl` | stage 1 | the options and the slice descriptions of the master line |
-| `SubproblemUserDescription` | `UserProblemDescription.jl` | stage 1 | the id expression, the options and the slice descriptions of one subproblem line |
-| `VarConstrOwnership` | `partition.jl` | the code is generated in stage 1, the objects are built in stage 2 | a slice description's name and number of indices, `is_master`, and `resolve` |
-| `VariableMapping`, `ConstraintMapping` | `models.jl` | stage 2 | the link between each original object and its copy |
+| Structure | Defined in | Holds |
+|-----------|------------|-------|
+| `MasterProblemOptions`, `SubproblemOptions` | `UserProblemDescription.jl` | the options of one model |
+| `MasterProblemUserDescription` | `UserProblemDescription.jl` | the options, the variables and the constraints of the master |
+| `SubproblemUserDescription` | `UserProblemDescription.jl` | the id, the options, the variables and the constraints of one subproblem |
+| `VariableMapping`, `ConstraintMapping` | `Mappings.jl` | the link between each original object and its copy |
 
 The docstrings of these structures are in the [API Reference](../reference/dml.md).
-
-In short, parsing turns text into user descriptions that own `JuMPSliceDescription`s,
-compilation turns each slice description into an `VarConstrOwnership`, and calling its function
-on the model's objects gives the ids and options that decide the partition.
 
 ## Steps
 
 The chart above, in words.
 
-1. **Parsing** (stage 1). The macro reads each line of the block into a
-   user description (`master()` or `subproblem(id)`, with its options) that owns
-   a `JuMPSliceDescription` for every variable and constraint it lists. A line that does
-   not have the form `master() => (...)` or `subproblem(id) => (...)` is
-   rejected, and so is a missing or a second `master()` line.
-2. **Slice descriptions become ownerships** (stage 1). For each owned slice description the macro
-   generates the code that builds an `VarConstrOwnership` when the script runs. Its
-   function takes one argument per index. An `_` index is an
-   unnamed argument, so it matches every value; a named index is bound and can
-   be used in `subproblem(id)` and in the options. An option a model does not
-   take (`user_overridden` on `master()`) is rejected here.
-3. **Asking the rules** (stage 2). `dantzig_wolfe_decomposition(model, ownerships)`
-   rejects an empty list of ownerships and two ownerships with the same name and number
-   of indices. It then lists every named variable and constraint of the model and looks up its
-   `VarConstrOwnership` by name and number of indices. A missing one is reported as an
-   `ArgumentError` naming the object. An error raised by an id or option
-   expression of your own is not caught.
-4. **Checks** (stage 2). Before building anything, the DML checks that every variable and
-   constraint has a name, and that no subproblem constraint uses a variable of
-   another model. See [Errors](../user-api/errors.md).
-5. **Building** (stage 2). The partition is turned into MOI models and a
-   `DWReformulation`; see `BridgeJuMPtoInternal.jl` and the
+1. **Describing** (`UserProblemDescription.jl`). The user builds one description for the master and one for each
+   subproblem. Nothing is checked against the model yet, except that `variables` holds variable
+   references and `constraints` constraint references.
+2. **Checking** (`Checker.jl`). `dantzig_wolfe_decomposition` rejects an empty collection of
+   subproblems and two subproblems with the same id. `check_ownerships` then goes through the
+   descriptions: every reference must belong to the decomposed model and be owned once; every
+   variable and constraint of the model must be owned; and a subproblem constraint may use the
+   variables of its own subproblem only. A failure is an `ArgumentError` naming the object. See
+   [Errors](../user-api/errors.md).
+3. **Building** (`Transition.jl`, `BridgeJuMPtoInternal.jl`). The owned objects are taken in the
+   order of the model, so the order the user wrote them in does not change the result. They are
+   copied into JuMP models, the options decide whether a model is built and whether it is silent,
+   and the result is turned into MOI models and a `DWReformulation`; see the
    [master](master.md) and [subproblem](subproblem.md) pages.
 
 ## Files
 
 | File | Role |
 |------|------|
-| `UserProblemDescription.jl` | parses the block into user descriptions and `JuMPSliceDescription`s |
-| `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro itself; included by the DML module |
-| `indexes.jl` | enumerates the real index tuples of any JuMP container (`Array`, `DenseAxisArray`, `SparseAxisArray`, `Dict`) |
-| `partition.jl` | `VarConstrOwnership`, and the functions that generate the code building them; the `VarConstrOwnership` table; looks up the owner of each named object and groups the results; runs the unnamed-object and foreign-variable checks |
-| `models.jl` | the variable and constraint mappings, and the functions that copy variables, constraints and the objective into the new JuMP models |
-| `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the run-time entry point: it runs the checks and the partition, builds the master and subproblem models, and registers everything in the `DWReformulation` |
+| `UserProblemDescription.jl` | the options structures and the user descriptions of the master and of a subproblem |
+| `Checker.jl` | checks that the descriptions are correct before anything is built: distinct ids, one owner for each variable and constraint, no foreign variable in a subproblem constraint |
+| `Mappings.jl` | the variable and constraint mappings that link each object of the flat model to its copy |
+| `Transition.jl` | the functions that copy variables, constraints and the objective of the flat model into the new JuMP master and subproblem models |
+| `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, builds the master and subproblem models, and registers everything in the `DWReformulation` |
+| `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro and its parser, written for an earlier shape of the descriptions; not part of the build until it is adapted |
 
 ## Details worth knowing
 
-- **Addressing by real indices.** `x[k in ["a", "b"], t in 3:5]` is addressed by
-  `("a", 3)`, not by position. `indexes.jl` returns the index tuples as the
-  user declared them for every JuMP container.
-- **Scalars.** A scalar object keeps an index set of `Set{Tuple{}}`; the model
-  builder dispatches on it.
-- **Options left unset.** `silent` and `user_overridden` are `nothing` until a
-  rule sets them. Two rules assigning to the same model must agree; unset means
-  the default (silent, built as a MOI model).
-- **Overridden subproblems.** For `user_overridden=true`, no model is built and
-  the variables get fresh `MOI.VariableIndex` values `1, 2, …` (names in
-  alphabetical order, then sorted indices). See `_subproblem_variable_indices`
-  in `BridgeJuMPtoInternal.jl`.
+- **Order.** Variables and constraints are copied in the order of the JuMP model, whatever the
+  order of the lists given to the descriptions.
+- **Overridden subproblems.** For `user_overridden = true`, no model is built and the
+  variables get fresh `MOI.VariableIndex` values `1, 2, …`, in the order of the model. See
+  `_subproblem_variable_indices` in `BridgeJuMPtoInternal.jl`.
+- **Names.** The copies keep the name of the original object, if it has one.

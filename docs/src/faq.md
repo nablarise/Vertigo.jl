@@ -34,10 +34,10 @@ It calls `BranchCutPriceContext`, which was renamed
 Constraints that couple the blocks (`assign` in the GAP). Variables of a block,
 and the constraints involving only that block, go to the subproblem.
 
-### Why do I get "has no name the rules can address"?
+### Why do I get "is not assigned to the master or to a subproblem"?
 
-Rules refer to objects by name. Declare every variable and constraint with a
-name; see [Errors](user-api/errors.md).
+Every variable and constraint of the model must be listed in exactly one
+description, the master's or a subproblem's; see [Errors](user-api/errors.md).
 
 ### Can a constraint involve variables of two subproblems?
 
@@ -47,11 +47,11 @@ No; it belongs in the master. Vertigo rejects it with an error.
 
 No. They use the optimiser of the model you decompose
 (`Model(HiGHS.Optimizer)` in the examples). Models are silent by default; use
-`silent=false` in a rule to see a solver's output.
+`SubproblemOptions(silent = false)` or `MasterProblemOptions(silent = false)` to see a solver's output.
 
 ### Can I solve a subproblem with my own algorithm?
 
-Yes: `subproblem(id, user_overridden=true)`. See the
+Yes: describe it with `SubproblemOptions(user_overridden = true)`. See the
 [tutorial](tutorials/overriding-subproblems.md) and
 [Decomposition rules](user-api/decomposition.md).
 

@@ -3,253 +3,155 @@
 # SPDX-License-Identifier: MIT
 
 """
-    JuMPSliceDescription(name, indices)
+    MasterProblemOptions(; silent = true)
 
-A variable or constraint of the JuMP model as written in a `@dantzig_wolfe`
-block, such as `x[k, _]`. `name` is the name of the JuMP container (`:x`) and
-`indices` the symbols written in the brackets (`[:k, :_]`, empty for a scalar
-object). An index is either `_`, which matches every value, or a name bound to
-the index value, which `subproblem(id)` can use.
-
-It is syntax, not a JuMP object: the macro expands before any index has a
-value. Only `name` and the number of indices select the objects it covers.
+Options of the master problem. With `silent = true`, the solver of the master model prints
+nothing.
 """
-struct JuMPSliceDescription
-    name::Symbol
-    indices::Vector{Symbol}
+Base.@kwdef struct MasterProblemOptions
+    silent::Bool = true
 end
 
 """
-    MasterProblemUserDescription(options, owned_vars, owned_constrs)
+    SubproblemOptions(; silent = true, user_overridden = false)
 
-What a `master(key=value, ...) => (variables = ..., constraints = ...)` line
-says about the master, kept as unevaluated syntax. `options` maps the name of each
-`key=value` keyword (`silent`) to the expression written for it. `owned_vars` and `owned_constrs` are the
-slice descriptions listed under `variables` and `constraints`.
+Options of one subproblem.
+
+- `silent`: with `true`, the solver of the subproblem model prints nothing.
+- `user_overridden`: with `true`, the subproblem is solved by an algorithm of your own and no
+  MOI model is built for it. Its constraints are not modelled, since your algorithm enforces
+  them. Its variables still get a `MOI.VariableIndex`, available through
+  `mapped_subproblem_var`, and `sp_models(decomp)[sp_id]` is `nothing` until you install
+  your pricer there.
+"""
+Base.@kwdef struct SubproblemOptions
+    silent::Bool = true
+    user_overridden::Bool = false
+end
+
+"""
+    MasterProblemUserDescription(variables = (), constraints = (), options = MasterProblemOptions())
+
+What the master problem contains: the variables and the constraints of the JuMP model that
+it owns, and its options. `variables` and `constraints` each take a reference, a container of
+references or slices of containers such as `x[k, :]`, possibly nested in a vector.
+
+The fields are `options`, `owned_vars` (a `Vector{JuMP.VariableRef}`) and `owned_constrs`
+(a `Vector{JuMP.ConstraintRef}`).
+
+Throws an `ArgumentError` if something that is not a variable reference is given as a
+variable, or something that is not a constraint reference as a constraint.
+
+# Example
+```julia
+MasterProblemUserDescription(
+    variables = u, constraints = [assign, max_unassign],
+    options = MasterProblemOptions(silent = false),
+)
+```
 """
 struct MasterProblemUserDescription
-    options::Dict{Symbol,Any}
-    owned_vars::Vector{JuMPSliceDescription}
-    owned_constrs::Vector{JuMPSliceDescription}
+    options::MasterProblemOptions
+    owned_vars::Vector{JuMP.VariableRef}
+    owned_constrs::Vector{JuMP.ConstraintRef}
+end
+
+function MasterProblemUserDescription(;
+    variables=(), constraints=(), options=MasterProblemOptions()
+)
+    return MasterProblemUserDescription(
+        options,
+        _collect_varconstrs_refs(variables, JuMP.VariableRef, "variable"),
+        _collect_varconstrs_refs(constraints, JuMP.ConstraintRef, "constraint"),
+    )
 end
 
 """
-    SubproblemUserDescription(id_expr, options, owned_vars, owned_constrs)
+    SubproblemUserDescription(id; variables = (), constraints = (), options = SubproblemOptions())
 
-What a `subproblem(id, key=value, ...) => (variables = ..., constraints = ...)`
-line says about one subproblem, kept as unevaluated syntax. `id_expr` is the id
-expression as written; it may use an index symbol bound by a slice description, which
-only gets a value when the generated method runs. `options` maps the name of each
-`key=value` keyword (`silent`, `user_overridden`) to the expression written for it,
-which may use the index symbols too. `owned_vars` and `owned_constrs` are the slice descriptions listed
-under `variables` and `constraints`.
+What one subproblem contains: its identifier `id`, the variables and the constraints of the
+JuMP model that it owns, and its options. `variables` and `constraints` are given as in
+[`MasterProblemUserDescription`](@ref). The identifier can be any value that can be sorted
+together with the identifiers of the other subproblems; it is the key of the `sp_id_map`
+returned by [`dantzig_wolfe_decomposition`](@ref).
 
-The macro turns each owned slice description into an [`VarConstrOwnership`](@ref), whose function
-gives the id and options of the matching object.
+The fields are `id`, `options`, `owned_vars` and `owned_constrs`.
+
+# Example
+```julia
+[
+    SubproblemUserDescription(
+        k;
+        variables = x[k, :],
+        constraints = knapsack[k],
+        options = SubproblemOptions(user_overridden = (k == 1)),
+    ) for k in K
+]
+```
 """
 struct SubproblemUserDescription
-    id_expr::Any
-    options::Dict{Symbol,Any}
-    owned_vars::Vector{JuMPSliceDescription}
-    owned_constrs::Vector{JuMPSliceDescription}
+    id::Any
+    options::SubproblemOptions
+    owned_vars::Vector{JuMP.VariableRef}
+    owned_constrs::Vector{JuMP.ConstraintRef}
 end
 
-"""
-    parse_decomposition_description(block) -> (master, subproblems)
-
-Read the `begin ... end` block of a `@dantzig_wolfe` call, as unevaluated syntax. Each
-line must have the form `master(...) => contents` or `subproblem(id, ...) => contents`;
-each line is then read by [`parse_problem_description`](@ref).
-
-Returns the [`MasterProblemUserDescription`](@ref) and the vector of
-[`SubproblemUserDescription`](@ref)s, in the order they are written. The block must
-contain exactly one `master()` line.
-
-Throws an error if `block` is not a `begin ... end` block, if a line is ill-formed,
-or if `master()` is missing or written more than once.
-
-# Example
-```julia
-master, subproblems = parse_decomposition_description(:(
-    begin
-        master() => (constraints = assign[_])
-        subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-    end
-))
-```
-"""
-function parse_decomposition_description(block::Expr)
-    if block.head != :block
-        error("Expected begin...end block")
-    end
-
-    masters = MasterProblemUserDescription[]
-    subproblems = SubproblemUserDescription[]
-
-    for line in block.args
-        if line isa LineNumberNode
-            continue
-        end
-
-        # Detect `f() => ...` structure
-        # line.args is a tuple of the form (:(=>), f(), ...).
-        if (
-            line isa Expr &&
-            line.head == :call &&
-            length(line.args) == 3 &&
-            line.args[1] == :(=>) &&
-            line.args[2] isa Expr &&
-            line.args[2].head == :call
-        )
-            description = parse_problem_description(line.args[2], line.args[3])
-            push!(
-                description isa MasterProblemUserDescription ? masters : subproblems,
-                description,
-            )
-        else
-            error(
-                "Expected `master()/subproblem(id) => " *
-                "(variables = ..., constraints = ...)`, got: $line. " *
-                "A slice description is listed in the model it belongs to: " *
-                "`subproblem(k) => (variables = x[k, _])`, not " *
-                "`x[k, _] => subproblem(k)`.",
-            )
-        end
-    end
-
-    if length(masters) != 1
-        error(
-            "@dantzig_wolfe needs exactly one master() line, got $(length(masters)); " *
-            "list all the variables and constraints of the master in one master() line",
-        )
-    end
-
-    master = only(masters)
-    return master, subproblems
-end
-
-"""
-    parse_problem_description(call, contents)
-
-Read one line `call => contents` of a `@dantzig_wolfe` block. `call` is the expression
-`master(options)` or `subproblem(id, options)`, and `contents` the expression after `=>`,
-written in one of three ways:
-- `(variables = ...)`: only variables;
-- `(constraints = ...)`: only constraints;
-- `(variables = ..., constraints = ...)`: both.
-
-Each assignment holds one slice description (`x[k, _]`) or a vector of them
-(`[x[k, _], y]`). The slice descriptions are read by [`parse_slice_description`](@ref).
-
-Returns a [`MasterProblemUserDescription`](@ref) or a [`SubproblemUserDescription`](@ref).
-The options are `silent` for both, and `user_overridden` for a subproblem only.
-
-Throws an error for an assignment that is neither `variables = ...` nor `constraints = ...`,
-for an unknown option, for a `subproblem` without exactly one positional argument (its
-id), for a `master` with a positional argument, and for any other function name.
-"""
-function parse_problem_description(call::Expr, contents)
-    # The contents may be a single assignment or a tuple of them. Single assignments are not
-    # considered a tuple.
-    assignments = contents isa Expr && contents.head == :tuple ? contents.args : [contents]
-
-    owned_vars = JuMPSliceDescription[]
-    owned_constrs = JuMPSliceDescription[]
-
-    for assignment in assignments
-        if !(
-            assignment isa Expr &&
-            assignment.head in (:kw, :(=)) &&
-            assignment.args[1] in (:variables, :constraints)
-        )
-            error(
-                "Expected `variables = ...` or `constraints = ...` in container, " *
-                "got: $assignment",
-            )
-        end
-
-        owned = assignment.args[1] == :variables ? owned_vars : owned_constrs
-        listed = assignment.args[2]
-
-        for slice in (listed isa Expr && listed.head == :vect ? listed.args : [listed])
-            push!(owned, parse_slice_description(slice))
-        end
-    end
-
-    func_name = call.args[1]
-    # `key = value` in a call is parsed as `:kw`; every other argument is positional.
-    is_option(arg) = arg isa Expr && arg.head == :kw
-    options = Dict{Symbol,Any}(
-        arg.args[1] => arg.args[2] for arg in call.args[2:end] if is_option(arg)
+function SubproblemUserDescription(
+    id; variables=(), constraints=(), options=SubproblemOptions()
+)
+    return SubproblemUserDescription(
+        id,
+        options,
+        _collect_varconstrs_refs(variables, JuMP.VariableRef, "variable"),
+        _collect_varconstrs_refs(constraints, JuMP.ConstraintRef, "constraint"),
     )
-    positional = filter(!is_option, call.args[2:end])
-    allowed = func_name == :master ? (:silent,) : (:silent, :user_overridden)
-
-    for name in keys(options)
-        if !(name in allowed)
-            error(
-                "Unknown option `$name` for $func_name in @dantzig_wolfe, " *
-                "expected one of: $(join(allowed, ", "))",
-            )
-        end
-    end
-
-    if func_name == :subproblem
-        if !(length(positional) == 1)
-            error("subproblem() requires exactly one positional argument")
-        end
-
-        return SubproblemUserDescription(positional[1], options, owned_vars, owned_constrs)
-    elseif func_name == :master
-        if !(isempty(positional))
-            error("master() takes no positional arguments")
-        end
-
-        return MasterProblemUserDescription(options, owned_vars, owned_constrs)
-    else
-        error("Unknown model in @dantzig_wolfe: $func_name, expected master or subproblem")
-    end
 end
 
 """
-    parse_slice_description(slice) -> JuMPSliceDescription
+    _collect_varconstrs_refs(container, R, what) -> Vector{R}
 
-Read one slice description of a `@dantzig_wolfe` block, as unevaluated syntax. `slice`
-is either a symbol naming a scalar variable or constraint (`z`), or an indexed name
-`name[i1, i2, ...]` whose indices are symbols: `_`, or a name bound to the index value.
+Flatten what the user gives as `variables` or `constraints` into a vector of references.
+`R` is the type of reference expected (`JuMP.VariableRef` or `JuMP.ConstraintRef`) and `what`
+its name in the error message (`"variable"` or `"constraint"`).
 
-Returns a [`JuMPSliceDescription`](@ref) with the name and the index symbols. Nothing is
-checked against a JuMP model, which does not exist yet when the macro expands.
+`container` can be a reference, or a container of references: an array, a JuMP container
+(`DenseAxisArray`, `SparseAxisArray`), a dictionary (its values are taken) or a tuple. A
+container can hold other containers, at any depth. The references keep the order in which they
+are met, and are neither sorted nor made unique: that is done when the model is known.
 
-Throws an error if `slice` is neither of the two forms, if the name of an indexed slice
-description is not a symbol, or if an index is not a symbol (`x[1, _]` and `x[k + 1, _]`
-are rejected).
+Throws an `ArgumentError` if an element is neither a reference of type `R` nor a container,
+for instance a constraint given as a variable.
+
+It is used by the keyword constructors of [`MasterProblemUserDescription`](@ref) and
+[`SubproblemUserDescription`](@ref), so that a description takes what JuMP gives: `x[k, :]`,
+`assign` or `knapsack[k]`, without a call to `collect`.
 
 # Example
 ```julia
-parse_slice_description(:(x[k, _]))  # JuMPSliceDescription(:x, [:k, :_])
-parse_slice_description(:z)          # JuMPSliceDescription(:z, Symbol[])
+_collect_varconstrs_refs(x[1, :], JuMP.VariableRef, "variable")               # the references of the slice
+_collect_varconstrs_refs([assign, max_unassign], JuMP.ConstraintRef, "constraint")  # a container and one reference
+_collect_varconstrs_refs(assign, JuMP.VariableRef, "variable")                # ArgumentError: a constraint
 ```
 """
-function parse_slice_description(slice)
-    if slice isa Symbol
-        return JuMPSliceDescription(slice, Symbol[])
-    elseif slice isa Expr && slice.head == :ref
-        name = slice.args[1]
-        if !(name isa Symbol)
-            error("Name of a slice description must be a symbol, got: $name")
-        end
+function _collect_varconstrs_refs(container, ::Type{R}, what::String) where {R}
+    return _collect_varconstrs_refs!(R[], container, what)
+end
 
-        index_symbols = Symbol[]
-        for idx in slice.args[2:end]
-            if !(idx isa Symbol)
-                error("Index must be a symbol or _, got: $idx")
-            end
-            push!(index_symbols, idx)
+# Fills `refs` with the references held by `container`; see `_collect_varconstrs_refs`.
+function _collect_varconstrs_refs!(refs::Vector{R}, container, what::String) where {R}
+    if container isa R
+        push!(refs, container)
+    elseif container isa Union{AbstractArray,AbstractDict,Tuple}
+        for element in (container isa AbstractDict ? values(container) : container)
+            _collect_varconstrs_refs!(refs, element, what)
         end
-
-        return JuMPSliceDescription(name, index_symbols)
     else
-        error("Expected name[indices] or name, got: $slice")
+        throw(
+            ArgumentError(
+                "expected a $what or a container of them, got `$container` " *
+                "of type $(typeof(container))",
+            ),
+        )
     end
+    return refs
 end

@@ -35,7 +35,9 @@ using .DML
 # ── Public API ────────────────────────────────────────────────────────────────
 
 # DML (Decomposition Modeling Language)
-export @dantzig_wolfe, dantzig_wolfe_decomposition
+export dantzig_wolfe_decomposition
+export MasterProblemUserDescription, SubproblemUserDescription
+export MasterProblemOptions, SubproblemOptions
 
 # Decomposition builder
 export PricingSubproblemId

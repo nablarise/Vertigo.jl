@@ -4,69 +4,72 @@
 
     This page is experimental and has not been reviewed.
 
-`@dantzig_wolfe` turns a JuMP model into a `DWReformulation`. You list what the
-master and each subproblem contain:
+`dantzig_wolfe_decomposition` turns a JuMP model into a `DWReformulation`. You describe what the
+master and each subproblem contain, with the JuMP variables and constraints themselves:
 
 ```julia
-decomp, sp_map = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 ```
 
 It returns `(decomp::DWReformulation, sp_map::Dict)`. The model is read, not
-modified. The rules are checked when the macro runs: see [Errors](errors.md).
+modified. The descriptions are checked before anything is built: see [Errors](errors.md).
 
-## Models
+## Descriptions
 
-Each line has the form `model => (variables = ..., constraints = ...)`.
+| Description | Meaning |
+|-------------|---------|
+| `SubproblemUserDescription(id; variables, constraints, options)` | the subproblem identified by `id` |
+| `MasterProblemUserDescription(variables, constraints, options)` | the master problem |
 
-| Model | Meaning |
-|-------|---------|
-| `subproblem(id)` | the subproblem identified by `id`, any expression of the captured indices |
-| `master()` | the master problem; written exactly once |
+The master is described once, and the subproblems by a vector with one description each. The
+identifier of a subproblem is any value that can be sorted together with the others: an integer,
+a string, a tuple such as `(m, t)`. It is the key of `sp_map`. Two subproblems cannot have the
+same identifier.
 
-Each assignment, `variables` and `constraints`, takes one slice description or a vector of
-slice descriptions, for example `variables = [x[k, _], y[k]]`. Both assignments are
-optional, and they only help the reader: a slice description is assigned to the model
-whichever assignment it is in.
+`variables` and `constraints` are optional and take what the description owns:
 
-## Slice descriptions
+- a variable or constraint reference, such as `knapsack[1]`;
+- a container of references, such as `assign`, or a slice such as `x[k, :]`;
+- a vector, a tuple or a dictionary of these, nested if needed:
+  `constraints = [assign, max_unassign]`.
 
-A slice description names a variable or constraint container and gives one symbol per
-index.
-
-| Slice description | Meaning |
-|---------|---------|
-| `x[k, t]` | every `x[k, t]`; `k` and `t` can be used in `subproblem(...)` |
-| `x[k, _]` | every `x[k, t]`; `_` is a wildcard matching every value of the second index |
-| `z` | a scalar variable or constraint named `z` |
-
-Indices must be plain symbols or `_`. Each variable or constraint must be
-matched by **exactly one** slice description, so two slice descriptions for the same name and
-number of indices are rejected.
+Each variable and each constraint of the model must be owned by **exactly one** description.
+`variables` takes variables and `constraints` takes constraints; giving one in place of the other
+is an error. A variable or constraint does not need a name, since it is found by its reference.
 
 ## Options
 
-`master()` and `subproblem(id)` accept options, written as keywords:
+The options of a model are held by a structure, passed as the `options` argument of its
+description:
 
-| Option | Applies to | Effect |
-|--------|------------|--------|
-| `silent=true\|false` | master, subproblem | silence the solver of that model; unset means silent |
-| `user_overridden=true` | subproblem | the subproblem is solved by your own algorithm; no MOI model is built |
+| Structure | Field | Effect |
+|-----------|-------|--------|
+| `MasterProblemOptions` | `silent = true` | `false` shows the output of the solver of the master |
+| `SubproblemOptions` | `silent = true` | `false` shows the output of the solver of the subproblem |
+| `SubproblemOptions` | `user_overridden = false` | `true`: the subproblem is solved by your own algorithm; no MOI model is built |
 
 ```julia
-subproblem(k, silent = false) => (variables = x[k, _], constraints = knapsack[k])
+SubproblemUserDescription(
+    k;
+    variables = x[k, :],
+    constraints = knapsack[k],
+    options = SubproblemOptions(silent = false),
+)
 ```
 
-Lines assigning to the same model must not contradict each other: one line
-may say `silent=false` and another leave it unset, but not `true` and
-`false`. The latter fails with *Conflicting `silent` settings for subproblem 2:
-all rules assigning to it must agree.*
+The options of a subproblem are ordinary values, so they can depend on its identifier:
+`options = SubproblemOptions(user_overridden = (k == 1))` overrides the subproblem 1 only.
 
 ### User-overridden subproblems
 
-With `user_overridden=true`, the constraints assigned to the subproblem are not
+With `user_overridden = true`, the constraints assigned to the subproblem are not
 modelled, since your algorithm enforces them. The variables still get a
 `MOI.VariableIndex`, available through `mapped_subproblem_var`, and
 `sp_models(decomp)[sp_id]` is `nothing` until you install your pricer there.
@@ -75,14 +78,14 @@ forget.
 
 ## JuMP containers
 
-Slice descriptions address elements by the indices you declared. This works for `Array`,
-`DenseAxisArray`, `SparseAxisArray` and `Dict` containers, so
-`x[k in ["a", "b"], t in 3:5]` is addressed by `("a", 3)`, not by position.
-Scalars and containers can be mixed.
+References are used as they are, so every container works: `Array`, `DenseAxisArray`,
+`SparseAxisArray` and `Dict`. A slice such as `x[k, :]` works on the containers that support it
+(`Array` and `DenseAxisArray`); for the others, list the elements:
+`variables = [x[k, t] for t in T]`. Scalars and containers can be mixed.
 
 ## Pure master variables
 
-A variable assigned to `master()` is a *pure master variable*. Its cost,
+A variable assigned to the master is a *pure master variable*. Its cost,
 bounds and integrality are kept (a binary variable stays in `[0, 1]`).
 Query them with `pure_master_variables`, `pure_master_cost` and
 `pure_master_bounds`.

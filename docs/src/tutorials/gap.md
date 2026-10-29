@@ -33,31 +33,35 @@ link the machines, since each task must be covered once overall. Each
 `knapsack[k]` involves only machine `k`'s variables. That is the block
 structure to exploit.
 
-Every variable and constraint must be **named**, as above: the rules below
-refer to them by name.
+Each variable and constraint of the model must end up in the master or in a
+subproblem, so the decomposition below lists them all.
 
 ## 2. The decomposition
 
 ```julia
-decomp, sp_map = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 ```
 
-Each line says what a model contains: `model => (variables = ..., constraints = ...)`.
+A description says what a model contains: its variables and its constraints, given as the
+JuMP objects themselves.
 
-- `master() => (constraints = assign[_])`: the `assign` constraints stay in
-  the master. `_` is a wildcard matching every task index, so all the `assign`
-  constraints are located in the master problem.
-- `subproblem(k) => (variables = x[k, _], constraints = knapsack[k])`:
-  subproblem `k` holds the variables `x[k, t]` and machine `k`'s capacity
-  constraint. The `k` in the slice descriptions is captured and reused as the
-  subproblem identifier.
+- `MasterProblemUserDescription(constraints = assign)`: the `assign` constraints stay in
+  the master. `assign` is the whole container, so all the `assign` constraints are located
+  in the master problem.
+- `SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k])`:
+  subproblem `k` holds the variables `x[k, t]`, a slice of `x`, and machine `k`'s capacity
+  constraint. The first argument, `k`, is the identifier of the subproblem.
 
-The macro returns the decomposition `decomp` and `sp_map`, a dictionary from your identifiers (`1`
-and `2` in the GAP example) to the internal `PricingSubproblemId`s. The original `model` is not
-modified.
+`dantzig_wolfe_decomposition` returns the decomposition `decomp` and `sp_map`, a dictionary from
+your identifiers (`1` and `2` in the GAP example) to the internal `PricingSubproblemId`s. The
+original `model` is not modified.
 
 ## 3. Column generation
 
@@ -88,10 +92,14 @@ The branch-and-price algorithm in Vertigo.jl branches on the original variables 
 generation at each node until it finds the integer optimum:
 
 ```julia
-decomp, _ = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-end
+decomp, _ = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 
 config = BranchCutPriceConfig()
 output = run_branch_and_price(BranchCutPriceWorkspace(decomp, config))
@@ -108,5 +116,5 @@ costs 65.0, and the tree has 5 nodes.
 
 TODO
 
-- [Decomposition rules](../user-api/decomposition.md) for slice descriptions, containers and options.
+- [Decomposition rules](../user-api/decomposition.md) for the descriptions, containers and options.
 - [Solving](../user-api/solving.md) for every configuration field.

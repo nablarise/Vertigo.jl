@@ -66,9 +66,13 @@ function build_gap_model(inst::GAPInstance)
     )
     @objective(model, Min, sum(inst.cost[k, t] * x[k, t] for k in K, t in T))
 
-    decomp, _ = @dantzig_wolfe model begin
-        master() => (constraints = assign[_])
-        subproblem(k) => (variables=x[k, _], constraints=knapsack[k])
-    end
+    decomp, _ = dantzig_wolfe_decomposition(
+        model,
+        MasterProblemUserDescription(constraints=assign),
+        [
+            SubproblemUserDescription(k; variables=x[k, :], constraints=knapsack[k]) for
+            k in K
+        ],
+    )
     return decomp
 end

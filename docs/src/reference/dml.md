@@ -16,18 +16,25 @@ Modules = [Vertigo.DML]
 Pages = ["DecompModelLanguage/UserProblemDescription.jl"]
 ```
 
-## partition.jl
+## Checker.jl
 
 ```@autodocs
 Modules = [Vertigo.DML]
-Pages = ["DecompModelLanguage/partition.jl"]
+Pages = ["DecompModelLanguage/Checker.jl"]
 ```
 
-## models.jl
+## Mappings.jl
 
 ```@autodocs
 Modules = [Vertigo.DML]
-Pages = ["DecompModelLanguage/models.jl"]
+Pages = ["DecompModelLanguage/Mappings.jl"]
+```
+
+## Transition.jl
+
+```@autodocs
+Modules = [Vertigo.DML]
+Pages = ["DecompModelLanguage/Transition.jl"]
 ```
 
 ## BridgeJuMPtoInternal.jl
@@ -35,11 +42,4 @@ Pages = ["DecompModelLanguage/models.jl"]
 ```@autodocs
 Modules = [Vertigo.DML]
 Pages = ["DecompModelLanguage/BridgeJuMPtoInternal.jl"]
-```
-
-## macros/dantzig_wolfe.jl
-
-```@autodocs
-Modules = [Vertigo.DML]
-Pages = ["DecompModelLanguage/macros/dantzig_wolfe.jl"]
 ```

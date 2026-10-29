@@ -14,7 +14,7 @@ branch-and-price.
 Vertigo provides:
 
 - a declarative way to describe the decomposition of a JuMP model
-  (`@dantzig_wolfe`);
+  (`dantzig_wolfe_decomposition`);
 - column generation with state of the art acceleration methods;
 - branch-and-price over a configurable tree search;
 - user-overridable functions and callbacks allowing for problem-specific algorithm given by the
@@ -54,10 +54,14 @@ set_silent(model)
 @constraint(model, knapsack[k in K], sum(weight[k, t] * x[k, t] for t in T) <= capacity[k])
 @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
-decomp, sp_map = @dantzig_wolfe model begin
-    master() => (constraints = assign[_])
-    subproblem(k) => (variables = x[k, _], constraints = knapsack[k])
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 
 output = run_column_generation(ColGenWorkspace(decomp, ColGenConfig()))
 output.status                # optimal
