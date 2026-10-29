@@ -36,7 +36,7 @@ everything after it works on MathOptInterface models and indices.
 |       v                                                                                    |
 | copy the objects into JuMP master and subproblem models                      Transition.jl |
 |       |   the options say whether a model is built (user_overridden) and if it is silent   |
-|       |   _register_variables!, _register_constraints!, _register_objective!               |
+|       |   copy_variables!, copy_constraints!, copy_objective!                              |
 |       |   (VariableMapping, ConstraintMapping); the optimiser is set                       |
 |                                                                                            |
 +====================================|=======================================================+
