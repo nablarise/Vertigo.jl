@@ -20,7 +20,7 @@ include("UserProblemDescription.jl")
 include("Checker.jl")
 include("Mappings.jl")
 include("Transition.jl")
-include("BridgeJuMPtoInternal.jl")
+include("Decomposition.jl")
 
 export dantzig_wolfe_decomposition
 export MasterProblemUserDescription, SubproblemUserDescription

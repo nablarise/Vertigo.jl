@@ -26,18 +26,27 @@ everything after it works on MathOptInterface models and indices.
 +====================================|=======================================================+
                                      |
                                      v
-+= dantzig_wolfe_decomposition ==============================================================+
++= Decomposition.jl: dantzig_wolfe_decomposition(model, master, subproblems) ================+
 |                                                                                            |
-| dantzig_wolfe_decomposition(model, master, subproblems)            BridgeJuMPtoInternal.jl |
+|   +- Checker.jl -----------------------------------------------------------------------+   |
+|   | _check_subproblem_ids, _check_ownerships                                           |   |
+|   +------------------------------------------------------------------------------------+   |
 |       |                                                                                    |
 |       v                                                                                    |
-| _check_subproblem_ids; _check_ownerships                                        Checker.jl |
+| read the descriptions: variables and constraints in the order of the model, options        |
 |       |                                                                                    |
 |       v                                                                                    |
-| create the mappings between the flat model and the decomposed models           Mappings.jl |
+|   +- Mappings.jl ----------------------------------------------------------------------+   |
+|   | create the mappings between the flat model and the decomposed models               |   |
+|   +------------------------------------------------------------------------------------+   |
 |       |                                                                                    |
 |       v                                                                                    |
-| copy the objects into JuMP master and subproblem models                      Transition.jl |
+|   +- Transition.jl --------------------------------------------------------------------+   |
+|   | copy the objects into the JuMP master and subproblem models                        |   |
+|   +------------------------------------------------------------------------------------+   |
+|       |                                                                                    |
+|       v                                                                                    |
+| set the optimisers, fill the Reformulation builder, add the convexity constraints          |
 |                                                                                            |
 +====================================|=======================================================+
                                      |
@@ -104,7 +113,7 @@ The chart above, in words.
    variable and constraint of the model must be owned; and a subproblem constraint may use the
    variables of its own subproblem only. A failure is an `ArgumentError` naming the object. See
    [Errors](../user-api/errors.md).
-3. **Building** (`Transition.jl`, `BridgeJuMPtoInternal.jl`). The owned objects are taken in the
+3. **Building** (`Transition.jl`, `Decomposition.jl`). The owned objects are taken in the
    order of the model, so the order the user wrote them in does not change the result. They are
    copied into JuMP models, the options decide whether a model is built and whether it is silent,
    and the result is turned into MOI models and a `DWReformulation`; see the
@@ -118,7 +127,7 @@ The chart above, in words.
 | `Checker.jl` | checks that the descriptions are correct before anything is built: distinct ids, one owner for each variable and constraint, no foreign variable in a subproblem constraint |
 | `Mappings.jl` | the variable and constraint mappings that link each object of the flat model to its copy |
 | `Transition.jl` | the functions that copy variables, constraints and the objective of the flat model into the new JuMP master and subproblem models |
-| `BridgeJuMPtoInternal.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, builds the master and subproblem models, and registers everything in the `DWReformulation` |
+| `Decomposition.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, builds the master and subproblem models, and registers everything in the `DWReformulation` |
 | `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro and its parser, written for an earlier shape of the descriptions; not part of the build until it is adapted |
 
 ## Details worth knowing
@@ -127,5 +136,5 @@ The chart above, in words.
   order of the lists given to the descriptions.
 - **Overridden subproblems.** For `user_overridden = true`, no model is built and the
   variables get fresh `MOI.VariableIndex` values `1, 2, …`, in the order of the model. See
-  `_subproblem_variable_indices` in `BridgeJuMPtoInternal.jl`.
+  `_subproblem_variable_indices` in `Decomposition.jl`.
 - **Names.** The copies keep the name of the original object, if it has one.

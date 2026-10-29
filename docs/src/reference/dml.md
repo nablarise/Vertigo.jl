@@ -37,9 +37,9 @@ Modules = [Vertigo.DML]
 Pages = ["DecompModelLanguage/Transition.jl"]
 ```
 
-## BridgeJuMPtoInternal.jl
+## Decomposition.jl
 
 ```@autodocs
 Modules = [Vertigo.DML]
-Pages = ["DecompModelLanguage/BridgeJuMPtoInternal.jl"]
+Pages = ["DecompModelLanguage/Decomposition.jl"]
 ```
