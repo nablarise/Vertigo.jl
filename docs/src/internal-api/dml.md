@@ -1,7 +1,7 @@
 # Decomposition Modeling Language
 
 The DML (`src/DecompModelLanguage/`) turns a JuMP model and a description of the master and of the
-subproblems into a `DWReformulation`. It is the only part of Vertigo that reads JuMP objects;
+subproblems into a `DWDecomposition`. It is the only part of Vertigo that reads JuMP objects;
 everything after it works on MathOptInterface models and indices.
 
 !!! note
@@ -26,14 +26,11 @@ everything after it works on MathOptInterface models and indices.
 +====================================|=======================================================+
                                      |
                                      v
-+= Decomposition.jl: dantzig_wolfe_decomposition(model, master, subproblems) ================+
++= DantzigWolfe.jl: dantzig_wolfe_decomposition(model, master, subproblems) ================+
 |                                                                                            |
 |   +- Checker.jl -----------------------------------------------------------------------+   |
 |   | _check_subproblem_ids, _check_ownerships                                           |   |
 |   +------------------------------------------------------------------------------------+   |
-|       |                                                                                    |
-|       v                                                                                    |
-| read the descriptions: variables and constraints in the order of the model, options        |
 |       |                                                                                    |
 |       v                                                                                    |
 |   +- Mappings.jl ----------------------------------------------------------------------+   |
@@ -46,16 +43,16 @@ everything after it works on MathOptInterface models and indices.
 |   +------------------------------------------------------------------------------------+   |
 |       |                                                                                    |
 |       v                                                                                    |
-| set the optimisers, fill the Reformulation builder, add the convexity constraints          |
+|       fill the Decomposition builder                                                       |
 |                                                                                            |
 +====================================|=======================================================+
                                      |
-                                     |  hand the data over to the Reformulation module
+                                     |  hand the data over to the Decomposition module
                                      v
-                  (decomp::DWReformulation, sp_id_map)
+                  Decomposition module returns a DWDecomposition object
 ```
 
-The [Reformulation page](reformulation.md) follows the flow from the hand-over on.
+The [Decomposition page](decomposition.md) follows the flow from the hand-over on.
 
 ## Basic structures
 
@@ -113,10 +110,13 @@ The chart above, in words.
    variable and constraint of the model must be owned; and a subproblem constraint may use the
    variables of its own subproblem only. A failure is an `ArgumentError` naming the object. See
    [Errors](../user-api/errors.md).
-3. **Building** (`Transition.jl`, `Decomposition.jl`). The owned objects are taken in the
-   order of the model, so the order the user wrote them in does not change the result. They are
-   copied into JuMP models, the options decide whether a model is built and whether it is silent,
-   and the result is turned into MOI models and a `DWReformulation`; see the
+3. **Building** (`Transition.jl`, `DantzigWolfe.jl`). The owned objects are taken in the
+   order of the model, so the order the user wrote them in does not change the result.
+   `_create_reformulated_jump_models` copies them into JuMP models; the options decide whether
+   a model is built and whether it is silent. `_build_decomposition` then fills the Decomposition
+   builder (`_fill_builder`) and calls `build(builder, master, sps)` with the MOI models. The
+   Decomposition module builds the `DWDecomposition`, adds the convexity constraints to the
+   master (`add_convexity_constraints!`) and stores the models; see the
    [master](master.md) and [subproblem](subproblem.md) pages.
 
 ## Files
@@ -127,7 +127,7 @@ The chart above, in words.
 | `Checker.jl` | checks that the descriptions are correct before anything is built: distinct ids, one owner for each variable and constraint, no foreign variable in a subproblem constraint |
 | `Mappings.jl` | the variable and constraint mappings that link each object of the flat model to its copy |
 | `Transition.jl` | the functions that copy variables, constraints and the objective of the flat model into the new JuMP master and subproblem models |
-| `Decomposition.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, builds the master and subproblem models, and registers everything in the `DWReformulation` |
+| `DantzigWolfe.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, then `_create_reformulated_jump_models` builds the master and subproblem models and `_build_decomposition` registers everything in the `DWDecomposition` |
 | `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro and its parser, written for an earlier shape of the descriptions; not part of the build until it is adapted |
 
 ## Details worth knowing
@@ -136,5 +136,5 @@ The chart above, in words.
   order of the lists given to the descriptions.
 - **Overridden subproblems.** For `user_overridden = true`, no model is built and the
   variables get fresh `MOI.VariableIndex` values `1, 2, …`, in the order of the model. See
-  `_subproblem_variable_indices` in `Decomposition.jl`.
+  `_subproblem_variable_indices` in `DantzigWolfe.jl`.
 - **Names.** The copies keep the name of the original object, if it has one.

@@ -24,7 +24,7 @@ function test_build_cut_saf_single_column()
 
         # Insert one column: z1=1.0
         col_var = MOI.add_variable(model)
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         record_column!(ws.pool, col_var, PricingSubproblemId(1), sol, 3.0)
@@ -48,14 +48,14 @@ function test_build_cut_saf_two_columns()
 
         # col_a: z1=1.0 → maps to (1,1)
         col_a = MOI.add_variable(model)
-        sol_a = Vertigo.Reformulation._SpSolution(
+        sol_a = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         record_column!(ws.pool, col_a, PricingSubproblemId(1), sol_a, 3.0)
 
         # col_b: z2=2.0 → maps to (1,2)
         col_b = MOI.add_variable(model)
-        sol_b = Vertigo.Reformulation._SpSolution(
+        sol_b = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 10.0, [(refs.z2, 2.0)]
         )
         record_column!(ws.pool, col_b, PricingSubproblemId(1), sol_b, 10.0)
@@ -81,7 +81,7 @@ function test_build_cut_saf_mixed_sp_vars()
 
         # One column with z1=1.0, z2=2.0
         col_var = MOI.add_variable(model)
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
         )
         record_column!(ws.pool, col_var, PricingSubproblemId(1), sol, 13.0)
@@ -106,7 +106,7 @@ function test_build_cut_saf_skips_invalid_column()
 
         # Record a column with a variable NOT added to the model
         fake_var = MOI.VariableIndex(999)
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         record_column!(ws.pool, fake_var, PricingSubproblemId(1), sol, 3.0)

@@ -67,9 +67,9 @@ function test_dml_gap_basic(; smoothing_alpha=0.0)
 end
 
 function _set_optimizer_on_models!(decomp, optimizer)
-    m = Vertigo.Reformulation.master_model(decomp)
+    m = Vertigo.Decomposition.master_model(decomp)
     MOI.set(m, MOI.Silent(), true)
-    for (_, sp) in Vertigo.Reformulation.sp_models(decomp)
+    for (_, sp) in Vertigo.Decomposition.sp_models(decomp)
         MOI.set(sp, MOI.Silent(), true)
     end
 end
@@ -360,7 +360,7 @@ function Vertigo.ColGen.optimize_pricing_problem!(
         CG._get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id) +
         CG._get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
     reduced_cost = best_obj + subproblem_fixed_cost(decomp, sp_id) - ν
-    sol = Vertigo.Reformulation._SpSolution(
+    sol = Vertigo.Decomposition._SpSolution(
         sp_id, reduced_cost, [(p.vars[t], 1.0) for t in best_set]
     )
     improving = reduced_cost < -CG.RC_IMPROVING_TOL

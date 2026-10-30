@@ -1,12 +1,12 @@
 # Subproblem
 
 A subproblem generates the columns of the master. For each subproblem, the
-`DWReformulation` stores its data and its model, and column generation prices
+`DWDecomposition` stores its data and its model, and column generation prices
 it at every iteration.
 
 ## What it contains
 
-`SubproblemData` (`src/Reformulation/subproblem_data.jl`) holds, for each
+`SubproblemData` (`src/Decomposition/subproblem_data.jl`) holds, for each
 subproblem identified by a `PricingSubproblemId`:
 
 | Field | Meaning |

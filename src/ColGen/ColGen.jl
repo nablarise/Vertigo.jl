@@ -9,8 +9,8 @@ using MathOptInterface
 const MOI = MathOptInterface
 using Printf
 
-using ..Reformulation
-import ..Reformulation: is_minimization
+using ..Decomposition
+import ..Decomposition: is_minimization
 
 # ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
 const ColGen = @__MODULE__

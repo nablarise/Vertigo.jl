@@ -7,7 +7,7 @@ makedocs(;
     modules=[
         Vertigo,
         Vertigo.DML,
-        Vertigo.Reformulation,
+        Vertigo.Decomposition,
         Vertigo.ColGen,
         Vertigo.BranchCutPrice,
         Vertigo.Branching,
@@ -26,7 +26,7 @@ makedocs(;
         "Internal API" => [
             "internal-api/introduction.md",
             "internal-api/dml.md",
-            "internal-api/reformulation.md",
+            "internal-api/decomposition.md",
             "internal-api/master.md",
             "internal-api/subproblem.md",
             "internal-api/column-generation.md",
@@ -35,7 +35,7 @@ makedocs(;
         "API Reference" => [
             "reference/index.md",
             "reference/dml.md",
-            "reference/reformulation.md",
+            "reference/decomposition.md",
             "reference/column-generation.md",
             "reference/branch-and-price.md",
             "reference/branching.md",

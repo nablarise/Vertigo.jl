@@ -2,7 +2,7 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-module Reformulation
+module Decomposition
 
 using MathOptInterface
 const MOI = MathOptInterface
@@ -11,7 +11,7 @@ include("interface.jl")
 include("moi_types.jl")
 include("moi_utils.jl")
 include("subproblem_data.jl")
-include("dw_reformulation.jl")
+include("dw_decomposition.jl")
 include("subproblem_solution.jl")
 include("column_pool.jl")
 include("builder.jl")
@@ -31,13 +31,13 @@ export CouplingEntry, CouplingCoefficients, get_coefficients
 # Subproblem data
 export SubproblemData, PureMasterVariableData, AbstractVariableMapping, OneToOneMapping
 
-# DWReformulation
-export DWReformulation
+# DWDecomposition
+export DWDecomposition
 export master_model, sp_model, sp_models
 export convexity_ub_ci, convexity_lb_ci
 export has_convexity_ub, has_convexity_lb
 export convexity_ub_pairs, convexity_lb_pairs
-export set_models!
+export set_models!, add_convexity_constraints!
 
 # Subproblem solution
 export _SpSolution
@@ -46,7 +46,7 @@ export _SpSolution
 export ColumnRecord, ColumnPool
 
 # Builder
-export DWReformulationBuilder
+export DWDecompositionBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
@@ -75,4 +75,4 @@ export compute_sp_reduced_costs, compute_column_reduced_cost
 export compute_dual_bound_pure_master_contribution
 export compute_branching_column_coefficient, project_to_original
 
-end # module Reformulation
+end # module Decomposition

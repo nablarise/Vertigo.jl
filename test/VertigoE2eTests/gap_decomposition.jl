@@ -93,7 +93,7 @@ end
 # ──────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_decomp(inst) -> DWReformulation
+    build_gap_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for a GAP instance.
 """
@@ -129,7 +129,7 @@ function build_gap_decomp(inst::GAPInstance)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -222,7 +222,7 @@ function build_gap_context_with_fixed_cost(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -316,7 +316,7 @@ function build_gap_shifted_context(inst::GAPInstance; smoothing_alpha::Float64=0
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         fixed_cost = -sum(inst.cost[k, :])
@@ -421,7 +421,7 @@ function build_gap_identical_context(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(
@@ -528,7 +528,7 @@ function build_gap_with_penalty_context(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -626,7 +626,7 @@ function build_gap_with_penalty_card_context(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -736,7 +736,7 @@ function build_gap_with_pure_master_context(inst::GAPInstance; smoothing_alpha::
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -823,7 +823,7 @@ function gap_fenchel_instance()
 end
 
 """
-    build_gap_fenchel_decomp(inst) -> DWReformulation
+    build_gap_fenchel_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for a GAP-with-opening-costs
 instance suitable for Fenchel-cut testing.
@@ -866,7 +866,7 @@ function build_gap_fenchel_decomp(inst::GAPInstanceWithOpeningCosts)
 
     # ── Build Decomposition ───────────────────────────────────────
     X = Tuple{Symbol,Int,Int}
-    builder = DWReformulationBuilder{X}(; minimize=true)
+    builder = DWDecompositionBuilder{X}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -961,7 +961,7 @@ function build_gap_context_max(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=false)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=false)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)

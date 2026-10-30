@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: MIT
 
 """
-    _copy_variables!(reformulated_model, var_mapping, original_vars)
+    _copy_variables!(original_vars, reformulated_model, var_mapping)
 
 Add to `reformulated_model` a copy of each variable of `original_vars`, with the same bounds, fixed
 value, start value and integrality, and record it in `var_mapping`. The copies keep the name
 of the originals.
 """
-function _copy_variables!(reformulated_model, var_mapping::VariableMapping, original_vars)
+function _copy_variables!(original_vars, reformulated_model, var_mapping::VariableMapping)
     for original_var in original_vars
         var = JuMP.build_variable(() -> error("todo."), _original_var_info(original_var))
         name = if JuMP.set_string_names_on_creation(reformulated_model)
@@ -23,7 +23,7 @@ function _copy_variables!(reformulated_model, var_mapping::VariableMapping, orig
 end
 
 """
-    _copy_constraints!(reformulated_model, constr_mapping, original_constrs, var_mapping)
+    _copy_constraints!(original_constrs, reformulated_model, var_mapping, constr_mapping)
 
 Add to `reformulated_model` a copy of each constraint of `original_constrs`, with the same set and
 the function rewritten over the copies of `var_mapping` (see `_replace_vars_in_func`), and
@@ -31,10 +31,10 @@ record it in `constr_mapping`. The variables of the constraints have to be regis
 The copies keep the name of the originals.
 """
 function _copy_constraints!(
-    reformulated_model,
-    constr_mapping::ConstraintMapping,
     original_constrs,
+    reformulated_model,
     var_mapping::VariableMapping,
+    constr_mapping::ConstraintMapping,
 )
     for original_constr in original_constrs
         original_constr_obj = JuMP.constraint_object(original_constr)
@@ -57,7 +57,7 @@ function _copy_constraints!(
 end
 
 """
-    _copy_objective!(reformulated_model, model, var_mapping; is_master = false)
+    _copy_objective!(model, reformulated_model, var_mapping; is_master = false)
 
 Give `reformulated_model` the objective of `model`: the same sense, and the objective function
 rewritten over the copies of `var_mapping`, so only the terms on the variables of
@@ -65,7 +65,7 @@ rewritten over the copies of `var_mapping`, so only the terms on the variables o
 true`) only.
 """
 function _copy_objective!(
-    reformulated_model, model, var_mapping::VariableMapping; is_master::Bool=false
+    model, reformulated_model, var_mapping::VariableMapping; is_master::Bool=false
 )
     original_obj_func = JuMP.objective_function(model)
     original_obj_sense = JuMP.objective_sense(model)

@@ -185,7 +185,7 @@ function test_dml_pure_master_variables()
             lb, ub = pure_master_bounds(decomp, pmv)
             lb ≈ 0.0 && ub ≈ 1.0
         end
-        @test all(pmv -> Vertigo.Reformulation.pure_master_is_integer(decomp, pmv), pm_vars)
+        @test all(pmv -> Vertigo.Decomposition.pure_master_is_integer(decomp, pmv), pm_vars)
     end
 end
 
@@ -270,7 +270,7 @@ function test_dml_pure_master_bounds_and_types()
             pmv in pure_master_variables(decomp)
         )
         @test sort(collect(keys(by_cost))) == [1, 2, 3, 4]
-        is_int(c) = Vertigo.Reformulation.pure_master_is_integer(decomp, by_cost[c])
+        is_int(c) = Vertigo.Decomposition.pure_master_is_integer(decomp, by_cost[c])
         bounds(c) = pure_master_bounds(decomp, by_cost[c])
 
         @test bounds(1) == (2.0, 7.0) && !is_int(1)        # u: continuous
@@ -388,12 +388,12 @@ function _enumerated_master_optimum(inst, penalty, user_overridden, Ks, Ts, cont
             if !(sum(inst.weight[ki, ti] for ti in positions; init=0) <= inst.capacity[ki])
                 continue
             end
-            sol = Vertigo.Reformulation._SpSolution(
+            sol = Vertigo.Decomposition._SpSolution(
                 sp_id, 0.0, [(sp_vars[ti], 1.0) for ti in positions]
             )
             coeffs = Dict{Vertigo.TaggedCI,Float64}(
                 cid => c for
-                (cid, c) in Vertigo.Reformulation.compute_column_coupling_coefficients(
+                (cid, c) in Vertigo.Decomposition.compute_column_coupling_coefficients(
                     decomp, sp_id, sol
                 )
             )
@@ -403,7 +403,7 @@ function _enumerated_master_optimum(inst, penalty, user_overridden, Ks, Ts, cont
                 master;
                 variable_type=MOI.ZeroOne(),
                 constraint_coeffs=coeffs,
-                objective_coeff=Vertigo.Reformulation.compute_column_original_cost(
+                objective_coeff=Vertigo.Decomposition.compute_column_original_cost(
                     decomp, sp_id, sol
                 ),
             )

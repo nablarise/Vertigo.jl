@@ -25,7 +25,7 @@ using Vertigo.Branching:
     branching_ok,
     DefaultBranchingContext
 using Vertigo.ColGen: max_cg_iterations
-using Vertigo.Reformulation: get_primal_solution
+using Vertigo.Decomposition: get_primal_solution
 
 function test_sb_score_both_feasible()
     @testset "[sb_score] both children feasible" begin

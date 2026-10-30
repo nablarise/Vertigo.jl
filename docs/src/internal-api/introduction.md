@@ -12,10 +12,10 @@ the decomposition; the rest solve it.
    variable and constraint has exactly one owner and turns the result into a
    decomposition. The [DML page](dml.md) follows these steps
    file by file.
-2. **Reformulation** (`src/Reformulation/`). `builder.jl` (`DWReformulationBuilder`
+2. **Decomposition** (`src/Decomposition/`). `builder.jl` (`DWDecompositionBuilder`
    and `build`) assembles the master, the subproblems and the mappings between
-   original and internal variables into a `DWReformulation`
-   (`dw_reformulation.jl`, `subproblem_data.jl`, `column_pool.jl`).
+   original and internal variables into a `DWDecomposition`
+   (`dw_decomposition.jl`, `subproblem_data.jl`, `column_pool.jl`).
 3. **Column generation** (`src/ColGen/`). When the user only wants the linear
    relaxation, `run_column_generation` (`context.jl`) solves it directly. The
    iteration itself is in `coluna.jl` and `dw_colgen_iteration.jl`.
@@ -39,7 +39,7 @@ the decomposition; the rest solve it.
                     v
 +---------------------------------------+
 |            (Internal API)             |
-| Reformulation                         |
+| Decomposition                         |
 | - Construction of master problem,     |
 | subproblems and mappings between user |
 | structures and internal structures    |

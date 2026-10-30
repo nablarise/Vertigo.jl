@@ -221,7 +221,7 @@ function CG.optimize_pricing_problem!(
         CG._get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
     value, chosen = solve_knapsack(p)
     column_reduced_cost = value + subproblem_fixed_cost(decomp, sp_id) - ν
-    solution = Vertigo.Reformulation._SpSolution(
+    solution = Vertigo.Decomposition._SpSolution(
         sp_id, column_reduced_cost, [(p.sp_vars[t], 1.0) for t in chosen]
     )
     column = CG.PricingPrimalSolution(sp_id, solution, column_reduced_cost < -CG.RC_IMPROVING_TOL)
@@ -244,7 +244,7 @@ Step by step:
   the two coincide, here at `value` (before the fixed cost and `ν`).
 
 > **Note.** The pricing interface uses names that are not exported:
-> `CG._get_convexity_dual`, `Vertigo.Reformulation._SpSolution` and
+> `CG._get_convexity_dual`, `Vertigo.Decomposition._SpSolution` and
 > `CG.RC_IMPROVING_TOL`. They may change without notice while the API is under
 > development.
 

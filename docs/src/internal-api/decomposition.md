@@ -1,6 +1,6 @@
-# Reformulation
+# Decomposition
 
-The Reformulation module (`src/Reformulation/`) is the solver's own model of a
+The Decomposition module (`src/Decomposition/`) is the solver's own model of a
 decomposed problem. It holds what column generation needs: the subproblems, the
 coefficients that couple them to the master, the pure master variables, and the
 mapping between the variables of the user's model and those of the
@@ -21,7 +21,7 @@ and branch and price then ask questions of the result.
                            v
 += BUILD ==================================================================================+
 |                                                                                          |
-|  DWReformulationBuilder{X}(; minimize)                                        builder.jl |
+|  DWDecompositionBuilder{X}(; minimize)                                        builder.jl |
 |        v                                                                                 |
 |  add_subproblem!(sp_id, fixed_cost, conv_lb, conv_ub)                                    |
 |  add_sp_variable!(sp_id, sp_var, cost)                                                   |
@@ -36,15 +36,15 @@ and branch and price then ask questions of the result.
 |        |   per pure master variable: its data and coefficients                           |
 |        |   both directions of the mapping between original and subproblem variables      |
 |        v                                                                                 |
-|  DWReformulation, without MOI models yet                             dw_reformulation.jl |
+|  DWDecomposition, without MOI models yet                             dw_decomposition.jl |
 +====================================|=====================================================+
                                      |
-                                     |  the caller adds the convexity constraints to the master
-                                     |  and calls set_models!(decomp, master, sps, conv_ub, conv_lb)
+                                     |  with the MOI models, build(builder, master, sps) adds the convexity constraints
+                                     |  to the master and calls set_models!(decomp, master, sps, conv_ub, conv_lb)
                                      v
 += USE ====================================================================================+
 |                                                                                          |
-|  asking the decomposition                                            dw_reformulation.jl |
+|  asking the decomposition                                            dw_decomposition.jl |
 |        |   original_cost, coupling_coefficients                                          |
 |        |   mapped_original_var, mapped_subproblem_var                                    |
 |        |   compute_*: column costs, reduced costs, dual bound               interface.jl |
@@ -52,7 +52,7 @@ and branch and price then ask questions of the result.
 |  recording the columns found                                              column_pool.jl |
 |        |   record_column!, has_column (no duplicate column)                              |
 |        v                                                                                 |
-|  project_to_original: master values to original variables            dw_reformulation.jl |
+|  project_to_original: master values to original variables            dw_decomposition.jl |
 +====================================|=====================================================+
                                      |
                                      v
@@ -63,7 +63,7 @@ and branch and price then ask questions of the result.
 
 | Element | Type | File |
 |---------|------|------|
-| The decomposition | `DWReformulation{X,M}`: subproblems, pure master variables, mapping, coupling constraints, sense, and the MOI models once set | `dw_reformulation.jl` |
+| The decomposition | `DWDecomposition{X,M}`: subproblems, pure master variables, mapping, coupling constraints, sense, and the MOI models once set | `dw_decomposition.jl` |
 | One subproblem | `SubproblemData`: variables, original costs, coupling coefficients, fixed cost, convexity bounds | `subproblem_data.jl` |
 | One pure master variable | `PureMasterVariableData`: cost, bounds, integrality, coupling coefficients | `subproblem_data.jl` |
 | Original and subproblem variables | `OneToOneMapping{X}`: both directions, where `X` is the type of the user's variable | `subproblem_data.jl` |
@@ -79,8 +79,8 @@ and branch and price then ask questions of the result.
 | `interface.jl` | the abstract types, and the computations written against them: column cost, coupling coefficients, reduced costs, dual bound contribution |
 | `moi_types.jl`, `moi_utils.jl` | the identifier types, and the functions that read the primal and dual solution of an MOI model |
 | `subproblem_data.jl` | the data of a subproblem and of a pure master variable, and the variable mapping |
-| `dw_reformulation.jl` | `DWReformulation`, its query functions, `set_models!` and `project_to_original` |
+| `dw_decomposition.jl` | `DWDecomposition`, its query functions, `set_models!`, `add_convexity_constraints!` and `project_to_original` |
 | `subproblem_solution.jl` | the subproblem solution type |
 | `column_pool.jl` | the pool of columns, indexed by column variable, subproblem and fingerprint |
-| `builder.jl` | `DWReformulationBuilder` and `build` |
+| `builder.jl` | `DWDecompositionBuilder` and `build`, with or without the MOI models |
 | `cut_separation.jl` | the interface of a robust cut separator |

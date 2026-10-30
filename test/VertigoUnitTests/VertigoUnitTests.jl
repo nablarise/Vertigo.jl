@@ -25,7 +25,7 @@ using Vertigo.ColGen:
     get_column_solution
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
-using Vertigo.Reformulation: get_primal_solution
+using Vertigo.Decomposition: get_primal_solution
 using Vertigo.Branching:
     find_fractional_variables,
     BranchingCandidate,
@@ -62,7 +62,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_decomp(inst) -> DWReformulation
+    build_gap_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for the given GAP instance.
 
@@ -104,7 +104,7 @@ function build_gap_decomp(inst::GAPInstance)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────────────
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)

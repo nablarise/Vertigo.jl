@@ -18,7 +18,7 @@ using Vertigo.Branching:
     bp_master_model,
     branching_ok
 using Vertigo.BranchCutPrice: BPNodeData
-using Vertigo.Reformulation: get_primal_solution
+using Vertigo.Decomposition: get_primal_solution
 
 function test_pseudocosts()
     @testset "[pseudocosts] cold start" begin

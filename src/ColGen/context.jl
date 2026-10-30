@@ -84,7 +84,7 @@ end
 
 A robust cut currently active in the master LP. Maps a MOI constraint
 to the original-variable coefficients of the cut.
-`X` is the original variable key type (matching `DWReformulation{X}`).
+`X` is the original variable key type (matching `DWDecomposition{X}`).
 """
 struct ActiveRobustCut{X}
     constraint_index::TaggedCI
@@ -102,7 +102,7 @@ Column generation workspace. Owns the decomposition, column pool,
 artificial variable tracking, and mutable runtime state.
 
 MOI models and convexity constraint indices are owned by `decomp`
-(`DWReformulation`), not by this struct.
+(`DWDecomposition`), not by this struct.
 
 Type parameters:
   - D: AbstractDecomposition implementation

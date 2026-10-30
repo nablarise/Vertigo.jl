@@ -15,7 +15,7 @@ end
 function _add_test_column!(ws, master_var_id::Int, sp_id_val::Int, cost::Float64)
     sp_id = PricingSubproblemId(sp_id_val)
     sp_var = MOI.VariableIndex(master_var_id + 1000)   # unique SP var
-    sol = Vertigo.Reformulation._SpSolution(sp_id, cost, [(sp_var, 1.0)])
+    sol = Vertigo.Decomposition._SpSolution(sp_id, cost, [(sp_var, 1.0)])
     master_var = MOI.VariableIndex(master_var_id)
     record_column!(ws.pool, master_var, sp_id, sol, cost)
     return master_var
@@ -139,7 +139,7 @@ function _add_test_pure_master_var!(ws, var_id::Int, cost::Float64, is_integer::
         0.0,
         1.0,
         is_integer,
-        Vertigo.Reformulation.CouplingEntry[],
+        Vertigo.Decomposition.CouplingEntry[],
     )
     push!(ws.decomp.pure_master_vars, pmv)
     return MOI.VariableIndex(var_id)

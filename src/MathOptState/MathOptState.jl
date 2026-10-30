@@ -7,7 +7,7 @@ module MathOptState
 using MathOptInterface
 
 const MOI = MathOptInterface
-using ..Reformulation: TaggedCI, with_typed_ci
+using ..Decomposition: TaggedCI, with_typed_ci
 const ColId = Int
 const RowId = Int
 

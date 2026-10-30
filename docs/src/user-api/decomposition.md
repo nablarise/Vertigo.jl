@@ -4,7 +4,7 @@
 
     This page is experimental and has not been reviewed.
 
-`dantzig_wolfe_decomposition` turns a JuMP model into a `DWReformulation`. You describe what the
+`dantzig_wolfe_decomposition` turns a JuMP model into a `DWDecomposition`. You describe what the
 master and each subproblem contain, with the JuMP variables and constraints themselves:
 
 ```julia
@@ -18,7 +18,7 @@ decomp, sp_map = dantzig_wolfe_decomposition(
 )
 ```
 
-It returns `(decomp::DWReformulation, sp_map::Dict)`. The model is read, not
+It returns `(decomp::DWDecomposition, sp_map::Dict)`. The model is read, not
 modified. The descriptions are checked before anything is built: see [Errors](errors.md).
 
 ## Descriptions

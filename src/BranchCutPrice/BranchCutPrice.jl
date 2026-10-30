@@ -8,7 +8,7 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 using Printf
-using ..Reformulation
+using ..Decomposition
 using ..ColGen
 using ..TreeSearch
 using ..MathOptState

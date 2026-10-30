@@ -10,7 +10,7 @@ Decompose a JuMP `model` into a Dantzig-Wolfe reformulation. `master` is a
 [`SubproblemUserDescription`](@ref): together they say which model owns each variable and
 constraint of `model`. Each variable and each constraint must be owned by exactly one of them.
 
-Returns `(decomp::DWReformulation, sp_id_map::Dict)` where `sp_id_map`
+Returns `(decomp::DWDecomposition, sp_id_map::Dict)` where `sp_id_map`
 maps the identifiers of the subproblem descriptions to `PricingSubproblemId`.
 
 # Example
@@ -84,55 +84,54 @@ function dantzig_wolfe_decomposition(
     if isempty(subproblems)
         throw(ArgumentError("At least one subproblem is needed to decompose the model"))
     end
+
     _check_subproblem_ids(subproblems)
     _check_ownerships(model, master, subproblems)
 
+    jump_models = _create_reformulated_jump_models(model, master, subproblems, optimizer)
+    return _build_decomposition(model, master, subproblems, jump_models)
+end
+
+# Creates the JuMP models of the master and of the subproblems that are not user-overridden,
+# with the copies of the variables, the constraints and the objective. Returns the models
+# (indexed by the identifiers of the subproblem descriptions) and the two mappings from the
+# original objects to their copies.
+function _create_reformulated_jump_models(model, master, subproblems, optimizer)
     master_vars = _in_model_order(master.owned_vars)
     master_constrs = _in_model_order(master.owned_constrs)
+
     sp_vars = Dict(sp.id => _in_model_order(sp.owned_vars) for sp in subproblems)
     sp_constrs = Dict(sp.id => _in_model_order(sp.owned_constrs) for sp in subproblems)
     sp_options = Dict(sp.id => sp.options for sp in subproblems)
 
-    # Create master JuMP model
     master_model = JuMP.Model()
     JuMP.set_objective_sense(master_model, JuMP.objective_sense(model))
 
     var_mapping = VariableMapping()
     constr_mapping = ConstraintMapping()
 
-    # Register master variables
-    _copy_variables!(master_model, var_mapping, master_vars)
+    _copy_variables!(master_vars, master_model, var_mapping)
 
-    # Create subproblem JuMP models, except for user-overridden subproblems,
-    # which are solved by the user's own algorithm and have no model.
-    user_sp_ids = collect(keys(sp_options))
-    user_overridden_sp_ids = Set(
-        sp_id for sp_id in user_sp_ids if sp_options[sp_id].user_overridden
+    sp_models = Dict(
+        sp_id => JuMP.Model() for
+        sp_id in keys(sp_vars) if !sp_options[sp_id].user_overridden
     )
-    sp_jump_models = Dict(
-        sp_id => JuMP.Model() for sp_id in user_sp_ids if !(sp_id in user_overridden_sp_ids)
-    )
-
-    # Register subproblem variables
-    for (sp_id, sp_model) in sp_jump_models
-        _copy_variables!(sp_model, var_mapping, sp_vars[sp_id])
+    for (sp_id, sp_model) in sp_models
+        _copy_variables!(sp_vars[sp_id], sp_model, var_mapping)
     end
 
-    # Register subproblem constraints
-    for (sp_id, sp_model) in sp_jump_models
-        _copy_constraints!(sp_model, constr_mapping, sp_constrs[sp_id], var_mapping)
+    for (sp_id, sp_model) in sp_models
+        _copy_constraints!(sp_constrs[sp_id], sp_model, var_mapping, constr_mapping)
     end
 
-    # Register master (coupling) constraints
-    _copy_constraints!(master_model, constr_mapping, master_constrs, var_mapping)
+    _copy_constraints!(master_constrs, master_model, var_mapping, constr_mapping)
 
-    # Register objectives
-    for sp_model in values(sp_jump_models)
-        _copy_objective!(sp_model, model, var_mapping; is_master=false)
+    for sp_model in values(sp_models)
+        _copy_objective!(model, sp_model, var_mapping; is_master=false)
     end
-    _copy_objective!(master_model, model, var_mapping; is_master=true)
 
-    # Resolve optimizer: explicit kwarg > original model's optimizer
+    _copy_objective!(model, master_model, var_mapping; is_master=true)
+
     opt = optimizer
     if opt === nothing
         opt = _get_optimizer(model)
@@ -143,7 +142,7 @@ function dantzig_wolfe_decomposition(
         if master.options.silent
             JuMP.set_silent(master_model)
         end
-        for (sp_id, sp_model) in sp_jump_models
+        for (sp_id, sp_model) in sp_models
             JuMP.set_optimizer(sp_model, opt)
             if sp_options[sp_id].silent
                 JuMP.set_silent(sp_model)
@@ -151,14 +150,46 @@ function dantzig_wolfe_decomposition(
         end
     end
 
-    # Deterministic sp_id mapping
-    sorted_ids = sort(collect(user_sp_ids))
+    return (; master_model, sp_models, var_mapping, constr_mapping)
+end
+
+# Builds the `DWDecomposition` of the original `model` from the JuMP models, and returns it
+# with the map from the identifiers of the subproblem descriptions to `PricingSubproblemId`.
+function _build_decomposition(model, master, subproblems, jump_models)
+    builder, sp_id_map = _fill_builder(model, master, subproblems, jump_models)
+
+    # A user-overridden subproblem has no model: the user installs a pricer.
+    sp_backends = Dict{PricingSubproblemId,Any}(
+        sp_id_map[sp.id] => (
+            if haskey(jump_models.sp_models, sp.id)
+                JuMP.backend(jump_models.sp_models[sp.id])
+            else
+                nothing
+            end
+        ) for sp in subproblems
+    )
+    decomp = build(builder, JuMP.backend(jump_models.master_model), sp_backends)
+    return (decomp, sp_id_map)
+end
+
+# Registers in a Decomposition builder what the original `model` and the mappings say about
+# the subproblems, the coupling constraints and the pure master variables. Returns the builder
+# and the map from the identifiers of the subproblem descriptions to `PricingSubproblemId`.
+function _fill_builder(model, master, subproblems, jump_models)
+    (; var_mapping, constr_mapping) = jump_models
+
+    master_vars = _in_model_order(master.owned_vars)
+    master_constrs = _in_model_order(master.owned_constrs)
+
+    sp_vars = Dict(sp.id => _in_model_order(sp.owned_vars) for sp in subproblems)
+    user_overridden_sp_ids = Set(sp.id for sp in subproblems if sp.options.user_overridden)
+
+    # Internal identifiers 1..n, given to the user identifiers in sorted order.
+    sorted_ids = sort([sp.id for sp in subproblems])
     sp_id_map = Dict(id => PricingSubproblemId(i) for (i, id) in enumerate(sorted_ids))
 
-    # Build DWReformulation via builder
-    sense = JuMP.objective_sense(model)
-    minimize = (sense == MOI.MIN_SENSE)
-    builder = DWReformulationBuilder{JuMP.VariableRef}(; minimize=minimize)
+    minimize = (JuMP.objective_sense(model) == MOI.MIN_SENSE)
+    builder = DWDecompositionBuilder{JuMP.VariableRef}(; minimize=minimize)
 
     for id in sorted_ids
         add_subproblem!(builder, sp_id_map[id], 0.0, 1.0, 1.0)
@@ -192,30 +223,7 @@ function dantzig_wolfe_decomposition(
         builder, master_vars, master_constrs, constr_mapping, var_mapping, orig_costs
     )
 
-    decomp = build(builder)
-
-    # Add convexity constraints to master
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}()
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}()
-
-    for id in sorted_ids
-        sp_id = sp_id_map[id]
-        conv_lb_ref = JuMP.@constraint(master_model, 0 >= 1)
-        conv_ub_ref = JuMP.@constraint(master_model, 0 <= 1)
-        conv_lb_map[sp_id] = TaggedCI(JuMP.index(conv_lb_ref))
-        conv_ub_map[sp_id] = TaggedCI(JuMP.index(conv_ub_ref))
-    end
-
-    # Wire MOI backends
-    # A user-overridden subproblem has no backend: the user installs a pricer.
-    sp_backends = Dict{PricingSubproblemId,Any}(
-        sp_id_map[id] =>
-            (haskey(sp_jump_models, id) ? JuMP.backend(sp_jump_models[id]) : nothing) for
-        id in user_sp_ids
-    )
-    set_models!(decomp, JuMP.backend(master_model), sp_backends, conv_ub_map, conv_lb_map)
-
-    return (decomp, sp_id_map)
+    return (builder, sp_id_map)
 end
 
 # The variables or constraints in the order they were created in the JuMP model. The order

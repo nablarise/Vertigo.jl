@@ -3,11 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 """
-    DWReformulationBuilder{X}
+    DWDecompositionBuilder{X}
 
-Incrementally builds an immutable DWReformulation from problem data.
+Incrementally builds an immutable DWDecomposition from problem data.
 """
-mutable struct DWReformulationBuilder{X}
+mutable struct DWDecompositionBuilder{X}
     minimize::Bool
     sp_variables::Dict{PricingSubproblemId,Vector{_VI}}
     sp_original_costs::Dict{PricingSubproblemId,Dict{_VI,Float64}}
@@ -23,8 +23,8 @@ mutable struct DWReformulationBuilder{X}
     coupling_cstrs::Vector{Tuple{TaggedCI,Float64}}
 end
 
-function DWReformulationBuilder{X}(; minimize::Bool=true) where {X}
-    return DWReformulationBuilder{X}(
+function DWDecompositionBuilder{X}(; minimize::Bool=true) where {X}
+    return DWDecompositionBuilder{X}(
         minimize,
         Dict{PricingSubproblemId,Vector{_VI}}(),
         Dict{PricingSubproblemId,Dict{_VI,Float64}}(),
@@ -42,7 +42,7 @@ function DWReformulationBuilder{X}(; minimize::Bool=true) where {X}
 end
 
 function add_subproblem!(
-    b::DWReformulationBuilder{X},
+    b::DWDecompositionBuilder{X},
     sp_id::PricingSubproblemId,
     fixed_cost::Float64,
     conv_lb::Float64,
@@ -57,7 +57,7 @@ function add_subproblem!(
 end
 
 function add_sp_variable!(
-    b::DWReformulationBuilder, sp_id::PricingSubproblemId, sp_var::_VI, orig_cost::Float64
+    b::DWDecompositionBuilder, sp_id::PricingSubproblemId, sp_var::_VI, orig_cost::Float64
 )
     push!(b.sp_variables[sp_id], sp_var)
     b.sp_original_costs[sp_id][sp_var] = orig_cost
@@ -65,7 +65,7 @@ function add_sp_variable!(
 end
 
 function add_coupling_coefficient!(
-    b::DWReformulationBuilder,
+    b::DWDecompositionBuilder,
     sp_id::PricingSubproblemId,
     sp_var::_VI,
     cstr_id,
@@ -80,7 +80,7 @@ function add_coupling_coefficient!(
 end
 
 function add_mapping!(
-    b::DWReformulationBuilder{X}, orig_var::X, sp_id::PricingSubproblemId, sp_var::_VI
+    b::DWDecompositionBuilder{X}, orig_var::X, sp_id::PricingSubproblemId, sp_var::_VI
 ) where {X}
     @assert !haskey(b.forward_map, orig_var) "Duplicate forward mapping for $orig_var"
     @assert !haskey(b.inverse_map, (sp_id, sp_var)) "Duplicate inverse mapping for ($sp_id, $sp_var)"
@@ -91,7 +91,7 @@ function add_mapping!(
 end
 
 function add_pure_master_variable!(
-    b::DWReformulationBuilder,
+    b::DWDecompositionBuilder,
     y_id::_VI,
     cost::Float64,
     lb::Float64,
@@ -104,21 +104,21 @@ function add_pure_master_variable!(
 end
 
 function add_pure_master_coupling!(
-    b::DWReformulationBuilder, y_id::_VI, cstr_id, coeff::Float64
+    b::DWDecompositionBuilder, y_id::_VI, cstr_id, coeff::Float64
 )
     push!(b.pm_coupling_accum[y_id], CouplingEntry(TaggedCI(cstr_id), coeff))
     return nothing
 end
 
-function add_coupling_constraint!(b::DWReformulationBuilder, cstr_id, rhs::Float64)
+function add_coupling_constraint!(b::DWDecompositionBuilder, cstr_id, rhs::Float64)
     push!(b.coupling_cstrs, (TaggedCI(cstr_id), rhs))
     return nothing
 end
 
 """
-    build(builder) -> DWReformulation
+    build(builder) -> DWDecomposition
 
-Compile the accumulated data into an immutable DWReformulation.
+Compile the accumulated data into an immutable DWDecomposition.
 Builds the CSR coupling coefficient structure in O(total entries).
 """
 function _build_coupling_coefficients(
@@ -150,7 +150,7 @@ function _build_coupling_coefficients(
     return CouplingCoefficients(entries, offsets)
 end
 
-function build(b::DWReformulationBuilder{X}) where {X}
+function build(b::DWDecompositionBuilder{X}) where {X}
     subproblems = Dict{PricingSubproblemId,SubproblemData}()
 
     for sp_id in keys(b.sp_variables)
@@ -178,7 +178,7 @@ function build(b::DWReformulationBuilder{X}) where {X}
 
     mapping = OneToOneMapping(b.forward_map, b.inverse_map, collect(b.all_orig_vars_set))
 
-    return DWReformulation(
+    return DWDecomposition(
         subproblems,
         pm_vars,
         mapping,
@@ -189,4 +189,19 @@ function build(b::DWReformulationBuilder{X}) where {X}
         Dict{PricingSubproblemId,TaggedCI}(),
         Dict{PricingSubproblemId,TaggedCI}(),
     )
+end
+
+"""
+    build(builder, master, sps) -> DWDecomposition
+
+Compile the builder as `build(builder)` does, add the convexity constraints to the MOI model
+`master` with [`add_convexity_constraints!`](@ref) and give the MOI models to the
+reformulation with `set_models!`. `sps` maps each subproblem id to its MOI model, or to
+`nothing` for a subproblem that has none yet.
+"""
+function build(b::DWDecompositionBuilder, master, sps)
+    decomp = build(b)
+    conv_ub, conv_lb = add_convexity_constraints!(decomp, master)
+    set_models!(decomp, master, sps, conv_ub, conv_lb)
+    return decomp
 end

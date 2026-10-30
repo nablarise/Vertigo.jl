@@ -343,7 +343,7 @@ both are optional:
 end
 ```
 
-Returns `(decomp::DWReformulation, sp_id_map::Dict)`.
+Returns `(decomp::DWDecomposition, sp_id_map::Dict)`.
 """
 macro dantzig_wolfe(model, block)
     master, subproblems = parse_decomposition_description(block)

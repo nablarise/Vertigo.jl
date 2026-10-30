@@ -45,7 +45,7 @@ function parse_gap_json(path::String)::GAPInstance
 end
 
 """
-    build_gap_model(inst::GAPInstance) -> DWReformulation
+    build_gap_model(inst::GAPInstance) -> DWDecomposition
 
 Build a flat JuMP model for `inst` and apply the Dantzig-Wolfe
 decomposition: `x` and the per-machine `knapsack` constraint go to

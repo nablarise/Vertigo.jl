@@ -14,7 +14,7 @@ abstract type AbstractCutSeparator end
     SeparatedCut{X}
 
 A robust cut expressed as a linear function of original variables.
-`X` is the original variable key type (matching `DWReformulation{X}`).
+`X` is the original variable key type (matching `DWDecomposition{X}`).
 
 # Fields
 - `coefficients`: mapping from original variable to coefficient.

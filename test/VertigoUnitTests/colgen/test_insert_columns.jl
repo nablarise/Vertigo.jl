@@ -83,7 +83,7 @@ function build_insert_columns_context()
     # X = Tuple{Int,Int} for original variable mappings
     OrigVar = Tuple{Int,Int}
 
-    builder = DWReformulationBuilder{OrigVar}(; minimize=true)
+    builder = DWDecompositionBuilder{OrigVar}(; minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 1.0)
 
@@ -144,7 +144,7 @@ function test_insert_columns_single_column()
 
         # Column: z1 = 1.0
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -173,10 +173,10 @@ function test_insert_columns_two_columns()
         ws, refs = build_insert_columns_context()
         model = master_model(ws.decomp)
 
-        sol_a = Vertigo.Reformulation._SpSolution(
+        sol_a = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
-        sol_b = Vertigo.Reformulation._SpSolution(
+        sol_b = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)]
         )
 
@@ -221,7 +221,7 @@ function test_insert_columns_duplicate_skipped()
     @testset "[insert_columns] duplicate column skipped" begin
         ws, refs = build_insert_columns_context()
 
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -250,7 +250,7 @@ function test_insert_columns_mixed_sp_variables()
         # cost = 3*1 + 5*2 = 13
         # c1 = 2*1 + 0*2 = 2, c2 = 1*1 + 4*2 = 9
         # br(x₁) = 1 (only z1 maps to x₁)
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -276,7 +276,7 @@ function test_insert_columns_pool_records_original_cost()
     @testset "[insert_columns] pool records original cost" begin
         ws, refs = build_insert_columns_context()
 
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -315,7 +315,7 @@ function test_insert_column_returns_var()
         ws, refs = build_insert_columns_context()
         model = master_model(ws.decomp)
 
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -339,7 +339,7 @@ function test_insert_column_duplicate_returns_nothing()
     @testset "[_insert_column] duplicate returns nothing" begin
         ws, refs = build_insert_columns_context()
 
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
@@ -360,7 +360,7 @@ function test_insert_column_phase1_zero_cost()
         ws, refs = build_insert_columns_context()
         model = master_model(ws.decomp)
 
-        sol = Vertigo.Reformulation._SpSolution(
+        sol = Vertigo.Decomposition._SpSolution(
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(

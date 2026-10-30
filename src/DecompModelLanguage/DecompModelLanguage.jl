@@ -7,20 +7,20 @@
 
 High-level declarative syntax for Dantzig-Wolfe decomposition.
 Partitions a JuMP model into master + subproblems and builds a
-`DWReformulation` automatically.
+`DWDecomposition` automatically.
 """
 module DML
 
 using JuMP
 using MathOptInterface
 const MOI = MathOptInterface
-using ..Reformulation
+using ..Decomposition
 
 include("UserProblemDescription.jl")
 include("Checker.jl")
 include("Mappings.jl")
 include("Transition.jl")
-include("Decomposition.jl")
+include("DantzigWolfe.jl")
 
 export dantzig_wolfe_decomposition
 export MasterProblemUserDescription, SubproblemUserDescription

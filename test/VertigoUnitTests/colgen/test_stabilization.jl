@@ -67,7 +67,7 @@ function _build_stab_ctx(; alpha=0.5)
 
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(; minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
     end

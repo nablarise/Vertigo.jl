@@ -7,7 +7,7 @@ generation.
 
 ## What it contains
 
-The `DWReformulation` owns the MOI master model, `master_model(decomp)`. It
+The `DWDecomposition` owns the MOI master model, `master_model(decomp)`. It
 holds:
 
 | Element | Source in the code |
