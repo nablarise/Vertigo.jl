@@ -64,6 +64,8 @@ compute_sp_init_db(lws::ColGenLoggerWorkspace, sp)                    = compute_
 compute_sp_init_pb(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lws.inner, sp)
 max_cg_iterations(lws::ColGenLoggerWorkspace)                         = max_cg_iterations(lws.inner)
 set_max_cg_iterations!(lws::ColGenLoggerWorkspace, n::Int)            = set_max_cg_iterations!(lws.inner, n)
+start_timer!(lws::ColGenLoggerWorkspace)                              = start_timer!(lws.inner)
+set_deadline!(lws::ColGenLoggerWorkspace, deadline::Float64)          = set_deadline!(lws.inner, deadline)
 
 # ── Protocol delegation (workspace as arg 2) ─────────────────────────
 
@@ -160,6 +162,7 @@ julia> # (see test for a full example)
 """
 function run_column_generation(lws::ColGenLoggerWorkspace)
     lws.cg_start_time = time()
+    start_timer!(lws)
     output = ColGen.run!(lws, nothing)
     _print_cg_footer(lws, output)
     return output
@@ -178,6 +181,8 @@ function _print_cg_footer(
         println("[STATUS] Subproblem infeasible.")
     elseif output.status == ip_pruned
         println("[STATUS] Node pruned by bound.")
+    elseif output.status == time_limit
+        println("[STATUS] Time limit reached.")
     else
         println("[STATUS] Iteration limit reached.")
     end

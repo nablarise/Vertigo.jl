@@ -123,6 +123,9 @@ mutable struct ColGenWorkspace{D<:AbstractDecomposition}
     smoothing_alpha::Float64
     max_cg_iterations::Int
     max_misprice_iterations::Int
+    time_limit::Float64     # seconds allowed to one run
+    run_start::Float64      # `time()` at the start of the current run
+    deadline::Float64       # absolute `time()` that no run may pass
 end
 
 """
@@ -159,7 +162,8 @@ function ColGenWorkspace(
         nothing, nothing,
         ActiveBranchingConstraint[], ActiveRobustCut[],
         config.smoothing_alpha, config.max_cg_iterations,
-        config.max_misprice_iterations
+        config.max_misprice_iterations,
+        config.time_limit, time(), Inf
     )
 end
 
@@ -171,6 +175,33 @@ max_cg_iterations(ws::ColGenWorkspace) = ws.max_cg_iterations
 function set_max_cg_iterations!(ws::ColGenWorkspace, n::Int)
     ws.max_cg_iterations = n
     return
+end
+
+"""
+    start_timer!(ws)
+
+Mark the start of a column generation run: `config.time_limit` is
+counted from here.
+"""
+function start_timer!(ws::ColGenWorkspace)
+    ws.run_start = time()
+    return
+end
+
+"""
+    set_deadline!(ws, deadline)
+
+Forbid every run to go on after the absolute time `deadline` (a
+`time()` value; `Inf` for none). The branch-and-price search uses it
+to bound the whole search.
+"""
+function set_deadline!(ws::ColGenWorkspace, deadline::Float64)
+    ws.deadline = deadline
+    return
+end
+
+function time_limit_reached(ws::ColGenWorkspace)
+    return time() >= min(ws.run_start + ws.time_limit, ws.deadline)
 end
 
 function get_master(ws::ColGenWorkspace)
@@ -227,7 +258,7 @@ const CGPhase = Union{Phase0,Phase1,Phase2}
 struct ExactStage end
 struct NoStabilization end
 
-@enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit ip_pruned
+@enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit ip_pruned time_limit
 
 new_phase_iterator(::ColGenWorkspace) = ColGenPhaseIterator()
 initial_phase(::ColGenPhaseIterator) = Phase0()
@@ -235,7 +266,7 @@ new_stage_iterator(::ColGenWorkspace) = ColGenStageIterator()
 initial_stage(::ColGenStageIterator) = ExactStage()
 
 stop_colgen(::ColGenWorkspace, ::Nothing) = false
-stop_colgen(::ColGenWorkspace, _) = false
+stop_colgen(ws::ColGenWorkspace, _) = time_limit_reached(ws)
 
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -427,7 +458,7 @@ function stop_colgen_phase(
         ws, incumbent_dual_bound, ws.ip_primal_bound
     )
     return iteration_limit || no_column_added ||
-           lp_gap_closed || ip_pruned
+           lp_gap_closed || ip_pruned || time_limit_reached(ws)
 end
 
 function stop_colgen_phase(
@@ -438,7 +469,8 @@ function stop_colgen_phase(
     ip_primal_sol,
     iteration
 )
-    # Phase1 has no iteration limit — feasibility must reach true convergence
+    # Phase1 has no iteration limit — feasibility must reach true convergence,
+    # unless the time runs out.
     master_lp_obj = colgen_iter_output.master_lp_obj
     no_column_added = colgen_iter_output.nb_columns_added == 0
     lp_gap_closed = (
@@ -446,7 +478,7 @@ function stop_colgen_phase(
         !isnothing(incumbent_dual_bound) &&
         abs(master_lp_obj - incumbent_dual_bound) < LP_GAP_TOL
     )
-    return no_column_added || lp_gap_closed
+    return no_column_added || lp_gap_closed || time_limit_reached(ws)
 end
 
 function new_iteration_output(
@@ -587,6 +619,11 @@ function new_output(
             optimal, p.master_lp_obj,
             p.incumbent_dual_bound, ip
         )
+    elseif time_limit_reached(ws)
+        return ColGenOutput(
+            time_limit, p.master_lp_obj,
+            p.incumbent_dual_bound, ip
+        )
     else
         return ColGenOutput(
             iteration_limit, p.master_lp_obj,
@@ -632,7 +669,7 @@ and `config`, then runs column generation.
 function run_col_gen(decomp, config::ColGenConfig)
     workspace = ColGenWorkspace(decomp, config)
     if config.silent
-        return ColGen.run!(workspace, nothing)
+        return run_column_generation(workspace)
     end
     return run_column_generation(ColGenLoggerWorkspace(workspace))
 end
@@ -643,5 +680,6 @@ end
 Run the column generation algorithm on the given workspace.
 """
 function run_column_generation(ws::ColGenWorkspace)
+    start_timer!(ws)
     return ColGen.run!(ws, nothing)
 end
