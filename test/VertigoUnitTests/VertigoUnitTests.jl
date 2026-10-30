@@ -12,16 +12,30 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 using Vertigo
-using Vertigo.ColGen: MasterPrimalSolution, PrimalMoiSolution,
-    check_primal_ip_feasibility!, update_inc_primal_sol!, Phase0, Phase1, Phase2,
-    get_column_sp_id, get_column_cost, get_column_solution
+using Vertigo.ColGen:
+    MasterPrimalSolution,
+    PrimalMoiSolution,
+    check_primal_ip_feasibility!,
+    update_inc_primal_sol!,
+    Phase0,
+    Phase1,
+    Phase2,
+    get_column_sp_id,
+    get_column_cost,
+    get_column_solution
 using Vertigo.TreeSearch
 using Vertigo.MathOptState
-using Vertigo.Reformulation: get_primal_solution
-using Vertigo.Branching: find_fractional_variables,
-    BranchingCandidate, MostFractionalRule, LeastFractionalRule,
-    select_candidates, MostFractionalBranching, select_branching_variable,
-    bp_master_model, most_fractional_original_variable
+using Vertigo.Decomposition: get_primal_solution
+using Vertigo.Branching:
+    find_fractional_variables,
+    BranchingCandidate,
+    MostFractionalRule,
+    LeastFractionalRule,
+    select_candidates,
+    MostFractionalBranching,
+    select_branching_variable,
+    bp_master_model,
+    most_fractional_original_variable
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -48,7 +62,7 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_decomp(inst) -> DWReformulation
+    build_gap_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for the given GAP instance.
 
@@ -90,7 +104,7 @@ function build_gap_decomp(inst::GAPInstance)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────────────
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -101,7 +115,9 @@ function build_gap_decomp(inst::GAPInstance)
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
             add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
             add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
@@ -113,8 +129,12 @@ function build_gap_decomp(inst::GAPInstance)
     decomp = build(builder)
 
     # ── Convexity constraint indices ──────────────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
@@ -129,12 +149,14 @@ unit tests; thin wrapper around [`build_gap_decomp`](@ref).
 """
 function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     decomp = build_gap_decomp(inst)
-    config = ColGenConfig(max_cg_iterations=max_cg_iterations)
-    return ColGenWorkspace(decomp, ColumnPool(),
+    config = ColGenConfig(; max_cg_iterations=max_cg_iterations)
+    return ColGenWorkspace(
+        decomp,
+        ColumnPool(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 end
 
@@ -180,34 +202,46 @@ include("dml/test_dml.jl")
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+# Every test function runs in its own testset, all under one outer testset: a failure or an
+# exception in one test is recorded and the others still run. The outer testset throws once,
+# at the end, if anything failed.
 function run()
-    test_gap_decomposition_builder()
-    test_gap_column_pool_populated()
-    test_gap_lp_dual_bound_matches_primal()
-    test_ip_management()
-    test_treesearch_node()
-    test_treesearch_search_loop()
-    test_treesearch_strategies()
-    test_tree_search_logger()
-    test_local_cut_tracker()
-    test_lp_basis_tracker()
-    test_column_tracker()
-    test_cut_pool_tracker()
-    test_max_cg_iterations()
-    test_colgen_status()
-    test_branching_strategy()
-    test_lp_probe()
-    test_strong_branching()
-    test_pseudocosts()
-    test_kernel()
-    test_branching_logger()
-    test_branch_and_price()
-    test_stabilization()
-    test_setup_reformulation()
-    test_insert_columns()
-    test_build_cut_saf()
-    test_column_pool()
-    test_dml()
+    @testset "VertigoUnitTests" begin
+        for test in (
+            test_gap_decomposition_builder,
+            test_gap_column_pool_populated,
+            test_gap_lp_dual_bound_matches_primal,
+            test_ip_management,
+            test_treesearch_node,
+            test_treesearch_search_loop,
+            test_treesearch_strategies,
+            test_tree_search_logger,
+            test_local_cut_tracker,
+            test_lp_basis_tracker,
+            test_column_tracker,
+            test_cut_pool_tracker,
+            test_max_cg_iterations,
+            test_colgen_status,
+            test_branching_strategy,
+            test_lp_probe,
+            test_strong_branching,
+            test_pseudocosts,
+            test_kernel,
+            test_branching_logger,
+            test_branch_and_price,
+            test_stabilization,
+            test_setup_reformulation,
+            test_insert_columns,
+            test_build_cut_saf,
+            test_column_pool,
+            test_dml,
+        )
+            @testset "$(nameof(test))" begin
+                test()
+            end
+        end
+    end
+    return nothing
 end
 
 end # module VertigoUnitTests

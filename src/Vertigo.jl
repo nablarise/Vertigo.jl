@@ -4,9 +4,9 @@
 
 module Vertigo
 
-# ── Reformulation (decomposition types) ──────────────────────────────────────
-include("Reformulation/Reformulation.jl")
-using .Reformulation
+# ── Decomposition (decomposition types) ──────────────────────────────────────
+include("Decomposition/Decomposition.jl")
+using .Decomposition
 
 # ── Column generation algorithm ───────────────────────────────────────────────
 include("ColGen/ColGen.jl")
@@ -29,18 +29,19 @@ include("BranchCutPrice/BranchCutPrice.jl")
 using .BranchCutPrice
 
 # ── Decomposition Modeling Language ───────────────────────────────────────────
-include("DML/DML.jl")
+include("DecompModelLanguage/DecompModelLanguage.jl")
 using .DML
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
 # DML (Decomposition Modeling Language)
-export @dantzig_wolfe, dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export dantzig_wolfe_decomposition
+export MasterProblemUserDescription, SubproblemUserDescription
+export MasterProblemOptions, SubproblemOptions
 
 # Decomposition builder
 export PricingSubproblemId
-export DWReformulation, DWReformulationBuilder
+export DWDecomposition, DWDecompositionBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
@@ -54,7 +55,8 @@ export ColumnPool
 # Context and solver entry point
 export ColGenConfig, ColGenWorkspace, ColGenLoggerWorkspace
 export run_col_gen, run_column_generation, ColGenOutput
-export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
+export ColGenStatus,
+    optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions
@@ -67,7 +69,7 @@ export has_column, record_column!, columns, columns_for_subproblem
 export column_sp_id, column_original_cost, pricing_objective_value
 export column_nonzero_entries
 
-# MOI model accessors on DWReformulation
+# MOI model accessors on DWDecomposition
 export master_model, sp_model, sp_models, set_models!
 export convexity_ub_ci, convexity_lb_ci
 export has_convexity_ub, has_convexity_lb

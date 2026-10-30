@@ -12,7 +12,7 @@ function _apply_integrality_relaxation!(backend, var_id, helper)
     else
         error("cannot relax variable $var_id: not integral")
     end
-    return
+    return nothing
 end
 
 function _apply_integrality_restriction!(backend, var_id, helper)
@@ -23,7 +23,7 @@ function _apply_integrality_restriction!(backend, var_id, helper)
     else
         error("variable $var_id is already integral")
     end
-    return
+    return nothing
 end
 
 function _apply_zero_one_relaxation!(backend, var_id, helper)
@@ -35,21 +35,25 @@ function _apply_zero_one_relaxation!(backend, var_id, helper)
         # Check bounds
         ci_lb = get(helper.map_lb, var_id, nothing)
         if isnothing(ci_lb) || MOI.get(backend, MOI.ConstraintSet(), ci_lb).lower < 0
-            !isnothing(ci_lb) && MOI.delete(backend, ci_lb)
+            if !isnothing(ci_lb)
+                MOI.delete(backend, ci_lb)
+            end
             new_ci_lb = MOI.add_constraint(backend, var_id, MOI.GreaterThan(0.0))
             helper.map_lb[var_id] = new_ci_lb
         end
 
         ci_ub = get(helper.map_ub, var_id, nothing)
         if isnothing(ci_ub) || MOI.get(backend, MOI.ConstraintSet(), ci_ub).upper > 1
-            !isnothing(ci_ub) && MOI.delete(backend, ci_ub)
+            if !isnothing(ci_ub)
+                MOI.delete(backend, ci_ub)
+            end
             new_ci_ub = MOI.add_constraint(backend, var_id, MOI.LessThan(1.0))
             helper.map_ub[var_id] = new_ci_ub
         end
     else
         error("cannot relax variable $var_id: not binary")
     end
-    return
+    return nothing
 end
 
 function _apply_zero_one_restriction!(backend, var_id, helper)
@@ -60,7 +64,7 @@ function _apply_zero_one_restriction!(backend, var_id, helper)
     else
         error("variable $var_id is already binary")
     end
-    return
+    return nothing
 end
 
 @enum IntegralityChangeType relax_integrality restrict_integrality relax_zero_one restrict_zero_one
@@ -70,7 +74,9 @@ struct IntegralityChange
     change::IntegralityChangeType
 end
 
-function apply_change!(backend, change::IntegralityChange, helper::DomainChangeTrackerHelper)
+function apply_change!(
+    backend, change::IntegralityChange, helper::DomainChangeTrackerHelper
+)
     if change.change == relax_integrality
         _apply_integrality_relaxation!(backend, change.var_id, helper)
     elseif change.change == restrict_integrality
@@ -88,14 +94,22 @@ end
 
 IntegralityChangeDiff() = IntegralityChangeDiff(IntegralityChange[])
 
-function apply_change!(backend, change::IntegralityChangeDiff, helper::DomainChangeTrackerHelper)
+function apply_change!(
+    backend, change::IntegralityChangeDiff, helper::DomainChangeTrackerHelper
+)
     for c in change.integrality_changes
         apply_change!(backend, c, helper)
     end
-    return
+    return nothing
 end
 
-new_state(::IntegralityStateTracker, backward::IntegralityChangeDiff, forward::IntegralityChangeDiff) = ModelState(backward, forward)
+function new_state(
+    ::IntegralityStateTracker,
+    backward::IntegralityChangeDiff,
+    forward::IntegralityChangeDiff,
+)
+    return ModelState(backward, forward)
+end
 
 """
     relax_integrality!(backend, helper::DomainChangeTrackerHelper)
@@ -106,14 +120,23 @@ Returns a state with forward diffs (relax) and backward diffs (restrict).
 function relax_integrality!(backend, helper::DomainChangeTrackerHelper)
     # Relax integrality constraints (Integer and ZeroOne) and add bounds for binary variables.
     forward_changes_itr = Iterators.flatten((
-        Iterators.map(var_id -> IntegralityChange(var_id, relax_integrality), keys(helper.map_integer)),
-        Iterators.map(var_id -> IntegralityChange(var_id, relax_zero_one), keys(helper.map_binary))
+        Iterators.map(
+            var_id -> IntegralityChange(var_id, relax_integrality), keys(helper.map_integer)
+        ),
+        Iterators.map(
+            var_id -> IntegralityChange(var_id, relax_zero_one), keys(helper.map_binary)
+        ),
     ))
     forward_changes = IntegralityChangeDiff(collect(forward_changes_itr))
 
     backward_changes_itr = Iterators.flatten((
-        Iterators.map(var_id -> IntegralityChange(var_id, restrict_integrality), keys(helper.map_integer)),
-        Iterators.map(var_id -> IntegralityChange(var_id, restrict_zero_one), keys(helper.map_binary))
+        Iterators.map(
+            var_id -> IntegralityChange(var_id, restrict_integrality),
+            keys(helper.map_integer),
+        ),
+        Iterators.map(
+            var_id -> IntegralityChange(var_id, restrict_zero_one), keys(helper.map_binary)
+        ),
     ))
     backward_changes = IntegralityChangeDiff(collect(backward_changes_itr))
 

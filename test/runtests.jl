@@ -10,5 +10,8 @@ push!(LOAD_PATH, joinpath(@__DIR__, "VertigoE2eTests"))
 using VertigoUnitTests
 using VertigoE2eTests
 
-VertigoUnitTests.run()
-VertigoE2eTests.run()
+# One outer testset so that unit failures do not keep the e2e tests from running.
+@testset "Vertigo" begin
+    VertigoUnitTests.run()
+    VertigoE2eTests.run()
+end

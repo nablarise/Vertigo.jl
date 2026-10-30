@@ -29,13 +29,10 @@ struct BranchingResult{X}
     value::Float64
 end
 
-BranchingResult(status::BranchingStatus) =
-    BranchingResult{Nothing}(status, nothing, 0.0)
+BranchingResult(status::BranchingStatus) = BranchingResult{Nothing}(status, nothing, 0.0)
 
 function BranchingResult(orig_var, value::Float64)
-    return BranchingResult{typeof(orig_var)}(
-        branching_ok, orig_var, value
-    )
+    return BranchingResult{typeof(orig_var)}(branching_ok, orig_var, value)
 end
 
 """
@@ -67,12 +64,13 @@ Select a branching variable. Returns a `BranchingResult` with
 `status` indicating the outcome.
 """
 function select_branching_variable(
-    ::MostFractionalBranching, space, node,
-    primal_values::Dict{MOI.VariableIndex,Float64}
+    ::MostFractionalBranching, space, node, primal_values::Dict{MOI.VariableIndex,Float64}
 )
     orig_var, x_val = most_fractional_original_variable(
         space.ws, primal_values; tol=space.tol
     )
-    isnothing(orig_var) && return BranchingResult(all_integral)
+    if isnothing(orig_var)
+        return BranchingResult(all_integral)
+    end
     return BranchingResult(orig_var, x_val)
 end

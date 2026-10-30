@@ -2,11 +2,18 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.Branching: select_initial_candidates,
-    score_candidate, filter_candidates, stop_phase,
-    BranchingCandidate, SBProbeResult, SBCandidateResult,
-    LPProbePhase, CGProbePhase,
-    PseudocostTracker, estimate_score
+using Vertigo.Branching:
+    select_initial_candidates,
+    score_candidate,
+    filter_candidates,
+    stop_phase,
+    BranchingCandidate,
+    SBProbeResult,
+    SBCandidateResult,
+    LPProbePhase,
+    CGProbePhase,
+    PseudocostTracker,
+    estimate_score
 
 function test_kernel()
     @testset "[select_initial_candidates] sorts by pseudocost" begin
@@ -14,9 +21,7 @@ function test_kernel()
         c1 = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         c2 = BranchingCandidate(2, 3.5, 3.0, 4.0, 0.5)
         c3 = BranchingCandidate(3, 4.7, 4.0, 5.0, 0.3)
-        result = select_initial_candidates(
-            tracker, [c1, c2, c3], 2
-        )
+        result = select_initial_candidates(tracker, [c1, c2, c3], 2)
         @test length(result) == 2
     end
 
@@ -27,10 +32,7 @@ function test_kernel()
         c2 = BranchingCandidate(2, 3.5, 3.0, 4.0, 0.5)
         c3 = BranchingCandidate(3, 4.7, 4.0, 5.0, 0.3)
         c4 = BranchingCandidate(4, 5.2, 5.0, 6.0, 0.2)
-        scored = [
-            (c1, 10.0), (c2, 8.0),
-            (c3, 6.0), (c4, 4.0)
-        ]
+        scored = [(c1, 10.0), (c2, 8.0), (c3, 6.0), (c4, 4.0)]
         result = filter_candidates(phase, next, scored)
         @test length(result) == 2
         @test result[1] === c1

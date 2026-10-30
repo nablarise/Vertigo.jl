@@ -11,10 +11,12 @@ function unzip_to(zip_path::String, dest::String)
     zf = ZipFile.Reader(zip_path)
     try
         for f in zf.files
-            endswith(f.name, ".json") || continue
+            if !(endswith(f.name, ".json"))
+                continue
+            end
             out = joinpath(dest, basename(f.name))
             open(out, "w") do io
-                write(io, read(f))
+                return write(io, read(f))
             end
         end
     finally
@@ -24,20 +26,21 @@ end
 
 function main()
     zip_path = joinpath(@__DIR__, "instances.zip")
-    isfile(zip_path) || error("missing $(zip_path)")
+    if !(isfile(zip_path))
+        error("missing $(zip_path)")
+    end
 
     workdir = mktempdir()
     unzip_to(zip_path, workdir)
-    paths = sort(filter(p -> endswith(p, ".json"),
-        readdir(workdir; join=true)))
+    paths = sort(filter(p -> endswith(p, ".json"), readdir(workdir; join=true)))
 
     cfg = BenchConfig(
         10_000, # node_limit
         0.5,    # smoothing_alpha
-        60.0    # rmp_time_limit
+        60.0,    # rmp_time_limit
     )
 
-    run_bench(paths, cfg, "full")
+    return run_bench(paths, cfg, "full")
 end
 
 main()

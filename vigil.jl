@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: MIT
 
 # Add test modules to LOAD_PATH
-for submodule in filter(item -> isdir(joinpath(@__DIR__, "test", item)), readdir(joinpath(@__DIR__, "test")))
+for submodule in filter(
+    item -> isdir(joinpath(@__DIR__, "test", item)), readdir(joinpath(@__DIR__, "test"))
+)
     push!(LOAD_PATH, joinpath(@__DIR__, "test", submodule))
 end
 
@@ -28,5 +30,5 @@ watch_and_run(
     [ColumnGenerationUnitTests, ColumnGenerationE2eTests],
     [ColumnGeneration];
     output_file=output_file,
-    format=format
+    format=format,
 )

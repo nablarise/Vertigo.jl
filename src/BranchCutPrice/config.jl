@@ -52,24 +52,34 @@ struct BranchCutPriceConfig
     log_level::Int
     dot_file::Union{Nothing,String}
     function BranchCutPriceConfig(;
-        colgen::ColGen.ColGenConfig = ColGen.ColGenConfig(),
-        cg_log_level::Int = 0,
-        strategy = TreeSearch.DepthFirstStrategy(),
-        node_limit::Int = 10_000,
-        tol::Float64 = 1e-6,
-        rmp_time_limit::Float64 = 60.0,
-        rmp_heuristic::Bool = true,
-        separator::Union{Nothing,AbstractCutSeparator} = nothing,
-        max_cut_rounds::Int = 0,
-        min_gap_improvement::Float64 = 0.01,
-        branching_strategy::AbstractBranchingStrategy =
-            MostFractionalBranching(),
-        log_level::Int = 0,
-        dot_file::Union{Nothing,String} = nothing
+        colgen::ColGen.ColGenConfig=ColGen.ColGenConfig(),
+        cg_log_level::Int=0,
+        strategy=TreeSearch.DepthFirstStrategy(),
+        node_limit::Int=10_000,
+        tol::Float64=1e-6,
+        rmp_time_limit::Float64=60.0,
+        rmp_heuristic::Bool=true,
+        separator::Union{Nothing,AbstractCutSeparator}=nothing,
+        max_cut_rounds::Int=0,
+        min_gap_improvement::Float64=0.01,
+        branching_strategy::AbstractBranchingStrategy=MostFractionalBranching(),
+        log_level::Int=0,
+        dot_file::Union{Nothing,String}=nothing,
     )
-        new(colgen, cg_log_level, strategy, node_limit, tol,
-            rmp_time_limit, rmp_heuristic, separator, max_cut_rounds,
-            min_gap_improvement, branching_strategy,
-            log_level, dot_file)
+        return new(
+            colgen,
+            cg_log_level,
+            strategy,
+            node_limit,
+            tol,
+            rmp_time_limit,
+            rmp_heuristic,
+            separator,
+            max_cut_rounds,
+            min_gap_improvement,
+            branching_strategy,
+            log_level,
+            dot_file,
+        )
     end
 end

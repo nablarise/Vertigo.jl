@@ -49,7 +49,7 @@ are absent from the dict.
 - `active_cuts::Dict{Int, TaggedCI}`: Maps cut ID to its constraint index.
 """
 mutable struct GlobalCutPoolHelper
-    active_cuts::Dict{Int, TaggedCI}
+    active_cuts::Dict{Int,TaggedCI}
 end
 
 """
@@ -57,7 +57,7 @@ end
 
 Create a helper with no active cuts.
 """
-GlobalCutPoolHelper() = GlobalCutPoolHelper(Dict{Int, TaggedCI}())
+GlobalCutPoolHelper() = GlobalCutPoolHelper(Dict{Int,TaggedCI}())
 
 """
     GlobalCutPoolDiff <: AbstractMathOptStateDiff
@@ -74,8 +74,8 @@ vcat accumulation).
 - `deactivate::Dict{Int, DeactivateGlobalCutChange}`: Cuts to remove (keyed by cut ID).
 """
 struct GlobalCutPoolDiff <: AbstractMathOptStateDiff
-    activate::Dict{Int, ActivateGlobalCutChange}
-    deactivate::Dict{Int, DeactivateGlobalCutChange}
+    activate::Dict{Int,ActivateGlobalCutChange}
+    deactivate::Dict{Int,DeactivateGlobalCutChange}
 end
 
 """
@@ -83,10 +83,11 @@ end
 
 Create an empty diff with no activations or deactivations.
 """
-GlobalCutPoolDiff() = GlobalCutPoolDiff(
-    Dict{Int, ActivateGlobalCutChange}(),
-    Dict{Int, DeactivateGlobalCutChange}(),
-)
+function GlobalCutPoolDiff()
+    return GlobalCutPoolDiff(
+        Dict{Int,ActivateGlobalCutChange}(), Dict{Int,DeactivateGlobalCutChange}()
+    )
+end
 
 """
     apply_change!(backend, change::ActivateGlobalCutChange, helper::GlobalCutPoolHelper)
@@ -97,14 +98,12 @@ function apply_change!(
     backend, change::ActivateGlobalCutChange, helper::GlobalCutPoolHelper
 )
     cut = change.cut
-    haskey(helper.active_cuts, cut.id) && return
-    ci = MOI.add_constraint(
-        backend,
-        MOI.ScalarAffineFunction(cut.terms, 0.0),
-        cut.set,
-    )
+    if haskey(helper.active_cuts, cut.id)
+        return nothing
+    end
+    ci = MOI.add_constraint(backend, MOI.ScalarAffineFunction(cut.terms, 0.0), cut.set)
     helper.active_cuts[cut.id] = TaggedCI(ci)
-    return
+    return nothing
 end
 
 """
@@ -117,12 +116,14 @@ function apply_change!(
 )
     cut = change.cut
     tagged = get(helper.active_cuts, cut.id, nothing)
-    isnothing(tagged) && return
+    if isnothing(tagged)
+        return nothing
+    end
     with_typed_ci(tagged) do ci
-        MOI.delete(backend, ci)
+        return MOI.delete(backend, ci)
     end
     delete!(helper.active_cuts, cut.id)
-    return
+    return nothing
 end
 
 """
@@ -133,16 +134,14 @@ Apply a full diff: deactivate first, then activate.
 Deactivations precede activations to avoid constraint conflicts when
 re-entering a node.
 """
-function apply_change!(
-    backend, diff::GlobalCutPoolDiff, helper::GlobalCutPoolHelper
-)
+function apply_change!(backend, diff::GlobalCutPoolDiff, helper::GlobalCutPoolHelper)
     for change in values(diff.deactivate)
         apply_change!(backend, change, helper)
     end
     for change in values(diff.activate)
         apply_change!(backend, change, helper)
     end
-    return
+    return nothing
 end
 
 """
@@ -154,9 +153,7 @@ Cross-cleaning ensures a cut cannot appear in both `activate` and `deactivate`:
 if the parent activated a cut that the local diff deactivates, the activation
 is removed, and vice versa.
 """
-function merge_forward_change_diff(
-    parent::GlobalCutPoolDiff, local_diff::GlobalCutPoolDiff
-)
+function merge_forward_change_diff(parent::GlobalCutPoolDiff, local_diff::GlobalCutPoolDiff)
     activate = copy(parent.activate)
     deactivate = copy(parent.deactivate)
     for (id, change) in local_diff.activate
@@ -205,7 +202,7 @@ values to activate/deactivate cuts per node.
 """
 struct GlobalCutPoolTracker <: AbstractMathOptStateTracker
     next_cut_id::Base.RefValue{Int}
-    pool::Dict{Int, GlobalCut}
+    pool::Dict{Int,GlobalCut}
 end
 
 """
@@ -213,7 +210,7 @@ end
 
 Create a new `GlobalCutPoolTracker` with an empty pool.
 """
-GlobalCutPoolTracker() = GlobalCutPoolTracker(Ref(0), Dict{Int, GlobalCut}())
+GlobalCutPoolTracker() = GlobalCutPoolTracker(Ref(0), Dict{Int,GlobalCut}())
 
 """
     register_cut!(tracker::GlobalCutPoolTracker, terms, set) -> GlobalCut
@@ -239,19 +236,18 @@ end
 
 Return the root state with empty forward and backward diffs (no cuts active at root).
 """
-root_state(::GlobalCutPoolTracker, backend) =
-    ModelState(GlobalCutPoolDiff(), GlobalCutPoolDiff())
+function root_state(::GlobalCutPoolTracker, backend)
+    return ModelState(GlobalCutPoolDiff(), GlobalCutPoolDiff())
+end
 
 """
     new_state(::GlobalCutPoolTracker, fwd, bwd) -> ModelState{GlobalCutPoolDiff}
 
 Wrap forward and backward diffs into a `ModelState`.
 """
-new_state(
-    ::GlobalCutPoolTracker,
-    fwd::GlobalCutPoolDiff,
-    bwd::GlobalCutPoolDiff,
-) = ModelState(fwd, bwd)
+function new_state(::GlobalCutPoolTracker, fwd::GlobalCutPoolDiff, bwd::GlobalCutPoolDiff)
+    return ModelState(fwd, bwd)
+end
 
 """
     transform_model!(::GlobalCutPoolTracker, backend) -> GlobalCutPoolHelper

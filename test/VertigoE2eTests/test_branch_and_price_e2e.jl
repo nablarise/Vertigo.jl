@@ -27,8 +27,8 @@ function test_bp_gap_a_instances()
                 BranchCutPriceConfig(
                     colgen=ColGenConfig(smoothing_alpha=0.5),
                     node_limit=5_000,
-                    dot_file=dot_path
-                )
+                    dot_file=dot_path,
+                ),
             )
             output = run_branch_and_price(bcp_ws)
 
@@ -39,18 +39,15 @@ function test_bp_gap_a_instances()
 
             if !isnothing(output.incumbent)
                 # Incumbent is a valid upper bound
-                @test output.incumbent.obj_value >=
-                    optimal - 1e-4
+                @test output.incumbent.obj_value >= optimal - 1e-4
 
                 # Dual bound ≤ incumbent (valid relaxation)
-                @test output.best_dual_bound <=
-                    output.incumbent.obj_value + 1e-4
+                @test output.best_dual_bound <= output.incumbent.obj_value + 1e-4
             end
 
             if output.status == :optimal
                 @test !isnothing(output.incumbent)
-                @test abs(output.incumbent.obj_value - optimal) <=
-                    1e-4
+                @test abs(output.incumbent.obj_value - optimal) <= 1e-4
             end
 
             # Dot file structural validity

@@ -33,21 +33,20 @@ end
 
 function Base.show(io::IO, sol::PrimalMoiSolution)
     println(io, "Primal solution:")
-    sorted_vars = sort(collect(sol.variable_values), by = x -> x[1].value)
+    sorted_vars = sort(collect(sol.variable_values); by=x -> x[1].value)
     for (i, (var_index, value)) in enumerate(sorted_vars)
         connector = i == length(sorted_vars) ? "└" : "|"
         println(io, "$connector _[$(var_index.value)]: $value")
     end
-    print(io, "└ cost = $(sol.obj_value)")
+    return print(io, "└ cost = $(sol.obj_value)")
 end
 
 function Base.show(io::IO, sol::DualMoiSolution)
     println(io, "Dual solution:")
-    sorted = sort(collect(sol.constraint_duals); by = first)
+    sorted = sort(collect(sol.constraint_duals); by=first)
     for (i, (tagged, dual_value)) in enumerate(sorted)
         connector = i == length(sorted) ? "└" : "|"
         println(io, "$connector constr[$(tagged)]: $dual_value")
     end
-    print(io, "└ cost = $(sol.obj_value)")
+    return print(io, "└ cost = $(sol.obj_value)")
 end
-

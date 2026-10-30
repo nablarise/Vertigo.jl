@@ -31,7 +31,7 @@ function parse_gap_file(filepath::String)::GAPInstance
     tokens = split(read(filepath, String))
     idx = Ref(1)
 
-    next_int() = (v = parse(Int, tokens[idx[]]); idx[] += 1; v)
+    next_int() = (v=parse(Int, tokens[idx[]]); idx[] += 1; v)
 
     m = next_int()
     n = next_int()
@@ -82,7 +82,9 @@ function get_gap_instance_path(class::Char, agents::Int, jobs::Int)::String
     end
     close(zf)
 
-    found || error("Entry '$(entry_name)' not found in '$(zip_path)'")
+    if !(found)
+        error("Entry '$(entry_name)' not found in '$(zip_path)'")
+    end
     return out_path
 end
 
@@ -91,7 +93,7 @@ end
 # ──────────────────────────────────────────────────────────────────────
 
 """
-    build_gap_decomp(inst) -> DWReformulation
+    build_gap_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for a GAP instance.
 """
@@ -127,7 +129,7 @@ function build_gap_decomp(inst::GAPInstance)
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -138,7 +140,9 @@ function build_gap_decomp(inst::GAPInstance)
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
             add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
             add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
@@ -150,8 +154,12 @@ function build_gap_decomp(inst::GAPInstance)
     decomp = build(builder)
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
@@ -166,19 +174,20 @@ for CG-only e2e tests.
 """
 function build_gap_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     decomp = build_gap_decomp(inst)
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, ColumnPool(),
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        ColumnPool(),
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     return ColGenLoggerWorkspace(inner_ws)
 end
 
 function build_gap_context_with_fixed_cost(
-    inst::GAPInstance, fixed_cost::Float64;
-    smoothing_alpha::Float64=0.0
+    inst::GAPInstance, fixed_cost::Float64; smoothing_alpha::Float64=0.0
 )
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
@@ -203,10 +212,7 @@ function build_gap_context_with_fixed_cost(
         set_silent(sp_jump)
 
         @variable(sp_jump, z[t in T], Bin)
-        @constraint(
-            sp_jump,
-            sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k]
-        )
+        @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k])
         @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
 
         sp_models[PricingSubproblemId(k)] = backend(sp_jump)
@@ -214,11 +220,9 @@ function build_gap_context_with_fixed_cost(
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -227,9 +231,7 @@ function build_gap_context_with_fixed_cost(
     for k in K
         for t in T
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
-            add_sp_variable!(
-                builder, PricingSubproblemId(k), sp_var, inst.cost[k, t]
-            )
+            add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
             add_coupling_coefficient!(
                 builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
@@ -258,12 +260,14 @@ function build_gap_context_with_fixed_cost(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 
@@ -274,9 +278,7 @@ end
 # Build ColGenWorkspace for a shifted GAP (z ∈ {1,2} instead of x ∈ {0,1})
 # ──────────────────────────────────────────────────────────────────────
 
-function build_gap_shifted_context(
-    inst::GAPInstance; smoothing_alpha::Float64=0.0
-)
+function build_gap_shifted_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -314,7 +316,7 @@ function build_gap_shifted_context(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         fixed_cost = -sum(inst.cost[k, :])
@@ -350,18 +352,24 @@ function build_gap_shifted_context(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 
@@ -378,8 +386,7 @@ struct GAPInstanceWithIdenticalMachines
 end
 
 function build_gap_identical_context(
-    inst::GAPInstanceWithIdenticalMachines;
-    smoothing_alpha::Float64=0.0
+    inst::GAPInstanceWithIdenticalMachines; smoothing_alpha::Float64=0.0
 )
     K = 1:inst.n_machine_types
     T = 1:inst.n_tasks
@@ -390,94 +397,52 @@ function build_gap_identical_context(
 
     @constraint(master_jump, assignment[t in T], 0 == 1)
     @constraint(master_jump, conv_lb[k in K], 0 >= 0)
-    @constraint(
-        master_jump,
-        conv_ub[k in K],
-        0 <= inst.multiplicity[k]
-    )
+    @constraint(master_jump, conv_ub[k in K], 0 <= inst.multiplicity[k])
     @objective(master_jump, Min, 0)
 
     master_model = backend(master_jump)
 
     # ── Subproblem models ─────────────────────────────────────────────
     sp_models = Dict{PricingSubproblemId,Any}()
-    sp_var_indices = Dict{
-        PricingSubproblemId,Vector{MOI.VariableIndex}
-    }()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
 
     for k in K
         sp_jump = Model(HiGHS.Optimizer)
         set_silent(sp_jump)
 
         @variable(sp_jump, z[t in T], Bin)
-        @constraint(
-            sp_jump,
-            sum(
-                inst.weight[k, t] * z[t] for t in T
-            ) <= inst.capacity[k]
-        )
-        @objective(
-            sp_jump,
-            Min,
-            sum(inst.cost[k, t] * z[t] for t in T)
-        )
+        @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k])
+        @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
 
         sp_models[PricingSubproblemId(k)] = backend(sp_jump)
-        sp_var_indices[PricingSubproblemId(k)] = [
-            index(z[t]) for t in T
-        ]
+        sp_var_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},
-        MOI.EqualTo{Float64}
-    }
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(
-        minimize=true
-    )
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(
-            builder,
-            PricingSubproblemId(k),
-            0.0,
-            0.0,
-            Float64(inst.multiplicity[k])
+            builder, PricingSubproblemId(k), 0.0, 0.0, Float64(inst.multiplicity[k])
         )
     end
 
     for k in K
         for t in T
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
-            add_sp_variable!(
-                builder,
-                PricingSubproblemId(k),
-                sp_var,
-                inst.cost[k, t]
-            )
+            add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
             add_coupling_coefficient!(
-                builder,
-                PricingSubproblemId(k),
-                sp_var,
-                cstr_idx,
-                1.0
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
             )
-            add_mapping!(
-                builder,
-                (k, t),
-                PricingSubproblemId(k),
-                sp_var
-            )
+            add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
 
     for t in T
-        add_coupling_constraint!(
-            builder, index(assignment[t]), 1.0
-        )
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
     end
 
     decomp = build(builder)
@@ -496,12 +461,14 @@ function build_gap_identical_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 
@@ -561,7 +528,7 @@ function build_gap_with_penalty_context(
     # ── Build Decomposition ───────────────────────────────────────────
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -572,7 +539,9 @@ function build_gap_with_penalty_context(
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
             add_sp_variable!(builder, PricingSubproblemId(k), sp_var, gap.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
             add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
@@ -582,130 +551,6 @@ function build_gap_with_penalty_context(
         add_pure_master_variable!(builder, index(u[t]), inst.penalty[t], 0.0, 1.0, true)
         add_pure_master_coupling!(builder, index(u[t]), index(assignment[t]), 1.0)
     end
-
-    decomp = build(builder)
-
-    # ── Column pool ───────────────────────────────────────────────────
-    pool = ColumnPool()
-
-    # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
-
-    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
-
-    # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
-        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
-        Dict{TaggedCI,MOI.VariableIndex}(),
-        Dict{TaggedCI,MOI.VariableIndex}(),
-        config
-    )
-    ws = ColGenLoggerWorkspace(inner_ws)
-
-    return ws
-end
-
-function build_gap_with_penalty_card_context(
-    inst::GAPWithPenaltyCardInstance;
-    smoothing_alpha::Float64=0.0
-)
-    gap = inst.gap
-    K = 1:gap.n_machines
-    T = 1:gap.n_tasks
-
-    # ── Master model ──────────────────────────────────────────────────
-    master_jump = Model(HiGHS.Optimizer)
-    set_silent(master_jump)
-
-    @variable(master_jump, u[t in T], Bin)
-    @constraint(master_jump, assignment[t in T], 0 == 1)
-    @constraint(
-        master_jump, max_unassign, 0 <= inst.max_unassigned
-    )
-    @constraint(master_jump, conv_lb[k in K], 0 >= 0)
-    @constraint(master_jump, conv_ub[k in K], 0 <= 1)
-    @objective(master_jump, Min, sum(inst.penalty[t] * u[t] for t in T))
-
-    for t in T
-        set_normalized_coefficient(assignment[t], u[t], 1.0)
-        set_normalized_coefficient(max_unassign, u[t], 1.0)
-    end
-
-    master_model = backend(master_jump)
-
-    # ── Subproblem models ─────────────────────────────────────────────
-    sp_models = Dict{PricingSubproblemId,Any}()
-    sp_var_indices = Dict{
-        PricingSubproblemId,Vector{MOI.VariableIndex}
-    }()
-
-    for k in K
-        sp_jump = Model(HiGHS.Optimizer)
-        set_silent(sp_jump)
-
-        @variable(sp_jump, z[t in T], Bin)
-        @constraint(
-            sp_jump,
-            sum(gap.weight[k, t] * z[t] for t in T) <= gap.capacity[k]
-        )
-        @objective(
-            sp_jump,
-            Min,
-            sum(gap.cost[k, t] * z[t] for t in T)
-        )
-
-        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
-        sp_var_indices[PricingSubproblemId(k)] = [
-            index(z[t]) for t in T
-        ]
-    end
-
-    # ── Build Decomposition ───────────────────────────────────────────
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
-
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
-
-    for k in K
-        add_subproblem!(
-            builder, PricingSubproblemId(k), 0.0, 0.0, 1.0
-        )
-    end
-
-    for k in K
-        sp_id = PricingSubproblemId(k)
-        for t in T
-            sp_var = sp_var_indices[sp_id][t]
-            add_sp_variable!(
-                builder, sp_id, sp_var, gap.cost[k, t]
-            )
-            add_coupling_coefficient!(
-                builder, sp_id, sp_var, index(assignment[t]), 1.0
-            )
-            add_mapping!(builder, (k, t), sp_id, sp_var)
-        end
-    end
-
-    for t in T
-        add_coupling_constraint!(
-            builder, index(assignment[t]), 1.0
-        )
-        add_pure_master_variable!(
-            builder, index(u[t]), inst.penalty[t], 0.0, 1.0, true
-        )
-        add_pure_master_coupling!(
-            builder, index(u[t]), index(assignment[t]), 1.0
-        )
-        add_pure_master_coupling!(
-            builder, index(u[t]), index(max_unassign), 1.0
-        )
-    end
-    add_coupling_constraint!(
-        builder, index(max_unassign), Float64(inst.max_unassigned)
-    )
 
     decomp = build(builder)
 
@@ -723,12 +568,112 @@ function build_gap_with_penalty_card_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
+    )
+    ws = ColGenLoggerWorkspace(inner_ws)
+
+    return ws
+end
+
+function build_gap_with_penalty_card_context(
+    inst::GAPWithPenaltyCardInstance; smoothing_alpha::Float64=0.0
+)
+    gap = inst.gap
+    K = 1:gap.n_machines
+    T = 1:gap.n_tasks
+
+    # ── Master model ──────────────────────────────────────────────────
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+
+    @variable(master_jump, u[t in T], Bin)
+    @constraint(master_jump, assignment[t in T], 0 == 1)
+    @constraint(master_jump, max_unassign, 0 <= inst.max_unassigned)
+    @constraint(master_jump, conv_lb[k in K], 0 >= 0)
+    @constraint(master_jump, conv_ub[k in K], 0 <= 1)
+    @objective(master_jump, Min, sum(inst.penalty[t] * u[t] for t in T))
+
+    for t in T
+        set_normalized_coefficient(assignment[t], u[t], 1.0)
+        set_normalized_coefficient(max_unassign, u[t], 1.0)
+    end
+
+    master_model = backend(master_jump)
+
+    # ── Subproblem models ─────────────────────────────────────────────
+    sp_models = Dict{PricingSubproblemId,Any}()
+    sp_var_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
+
+    for k in K
+        sp_jump = Model(HiGHS.Optimizer)
+        set_silent(sp_jump)
+
+        @variable(sp_jump, z[t in T], Bin)
+        @constraint(sp_jump, sum(gap.weight[k, t] * z[t] for t in T) <= gap.capacity[k])
+        @objective(sp_jump, Min, sum(gap.cost[k, t] * z[t] for t in T))
+
+        sp_models[PricingSubproblemId(k)] = backend(sp_jump)
+        sp_var_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
+    end
+
+    # ── Build Decomposition ───────────────────────────────────────────
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
+
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
+
+    for k in K
+        add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
+    end
+
+    for k in K
+        sp_id = PricingSubproblemId(k)
+        for t in T
+            sp_var = sp_var_indices[sp_id][t]
+            add_sp_variable!(builder, sp_id, sp_var, gap.cost[k, t])
+            add_coupling_coefficient!(builder, sp_id, sp_var, index(assignment[t]), 1.0)
+            add_mapping!(builder, (k, t), sp_id, sp_var)
+        end
+    end
+
+    for t in T
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
+        add_pure_master_variable!(builder, index(u[t]), inst.penalty[t], 0.0, 1.0, true)
+        add_pure_master_coupling!(builder, index(u[t]), index(assignment[t]), 1.0)
+        add_pure_master_coupling!(builder, index(u[t]), index(max_unassign), 1.0)
+    end
+    add_coupling_constraint!(builder, index(max_unassign), Float64(inst.max_unassigned))
+
+    decomp = build(builder)
+
+    # ── Column pool ───────────────────────────────────────────────────
+    pool = ColumnPool()
+
+    # ── Convexity constraint indices ──────────────────────────────────
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
+
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
+
+    # ── Build context ─────────────────────────────────────────────────
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 
@@ -744,9 +689,7 @@ assignment constraint. This creates a scenario where `y` has nonzero
 reduced cost at optimality, exposing the pure_master_contrib double-counting bug
 in `compute_dual_bound`.
 """
-function build_gap_with_pure_master_context(
-    inst::GAPInstance; smoothing_alpha::Float64=0.0
-)
+function build_gap_with_pure_master_context(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -766,16 +709,12 @@ function build_gap_with_pure_master_context(
     MOI.add_constraint(master_model, y, MOI.GreaterThan(0.0))
     MOI.add_constraint(master_model, y, MOI.LessThan(1.0))
 
-    MOI.modify(
-        master_model,
-        index(assignment[1]),
-        MOI.ScalarCoefficientChange(y, 1.0)
-    )
+    MOI.modify(master_model, index(assignment[1]), MOI.ScalarCoefficientChange(y, 1.0))
 
     MOI.modify(
         master_model,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-        MOI.ScalarCoefficientChange(y, 2.0)
+        MOI.ScalarCoefficientChange(y, 2.0),
     )
 
     # ── Subproblem models ─────────────────────────────────────────────
@@ -787,10 +726,7 @@ function build_gap_with_pure_master_context(
         set_silent(sp_jump)
 
         @variable(sp_jump, z[t in T], Bin)
-        @constraint(
-            sp_jump,
-            sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k]
-        )
+        @constraint(sp_jump, sum(inst.weight[k, t] * z[t] for t in T) <= inst.capacity[k])
         @objective(sp_jump, Min, sum(inst.cost[k, t] * z[t] for t in T))
 
         sp_models[PricingSubproblemId(k)] = backend(sp_jump)
@@ -798,11 +734,9 @@ function build_gap_with_pure_master_context(
     end
 
     # ── Build Decomposition ───────────────────────────────────────────
-    CstrId = MOI.ConstraintIndex{
-        MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
-    }
+    CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=true)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -811,9 +745,7 @@ function build_gap_with_pure_master_context(
     for k in K
         for t in T
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
-            add_sp_variable!(
-                builder, PricingSubproblemId(k), sp_var, inst.cost[k, t]
-            )
+            add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
             add_coupling_coefficient!(
                 builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
@@ -845,12 +777,14 @@ function build_gap_with_pure_master_context(
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 
@@ -871,12 +805,12 @@ function gap_fenchel_instance()
     J = 10
     # cost[j, m]: rows = tasks, cols = machines
     c = [
-        10.13 15.6  15.54 13.41 17.08;
-        19.58 16.83 10.75 15.8  14.89;
+        10.13 15.6 15.54 13.41 17.08;
+        19.58 16.83 10.75 15.8 14.89;
         14.23 17.36 16.05 14.49 18.96;
         16.47 16.38 18.14 15.46 11.64;
         17.87 18.25 13.12 19.16 16.33;
-        11.09 16.76 15.5  12.08 13.06;
+        11.09 16.76 15.5 12.08 13.06;
         15.19 13.86 16.08 19.47 15.79;
         10.79 18.96 16.11 19.78 15.55;
         12.03 19.03 16.01 14.46 12.77;
@@ -889,14 +823,12 @@ function gap_fenchel_instance()
 end
 
 """
-    build_gap_fenchel_decomp(inst) -> DWReformulation
+    build_gap_fenchel_decomp(inst) -> DWDecomposition
 
 Build the Dantzig–Wolfe decomposition for a GAP-with-opening-costs
 instance suitable for Fenchel-cut testing.
 """
-function build_gap_fenchel_decomp(
-    inst::GAPInstanceWithOpeningCosts
-)
+function build_gap_fenchel_decomp(inst::GAPInstanceWithOpeningCosts)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -913,12 +845,8 @@ function build_gap_fenchel_decomp(
 
     # ── Subproblem models ─────────────────────────────────────────
     sp_models = Dict{PricingSubproblemId,Any}()
-    sp_x_indices = Dict{
-        PricingSubproblemId,Vector{MOI.VariableIndex}
-    }()
-    sp_y_indices = Dict{
-        PricingSubproblemId,MOI.VariableIndex
-    }()
+    sp_x_indices = Dict{PricingSubproblemId,Vector{MOI.VariableIndex}}()
+    sp_y_indices = Dict{PricingSubproblemId,MOI.VariableIndex}()
 
     for k in K
         sp_jump = Model(HiGHS.Optimizer)
@@ -926,82 +854,53 @@ function build_gap_fenchel_decomp(
 
         @variable(sp_jump, z[t in T], Bin)
         @variable(sp_jump, y, Bin)
-        @constraint(
-            sp_jump,
-            sum(
-                inst.weight[t] * z[t] for t in T
-            ) <= inst.capacity[k] * y
-        )
+        @constraint(sp_jump, sum(inst.weight[t] * z[t] for t in T) <= inst.capacity[k] * y)
         @objective(
-            sp_jump, Min,
-            sum(inst.cost[t, k] * z[t] for t in T) +
-                inst.opening_cost[k] * y
+            sp_jump, Min, sum(inst.cost[t, k] * z[t] for t in T) + inst.opening_cost[k] * y
         )
 
         sp_models[PricingSubproblemId(k)] = backend(sp_jump)
-        sp_x_indices[PricingSubproblemId(k)] = [
-            index(z[t]) for t in T
-        ]
+        sp_x_indices[PricingSubproblemId(k)] = [index(z[t]) for t in T]
         sp_y_indices[PricingSubproblemId(k)] = index(y)
     end
 
     # ── Build Decomposition ───────────────────────────────────────
     X = Tuple{Symbol,Int,Int}
-    builder = DWReformulationBuilder{X}(minimize=true)
+    builder = DWDecompositionBuilder{X}(; minimize=true)
 
     for k in K
-        add_subproblem!(
-            builder, PricingSubproblemId(k),
-            0.0, 0.0, 1.0
-        )
+        add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
     end
 
     for k in K
         sp_id = PricingSubproblemId(k)
         for t in T
             sp_var = sp_x_indices[sp_id][t]
-            add_sp_variable!(
-                builder, sp_id, sp_var, inst.cost[t, k]
-            )
+            add_sp_variable!(builder, sp_id, sp_var, inst.cost[t, k])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(
-                builder, sp_id, sp_var, cstr_idx, 1.0
-            )
-            add_mapping!(
-                builder, (:x, k, t), sp_id, sp_var
-            )
+            add_coupling_coefficient!(builder, sp_id, sp_var, cstr_idx, 1.0)
+            add_mapping!(builder, (:x, k, t), sp_id, sp_var)
         end
         y_var = sp_y_indices[sp_id]
-        add_sp_variable!(
-            builder, sp_id, y_var, inst.opening_cost[k]
-        )
+        add_sp_variable!(builder, sp_id, y_var, inst.opening_cost[k])
         add_mapping!(builder, (:y, k, 0), sp_id, y_var)
     end
 
     for t in T
-        add_coupling_constraint!(
-            builder, index(assignment[t]), 1.0
-        )
+        add_coupling_constraint!(builder, index(assignment[t]), 1.0)
     end
 
     decomp = build(builder)
 
     # ── Convexity constraint indices ──────────────────────────────
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
-        PricingSubproblemId(k) => TaggedCI(
-            index(conv_ub[k])
-        ) for k in K
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
     )
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
-        PricingSubproblemId(k) => TaggedCI(
-            index(conv_lb[k])
-        ) for k in K
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
     )
 
-    set_models!(
-        decomp, master_model, sp_models,
-        conv_ub_map, conv_lb_map
-    )
+    set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     return decomp
 end
@@ -1012,25 +911,22 @@ end
 Convenience CG-workspace builder atop [`build_gap_fenchel_decomp`](@ref).
 """
 function build_gap_fenchel_context(
-    inst::GAPInstanceWithOpeningCosts;
-    smoothing_alpha::Float64=0.0
+    inst::GAPInstanceWithOpeningCosts; smoothing_alpha::Float64=0.0
 )
     decomp = build_gap_fenchel_decomp(inst)
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, ColumnPool(),
-        Dict{TaggedCI,Tuple{
-            MOI.VariableIndex,MOI.VariableIndex
-        }}(),
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        ColumnPool(),
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     return ColGenLoggerWorkspace(inner_ws)
 end
 
-function build_gap_context_max(
-    inst::GAPInstance; smoothing_alpha::Float64=0.0
-)
+function build_gap_context_max(inst::GAPInstance; smoothing_alpha::Float64=0.0)
     K = 1:inst.n_machines
     T = 1:inst.n_tasks
 
@@ -1065,7 +961,7 @@ function build_gap_context_max(
     SpVar = MOI.VariableIndex
     CstrId = MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 
-    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=false)
+    builder = DWDecompositionBuilder{Tuple{Int,Int}}(; minimize=false)
 
     for k in K
         add_subproblem!(builder, PricingSubproblemId(k), 0.0, 0.0, 1.0)
@@ -1076,7 +972,9 @@ function build_gap_context_max(
             sp_var = sp_var_indices[PricingSubproblemId(k)][t]
             add_sp_variable!(builder, PricingSubproblemId(k), sp_var, inst.cost[k, t])
             cstr_idx = index(assignment[t])
-            add_coupling_coefficient!(builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0)
+            add_coupling_coefficient!(
+                builder, PricingSubproblemId(k), sp_var, cstr_idx, 1.0
+            )
             add_mapping!(builder, (k, t), PricingSubproblemId(k), sp_var)
         end
     end
@@ -1091,18 +989,24 @@ function build_gap_context_max(
     pool = ColumnPool()
 
     # ── Convexity constraint indices ──────────────────────────────────
-    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K)
-    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K)
+    conv_ub_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_ub[k])) for k in K
+    )
+    conv_lb_map = Dict{PricingSubproblemId,TaggedCI}(
+        PricingSubproblemId(k) => TaggedCI(index(conv_lb[k])) for k in K
+    )
 
     set_models!(decomp, master_model, sp_models, conv_ub_map, conv_lb_map)
 
     # ── Build context ─────────────────────────────────────────────────
-    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
-    inner_ws = ColGenWorkspace(decomp, pool,
+    config = ColGenConfig(; smoothing_alpha=smoothing_alpha)
+    inner_ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
     ws = ColGenLoggerWorkspace(inner_ws)
 

@@ -10,15 +10,11 @@ most fractional original variable (closest to 0.5). Returns
 `(orig_var, x_val)` or `(nothing, nothing)` if all are integral.
 """
 function most_fractional_original_variable(
-    ws,
-    primal_values::Dict{MOI.VariableIndex,Float64};
-    tol::Float64 = 1e-6
+    ws, primal_values::Dict{MOI.VariableIndex,Float64}; tol::Float64=1e-6
 )
     decomp = bp_decomp(ws)
     pool = bp_pool(ws)
-    x_values = project_to_original(
-        decomp, pool, v -> get(primal_values, v, 0.0)
-    )
+    x_values = project_to_original(decomp, pool, v -> get(primal_values, v, 0.0))
 
     best_var = nothing
     best_val = 0.0
@@ -26,7 +22,9 @@ function most_fractional_original_variable(
 
     for (orig_var, x_val) in x_values
         frac_part = x_val - floor(x_val)
-        (frac_part < tol || frac_part > 1.0 - tol) && continue
+        if (frac_part < tol || frac_part > 1.0 - tol)
+            continue
+        end
         dist = abs(frac_part - 0.5)
         if dist < best_dist
             best_dist = dist

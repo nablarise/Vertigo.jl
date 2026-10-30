@@ -10,12 +10,10 @@
 Enumerate all machine configurations h ∈ {0,1}^M such that
 h'Q >= total_weight (enough capacity to serve all tasks).
 """
-function _enumerate_feasible_configs(
-    Q::Vector{Float64}, total_weight::Float64
-)
+function _enumerate_feasible_configs(Q::Vector{Float64}, total_weight::Float64)
     M = length(Q)
     configs = Vector{Int}[]
-    for mask in 1:(2^M - 1)
+    for mask in 1:(2 ^ M - 1)
         h = [(mask >> (m - 1)) & 1 for m in 1:M]
         if sum(h[m] * Q[m] for m in 1:M) >= total_weight
             push!(configs, h)
@@ -31,32 +29,22 @@ Build a Fenchel cut separator for a GAP instance with opening
 costs. Enumerates feasible machine configurations once, then
 solves a dual separation LP at each call.
 """
-function _make_fenchel_separator(
-    inst::GAPInstanceWithOpeningCosts
-)
+function _make_fenchel_separator(inst::GAPInstanceWithOpeningCosts)
     M = inst.n_machines
     total_weight = sum(inst.weight)
-    configs = _enumerate_feasible_configs(
-        inst.capacity, total_weight
-    )
+    configs = _enumerate_feasible_configs(inst.capacity, total_weight)
 
     sep_model = Model(HiGHS.Optimizer)
     set_silent(sep_model)
     @variable(sep_model, ψ[1:M] >= 0)
     for h in configs
-        @constraint(
-            sep_model,
-            sum(ψ[m] * h[m] for m in 1:M) >= 1
-        )
+        @constraint(sep_model, sum(ψ[m] * h[m] for m in 1:M) >= 1)
     end
 
     return CustomCutSeparator(
         function (x)
             ȳ = [get(x, (:y, m, 0), 0.0) for m in 1:M]
-            @objective(
-                sep_model, Min,
-                sum(ȳ[m] * ψ[m] for m in 1:M)
-            )
+            @objective(sep_model, Min, sum(ȳ[m] * ψ[m] for m in 1:M))
             optimize!(sep_model)
             T = Tuple{Symbol,Int,Int}
             if termination_status(sep_model) != OPTIMAL
@@ -71,9 +59,7 @@ function _make_fenchel_separator(
                         coeffs[(:y, m, 0)] = v
                     end
                 end
-                return [SeparatedCut{T}(
-                    coeffs, MOI.GreaterThan(1.0)
-                )]
+                return [SeparatedCut{T}(coeffs, MOI.GreaterThan(1.0))]
             end
             return SeparatedCut{T}[]
         end
@@ -94,10 +80,7 @@ function test_fenchel_separation()
         set_silent(sep)
         @variable(sep, ψ[1:3] >= 0)
         for h in configs
-            @constraint(
-                sep,
-                sum(ψ[m] * h[m] for m in 1:3) >= 1
-            )
+            @constraint(sep, sum(ψ[m] * h[m] for m in 1:3) >= 1)
         end
 
         # Fractional solution: all machines half-open
@@ -131,16 +114,14 @@ function test_fenchel_cut_gap()
                 max_cut_rounds=20,
                 min_gap_improvement=0.0,
                 node_limit=1,
-                log_level=2
-            )
+                log_level=2,
+            ),
         )
         output = run_branch_and_price(bcp_ws)
 
         @test output.status in (:optimal, :node_limit)
         @test !isnothing(output.incumbent)
-        @test abs(
-            output.incumbent.obj_value - 440.55
-        ) <= 1e-2
+        @test abs(output.incumbent.obj_value - 440.55) <= 1e-2
     end
 end
 

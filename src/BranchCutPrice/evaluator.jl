@@ -17,12 +17,16 @@ function _rebuild_branching_constraints!(space::BranchCutPriceWorkspace)
         ov = space.branching_cut_info[cut_id]
         push!(bcs, ColGen.ActiveBranchingConstraint(ci, ov))
     end
-    return
+    return nothing
 end
 
 function _should_prune(space::BranchCutPriceWorkspace, db)::Bool
-    isnothing(space.incumbent) && return false
-    isnothing(db) && return false
+    if isnothing(space.incumbent)
+        return false
+    end
+    if isnothing(db)
+        return false
+    end
     if is_minimization(space.ws)
         return db >= space.incumbent.obj_value - space.tol
     end
@@ -32,7 +36,9 @@ end
 function _is_improving_incumbent(
     space::BranchCutPriceWorkspace, sol::ColGen.MasterIpPrimalSol
 )::Bool
-    isnothing(space.incumbent) && return true
+    if isnothing(space.incumbent)
+        return true
+    end
     if is_minimization(space.ws)
         return sol.obj_value < space.incumbent.obj_value - space.tol
     end
@@ -41,16 +47,12 @@ end
 
 function _set_incumbent_bound!(space::BranchCutPriceWorkspace)
     bp_set_ip_primal_bound!(
-        space.ws,
-        isnothing(space.incumbent) ?
-            nothing : space.incumbent.obj_value
+        space.ws, isnothing(space.incumbent) ? nothing : space.incumbent.obj_value
     )
-    return
+    return nothing
 end
 
-function TreeSearch.evaluate!(
-    ::BPEvaluator, space::BranchCutPriceWorkspace, node
-)
+function TreeSearch.evaluate!(::BPEvaluator, space::BranchCutPriceWorkspace, node)
     space.nodes_explored += 1
     delete!(space.open_node_bounds, node.id)
 
@@ -66,8 +68,7 @@ function TreeSearch.evaluate!(
 
     # Cut-and-column-generation loop
     while !stop_cutcolgen(
-        space.cutcolgen_ctx, round, nb_cuts,
-        cg_output.status, prev_lp, lp
+        space.cutcolgen_ctx, round, nb_cuts, cg_output.status, prev_lp, lp
     )
         prev_lp = lp
         round += 1
@@ -87,14 +88,12 @@ function TreeSearch.evaluate!(
         node.user_data = BPNodeData()
     end
     node.user_data.cg_output = cg_output
-    on_node_evaluated(
-        space.branching_strategy, space, node, cg_output
-    )
+    on_node_evaluated(space.branching_strategy, space, node, cg_output)
 
     # Infeasible node
     if cg_output.status == ColGen.master_infeasible ||
-       cg_output.status == ColGen.subproblem_infeasible ||
-       cg_output.status == ColGen.ip_pruned
+        cg_output.status == ColGen.subproblem_infeasible ||
+        cg_output.status == ColGen.ip_pruned
         _recompute_global_dual_bound!(space)
         return TreeSearch.CUTOFF
     end
@@ -125,8 +124,7 @@ function TreeSearch.evaluate!(
     # Restricted master IP heuristic
     if space.rmp_heuristic
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
-        if !isnothing(rmp_sol) &&
-                _is_improving_incumbent(space, rmp_sol)
+        if !isnothing(rmp_sol) && _is_improving_incumbent(space, rmp_sol)
             space.incumbent = rmp_sol
             _recompute_global_dual_bound!(space)
         end

@@ -89,23 +89,16 @@ struct _NodeLoggerEvaluator{E<:AbstractNodeEvaluator} <: AbstractNodeEvaluator
 end
 
 function evaluate!(
-    wrapper::_NodeLoggerEvaluator, space::AbstractSearchSpace,
-    node::SearchNode
+    wrapper::_NodeLoggerEvaluator, space::AbstractSearchSpace, node::SearchNode
 )
     if wrapper.log_level >= 2
-        _print_verbose_banner(
-            wrapper.space, node, wrapper.start_time
-        )
+        _print_verbose_banner(wrapper.space, node, wrapper.start_time)
     end
     status = evaluate!(wrapper.inner, space, node)
     if wrapper.log_level >= 2
-        _print_verbose_node_footer(
-            wrapper.space, node, status, wrapper.start_time
-        )
+        _print_verbose_node_footer(wrapper.space, node, status, wrapper.start_time)
     else
-        _print_ts_row(
-            wrapper.space, node, status, wrapper.start_time
-        )
+        _print_ts_row(wrapper.space, node, status, wrapper.start_time)
     end
     return status
 end
@@ -128,8 +121,12 @@ function _fmt_elapsed(start_time)
 end
 
 function _fmt_bound_verbose(x)
-    isnothing(x) && return "N/A"
-    isinf(x) && return x < 0 ? "-1e+12" : "1e+06"
+    if isnothing(x)
+        return "N/A"
+    end
+    if isinf(x)
+        return x < 0 ? "-1e+12" : "1e+06"
+    end
     return string(round(x; digits=6))
 end
 
@@ -138,8 +135,7 @@ function _print_verbose_banner(space, node, start_time)
     if is_root(node)
         println("**** BaB tree root node")
     else
-        @printf("**** BaB tree node %d (depth %d)\n",
-            node.id, node.depth)
+        @printf("**** BaB tree node %d (depth %d)\n", node.id, node.depth)
         desc = ts_branching_description(space, node)
         if !isnothing(desc)
             println("**** Branching constraint: ", desc)
@@ -148,18 +144,25 @@ function _print_verbose_banner(space, node, start_time)
     db = ts_best_dual_bound(space)
     inc = ts_incumbent_value(space)
     elapsed = _fmt_elapsed(start_time)
-    @printf("**** Local DB = %s, global bounds : [ %s , %s ], TIME = %s\n",
+    @printf(
+        "**** Local DB = %s, global bounds : [ %s , %s ], TIME = %s\n",
         _fmt_bound_verbose(db),
         _fmt_bound_verbose(db),
         _fmt_bound_verbose(inc),
-        elapsed)
+        elapsed
+    )
     open_n = ts_open_node_count(space)
     total_c = ts_total_columns(space)
     active_c = ts_active_columns(space)
     cuts = ts_total_cuts(space)
-    @printf("**** %d open nodes, %d columns (%d active), %d cuts\n",
-        open_n, total_c, active_c, cuts)
-    println(_VERBOSE_SEP)
+    @printf(
+        "**** %d open nodes, %d columns (%d active), %d cuts\n",
+        open_n,
+        total_c,
+        active_c,
+        cuts
+    )
+    return println(_VERBOSE_SEP)
 end
 
 function _print_verbose_node_footer(space, node, status, start_time)
@@ -168,11 +171,16 @@ function _print_verbose_node_footer(space, node, status, start_time)
     minimize = ts_is_minimization(space)
     elapsed = _fmt_elapsed(start_time)
     gap_str = _fmt_gap(db, inc, minimize)
-    @printf("**** Node %d done (%s) -- DB = %s, Inc = %s, Gap = %s, TIME = %s\n",
-        node.id, _fmt_node_status(status),
-        _fmt_bound_verbose(db), _fmt_bound_verbose(inc),
-        gap_str, elapsed)
-    println()
+    @printf(
+        "**** Node %d done (%s) -- DB = %s, Inc = %s, Gap = %s, TIME = %s\n",
+        node.id,
+        _fmt_node_status(status),
+        _fmt_bound_verbose(db),
+        _fmt_bound_verbose(inc),
+        gap_str,
+        elapsed
+    )
+    return println()
 end
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -184,38 +192,61 @@ const _TS_SEP = "  ------   -----   -------   -----------   -----------   ------
 
 _fmt_val(::Nothing) = "        N/A"
 function _fmt_val(x::Float64)
-    isinf(x) && return x < 0 ? "       -inf" : "        inf"
+    if isinf(x)
+        return x < 0 ? "       -inf" : "        inf"
+    end
     return @sprintf("%11.5e", x)
 end
 
 function _fmt_node_status(status::NodeStatus)
-    status == BRANCH  && return "BRANCH"
-    status == FEASIBLE && return "FEASBL"
+    if status == BRANCH
+        return "BRANCH"
+    end
+    if status == FEASIBLE
+        return "FEASBL"
+    end
     return "CUTOFF"
 end
 
 function _fmt_gap(db, inc, minimize::Bool)
-    isnothing(db) && return "     N/A"
-    isnothing(inc) && return "     N/A"
-    isinf(db) && return "     N/A"
-    isinf(inc) && return "     N/A"
+    if isnothing(db)
+        return "     N/A"
+    end
+    if isnothing(inc)
+        return "     N/A"
+    end
+    if isinf(db)
+        return "     N/A"
+    end
+    if isinf(inc)
+        return "     N/A"
+    end
     denom = abs(inc)
-    denom < 1e-10 && return "     N/A"
+    if denom < 1e-10
+        return "     N/A"
+    end
     gap = minimize ? (inc - db) / denom : (db - inc) / denom
     gap = abs(gap) * 100.0
     return @sprintf("%7.2f%%", gap)
 end
 
 function _print_ts_row(space, node, status, start_time)
-    db  = ts_best_dual_bound(space)
+    db = ts_best_dual_bound(space)
     inc = ts_incumbent_value(space)
     minimize = ts_is_minimization(space)
     cuts = ts_total_cuts(space)
     t = time() - start_time
-    @printf("  %6d   %5d   %-6s   %s   %s   %s   %4d   %8.2f\n",
-        node.id, node.depth, _fmt_node_status(status),
-        _fmt_val(db), _fmt_val(inc),
-        _fmt_gap(db, inc, minimize), cuts, t)
+    @printf(
+        "  %6d   %5d   %-6s   %s   %s   %s   %4d   %8.2f\n",
+        node.id,
+        node.depth,
+        _fmt_node_status(status),
+        _fmt_val(db),
+        _fmt_val(inc),
+        _fmt_gap(db, inc, minimize),
+        cuts,
+        t
+    )
 end
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -232,17 +263,15 @@ logging during tree search.
 - `space::S`: The search space.
 - `evaluator::E`: The node evaluator.
 """
-struct TreeSearchLoggerContext{
-    S<:AbstractSearchSpace,E<:AbstractNodeEvaluator
-}
+struct TreeSearchLoggerContext{S<:AbstractSearchSpace,E<:AbstractNodeEvaluator}
     space::S
     evaluator::E
     log_level::Int
 end
 
-function TreeSearchLoggerContext(space::S, evaluator::E) where {
-    S<:AbstractSearchSpace,E<:AbstractNodeEvaluator
-}
+function TreeSearchLoggerContext(
+    space::S, evaluator::E
+) where {S<:AbstractSearchSpace,E<:AbstractNodeEvaluator}
     return TreeSearchLoggerContext{S,E}(space, evaluator, 1)
 end
 
@@ -256,18 +285,13 @@ end
 Run tree search with VERTIGO-styled per-node logging.
 Prints a header, delegates to the 3-arg `search`, then prints a footer.
 """
-function search(
-    strategy::AbstractSearchStrategy,
-    ctx::TreeSearchLoggerContext
-)
+function search(strategy::AbstractSearchStrategy, ctx::TreeSearchLoggerContext)
     start_time = time()
     if ctx.log_level <= 1
         println(_TS_HDR)
         println(_TS_SEP)
     end
-    wrapper = _NodeLoggerEvaluator(
-        ctx.evaluator, ctx.space, start_time, ctx.log_level
-    )
+    wrapper = _NodeLoggerEvaluator(ctx.evaluator, ctx.space, start_time, ctx.log_level)
     result = search(strategy, ctx.space, wrapper)
     _print_ts_footer(ctx.space, start_time, ctx.log_level)
     return result
@@ -280,7 +304,7 @@ end
 function _print_ts_footer(space, start_time, log_level::Int=1)
     t = time() - start_time
     msg = ts_search_status_message(space)
-    db  = ts_best_dual_bound(space)
+    db = ts_best_dual_bound(space)
     inc = ts_incumbent_value(space)
     minimize = ts_is_minimization(space)
     nodes = ts_nodes_explored(space)
@@ -289,19 +313,30 @@ function _print_ts_footer(space, start_time, log_level::Int=1)
         elapsed = _fmt_elapsed(start_time)
         println(_VERBOSE_SEP)
         @printf("**** %s\n", msg)
-        @printf("**** DB = %s, Inc = %s, Gap = %s, Nodes = %d, Cuts = %d, TIME = %s\n",
+        @printf(
+            "**** DB = %s, Inc = %s, Gap = %s, Nodes = %d, Cuts = %d, TIME = %s\n",
             _fmt_bound_verbose(db),
             _fmt_bound_verbose(inc),
             _fmt_gap(db, inc, minimize),
-            nodes, cuts, elapsed)
+            nodes,
+            cuts,
+            elapsed
+        )
         println(_VERBOSE_SEP)
     else
         inc_str = isnothing(inc) ? "N/A" : @sprintf("%.3e", inc)
-        db_str  = isnothing(db)  ? "N/A" : @sprintf("%.3e", db)
+        db_str = isnothing(db) ? "N/A" : @sprintf("%.3e", db)
         gap_str = _fmt_gap(db, inc, minimize)
         println()
         @printf("[STATUS] :: %s\n", msg)
-        @printf("[RESULT] :: Incumbent: %s | Dual: %s | Gap: %s | Nodes: %d | Cuts: %d | Time: %.1fs\n",
-            inc_str, db_str, gap_str, nodes, cuts, t)
+        @printf(
+            "[RESULT] :: Incumbent: %s | Dual: %s | Gap: %s | Nodes: %d | Cuts: %d | Time: %.1fs\n",
+            inc_str,
+            db_str,
+            gap_str,
+            nodes,
+            cuts,
+            t
+        )
     end
 end

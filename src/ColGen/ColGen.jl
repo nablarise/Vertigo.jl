@@ -9,8 +9,8 @@ using MathOptInterface
 const MOI = MathOptInterface
 using Printf
 
-using ..Reformulation
-import ..Reformulation: is_minimization
+using ..Decomposition
+import ..Decomposition: is_minimization
 
 # ColGen alias: coluna.jl calls ColGen.get_dual_bound(...) and ColGen.run!(...)
 const ColGen = @__MODULE__
@@ -51,7 +51,8 @@ include("logger.jl")
 # Context and solver entry point
 export ColGenConfig, ColGenWorkspace, ColGenLoggerWorkspace
 export run_col_gen, run_column_generation, ColGenOutput
-export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
+export ColGenStatus,
+    optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
 export CGPhase, Phase0, Phase1, Phase2
 export WentgesSmoothing, NoStabilization
 

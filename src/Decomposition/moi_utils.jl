@@ -39,18 +39,10 @@ solution before calling this function.
 """
 function get_dual_solution(model)
     result = Dict{TaggedCI,Float64}()
-    sense = MOI.get(
-        model, MOI.ObjectiveSense()
-    ) == MOI.MAX_SENSE ? -1 : 1
-    for (F, S) in MOI.get(
-        model, MOI.ListOfConstraintTypesPresent()
-    )
-        for ci in MOI.get(
-            model, MOI.ListOfConstraintIndices{F,S}()
-        )
-            dual_val = sense * MOI.get(
-                model, MOI.ConstraintDual(), ci
-            )
+    sense = MOI.get(model, MOI.ObjectiveSense()) == MOI.MAX_SENSE ? -1 : 1
+    for (F, S) in MOI.get(model, MOI.ListOfConstraintTypesPresent())
+        for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+            dual_val = sense * MOI.get(model, MOI.ConstraintDual(), ci)
             if abs(dual_val) > ZERO_TOL
                 result[TaggedCI(ci)] = dual_val
             end

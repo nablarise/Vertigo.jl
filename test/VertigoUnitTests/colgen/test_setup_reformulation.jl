@@ -4,12 +4,11 @@
 
 # Helper: read a variable's objective coefficient from the MOI model.
 function _obj_coeff(model, var::MOI.VariableIndex)
-    obj = MOI.get(
-        model,
-        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-    )
+    obj = MOI.get(model, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}())
     for term in obj.terms
-        term.variable == var && return term.coefficient
+        if term.variable == var
+            return term.coefficient
+        end
     end
     return 0.0
 end
@@ -33,10 +32,7 @@ No actual subproblem models are needed.
 """
 function build_phase_test_context()
     model = MOI.Utilities.CachingOptimizer(
-        MOI.Utilities.UniversalFallback(
-            MOI.Utilities.Model{Float64}()
-        ),
-        HiGHS.Optimizer()
+        MOI.Utilities.UniversalFallback(MOI.Utilities.Model{Float64}()), HiGHS.Optimizer()
     )
     MOI.set(model, MOI.Silent(), true)
     MOI.set(model, MOI.ObjectiveSense(), MOI.MIN_SENSE)
@@ -61,63 +57,60 @@ function build_phase_test_context()
     c1 = MOI.add_constraint(
         model,
         MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(1.0, λ1),
-             MOI.ScalarAffineTerm(1.0, λ2),
-             MOI.ScalarAffineTerm(1.0, y_cont),
-             MOI.ScalarAffineTerm(1.0, y_int)],
-            0.0
+            [
+                MOI.ScalarAffineTerm(1.0, λ1),
+                MOI.ScalarAffineTerm(1.0, λ2),
+                MOI.ScalarAffineTerm(1.0, y_cont),
+                MOI.ScalarAffineTerm(1.0, y_int),
+            ],
+            0.0,
         ),
-        MOI.EqualTo(1.0)
+        MOI.EqualTo(1.0),
     )
 
     # c2: λ₁ + λ₂ <= 2 (convexity UB)
     c2 = MOI.add_constraint(
         model,
         MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(1.0, λ1),
-             MOI.ScalarAffineTerm(1.0, λ2)],
-            0.0
+            [MOI.ScalarAffineTerm(1.0, λ1), MOI.ScalarAffineTerm(1.0, λ2)], 0.0
         ),
-        MOI.LessThan(2.0)
+        MOI.LessThan(2.0),
     )
 
     # c3: 0 >= 0 (convexity LB)
     c3 = MOI.add_constraint(
         model,
-        MOI.ScalarAffineFunction(
-            MOI.ScalarAffineTerm{Float64}[], 0.0
-        ),
-        MOI.GreaterThan(0.0)
+        MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+        MOI.GreaterThan(0.0),
     )
 
     # Objective: 5 λ₁ + 8 λ₂ + 3.5 y_cont + 7 y_int
-    MOI.set(model,
+    MOI.set(
+        model,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
         MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(5.0, λ1),
-             MOI.ScalarAffineTerm(8.0, λ2),
-             MOI.ScalarAffineTerm(3.5, y_cont),
-             MOI.ScalarAffineTerm(7.0, y_int)],
-            0.0
-        )
+            [
+                MOI.ScalarAffineTerm(5.0, λ1),
+                MOI.ScalarAffineTerm(8.0, λ2),
+                MOI.ScalarAffineTerm(3.5, y_cont),
+                MOI.ScalarAffineTerm(7.0, y_int),
+            ],
+            0.0,
+        ),
     )
 
     # Decomposition with pure master variables (no real subproblem).
     SpVar = MOI.VariableIndex
     CstrEq = typeof(c1)
-    builder = DWReformulationBuilder{Nothing}(minimize=true)
+    builder = DWDecompositionBuilder{Nothing}(; minimize=true)
 
     add_subproblem!(builder, PricingSubproblemId(1), 0.0, 0.0, 2.0)
     add_coupling_constraint!(builder, c1, 1.0)
 
-    add_pure_master_variable!(
-        builder, y_cont, 3.5, 0.0, 10.0, false
-    )
+    add_pure_master_variable!(builder, y_cont, 3.5, 0.0, 10.0, false)
     add_pure_master_coupling!(builder, y_cont, c1, 1.0)
 
-    add_pure_master_variable!(
-        builder, y_int, 7.0, 0.0, 5.0, true
-    )
+    add_pure_master_variable!(builder, y_int, 7.0, 0.0, 5.0, true)
     add_pure_master_coupling!(builder, y_int, c1, 1.0)
 
     decomp = build(builder)
@@ -126,8 +119,8 @@ function build_phase_test_context()
     pool = ColumnPool()
     sp_var_dummy = MOI.VariableIndex(9999)
     sp1 = PricingSubproblemId(1)
-    sol1 = Vertigo.Reformulation._SpSolution(sp1, 5.0, [(sp_var_dummy, 1.0)])
-    sol2 = Vertigo.Reformulation._SpSolution(sp1, 8.0, [(sp_var_dummy, 1.0)])
+    sol1 = Vertigo.Decomposition._SpSolution(sp1, 5.0, [(sp_var_dummy, 1.0)])
+    sol2 = Vertigo.Decomposition._SpSolution(sp1, 8.0, [(sp_var_dummy, 1.0)])
     record_column!(pool, λ1, sp1, sol1, 5.0)
     record_column!(pool, λ2, sp1, sol2, 8.0)
 
@@ -137,11 +130,13 @@ function build_phase_test_context()
     set_models!(decomp, model, Dict{PricingSubproblemId,Any}(), conv_ub, conv_lb)
 
     config = ColGenConfig()
-    ws = ColGenWorkspace(decomp, pool,
+    ws = ColGenWorkspace(
+        decomp,
+        pool,
         Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
         Dict{TaggedCI,MOI.VariableIndex}(),
-        config
+        config,
     )
 
     return ws, (λ1=λ1, λ2=λ2, y_cont=y_cont, y_int=y_int)
@@ -154,18 +149,16 @@ function test_setup_reformulation_phase0_relaxes_integrality()
         ws, _ = build_phase_test_context()
         model = master_model(ws.decomp)
 
-        int_cis = MOI.get(model,
-            MOI.ListOfConstraintIndices{
-                MOI.VariableIndex,MOI.Integer
-            }())
+        int_cis = MOI.get(
+            model, MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Integer}()
+        )
         @test length(int_cis) == 1
 
         Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
-        int_cis2 = MOI.get(model,
-            MOI.ListOfConstraintIndices{
-                MOI.VariableIndex,MOI.Integer
-            }())
+        int_cis2 = MOI.get(
+            model, MOI.ListOfConstraintIndices{MOI.VariableIndex,MOI.Integer}()
+        )
         @test isempty(int_cis2)
 
         # Artificial variables were created for c1 (EqualTo)
@@ -225,9 +218,7 @@ function test_setup_reformulation_phase2_removes_art_vars()
 
         Vertigo.ColGen.setup_reformulation!(ws, Phase0())
 
-        n_art = length(ws.eq_art_vars) +
-                length(ws.leq_art_vars) +
-                length(ws.geq_art_vars)
+        n_art = length(ws.eq_art_vars) + length(ws.leq_art_vars) + length(ws.geq_art_vars)
         @test n_art > 0
 
         Vertigo.ColGen.setup_reformulation!(ws, Phase1())
@@ -287,5 +278,5 @@ function test_setup_reformulation()
     test_setup_reformulation_phase1_zeroes_costs()
     test_setup_reformulation_phase2_restores_costs()
     test_setup_reformulation_phase2_removes_art_vars()
-    test_setup_reformulation_full_sequence()
+    return test_setup_reformulation_full_sequence()
 end

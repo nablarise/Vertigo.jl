@@ -39,7 +39,8 @@ ws = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(...))
 output = run_branch_and_price(ws)
 ```
 """
-mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <: TreeSearch.AbstractSearchSpace
+mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <:
+               TreeSearch.AbstractSearchSpace
     ws::Ws
     backend::B
     domain_helper::MathOptState.DomainChangeTrackerHelper
@@ -78,13 +79,17 @@ domain/cut trackers on the master.
 """
 function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
     inner = ColGen.ColGenWorkspace(decomp, config.colgen)
-    cg_ws = config.cg_log_level > 0 ?
-        ColGen.ColGenLoggerWorkspace(inner; log_level=config.cg_log_level) :
+    cg_ws = if config.cg_log_level > 0
+        ColGen.ColGenLoggerWorkspace(inner; log_level=config.cg_log_level)
+    else
         inner
+    end
 
-    branching_ctx = config.log_level > 0 ?
-        BranchingLoggerContext(; log_level=config.log_level) :
+    branching_ctx = if config.log_level > 0
+        BranchingLoggerContext(; log_level=config.log_level)
+    else
         DefaultBranchingContext()
+    end
     effective_strategy = _branching_strategy_with_ctx(
         config.branching_strategy, branching_ctx
     )
@@ -96,11 +101,15 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
     cut_helper = MathOptState.transform_model!(cut_tracker, master)
 
     return BranchCutPriceWorkspace(
-        cg_ws, master, domain_helper,
-        cut_tracker, cut_helper,
+        cg_ws,
+        master,
+        domain_helper,
+        cut_tracker,
+        cut_helper,
         Dict{Int,Any}(),
         TreeSearch.NodeIdCounter(),
-        nothing, nothing,
+        nothing,
+        nothing,
         is_minimization(cg_ws) ? -Inf : Inf,
         Dict{Int,Float64}(),
         0,
@@ -115,7 +124,7 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
         effective_strategy,
         config.log_level,
         config.strategy,
-        config.dot_file
+        config.dot_file,
     )
 end
 
@@ -123,29 +132,16 @@ end
 # that hold a `BranchingContext`.
 _branching_strategy_with_ctx(s::AbstractBranchingStrategy, _) = s
 
-function _branching_strategy_with_ctx(
-    s::MultiPhaseStrongBranching, ctx::BranchingContext
-)
+function _branching_strategy_with_ctx(s::MultiPhaseStrongBranching, ctx::BranchingContext)
     return with_branching_ctx(s, ctx)
 end
 
 # ── TreeSearch interface ─────────────────────────────────────────────────
 
 function TreeSearch.new_root(space::BranchCutPriceWorkspace)
-    empty_fwd = (
-        MathOptState.DomainChangeDiff(),
-        MathOptState.LocalCutChangeDiff()
-    )
-    empty_bwd = (
-        MathOptState.DomainChangeDiff(),
-        MathOptState.LocalCutChangeDiff()
-    )
-    node = TreeSearch.root_node(
-        space.id_counter,
-        empty_fwd,
-        empty_bwd,
-        BPNodeData()
-    )
+    empty_fwd = (MathOptState.DomainChangeDiff(), MathOptState.LocalCutChangeDiff())
+    empty_bwd = (MathOptState.DomainChangeDiff(), MathOptState.LocalCutChangeDiff())
+    node = TreeSearch.root_node(space.id_counter, empty_fwd, empty_bwd, BPNodeData())
     space.open_node_bounds[node.id] = node.dual_bound
     return node
 end
@@ -165,40 +161,37 @@ function TreeSearch.output(space::BranchCutPriceWorkspace)
         :infeasible
     end
     return BPOutput(
-        status, space.incumbent,
-        space.best_dual_bound, space.nodes_explored,
-        space.root_lp_value
+        status,
+        space.incumbent,
+        space.best_dual_bound,
+        space.nodes_explored,
+        space.root_lp_value,
     )
 end
 
-function TreeSearch.transition!(
-    space::BranchCutPriceWorkspace, current, next
-)
+function TreeSearch.transition!(space::BranchCutPriceWorkspace, current, next)
     fwd!, bwd! = MathOptState.make_transition_callbacks(
         space.backend, (space.domain_helper, space.cut_helper)
     )
     TreeSearch.transition_to!(current, next, fwd!, bwd!)
-    return
+    return nothing
 end
 
 function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        space.best_dual_bound = is_minimization(space.ws) ?
-            -Inf : Inf
-        return
+        space.best_dual_bound = is_minimization(space.ws) ? -Inf : Inf
+        return nothing
     end
-    space.best_dual_bound = is_minimization(space.ws) ?
-        minimum(values(bounds)) : maximum(values(bounds))
-    return
+    space.best_dual_bound =
+        is_minimization(space.ws) ? minimum(values(bounds)) : maximum(values(bounds))
+    return nothing
 end
 
 function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     primal_values = get_primal_solution(space.backend)
 
-    result = select_branching_variable(
-        space.branching_strategy, space, node, primal_values
-    )
+    result = select_branching_variable(space.branching_strategy, space, node, primal_values)
     if result.status == all_integral
         return typeof(node)[]
     elseif result.status == node_infeasible
@@ -208,15 +201,13 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     x_val = result.value
 
     cg_output = node.user_data.cg_output
-    db = if isnothing(cg_output) ||
-            isnothing(cg_output.incumbent_dual_bound)
+    db = if isnothing(cg_output) || isnothing(cg_output.incumbent_dual_bound)
         node.dual_bound
     else
         cg_output.incumbent_dual_bound
     end
 
-    parent_lp = if !isnothing(node.user_data) &&
-                   !isnothing(node.user_data.cg_output)
+    parent_lp = if !isnothing(node.user_data) && !isnothing(node.user_data.cg_output)
         node.user_data.cg_output.master_lp_obj
     else
         nothing
@@ -224,8 +215,7 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     branching_frac = x_val - floor(x_val)
 
     children, cut_info = create_branching_children(
-        space.id_counter, node, orig_var, x_val,
-        space.ws, db, space.cut_tracker
+        space.id_counter, node, orig_var, x_val, space.ws, db, space.cut_tracker
     )
     for (cut_id, ov) in cut_info
         space.branching_cut_info[cut_id] = ov
@@ -249,7 +239,7 @@ function TreeSearch.on_feasible_solution!(
     ::BranchCutPriceWorkspace, ::TreeSearch.SearchNode
 )
     # Incumbent already updated in evaluate!
-    return
+    return nothing
 end
 
 # ── TreeSearch logger protocol ───────────────────────────────────────────
@@ -281,8 +271,7 @@ function TreeSearch.ts_search_status_message(s::BranchCutPriceWorkspace)
     if s.nodes_explored >= s.node_limit
         return "Node limit reached."
     end
-    return isnothing(inc) ? "No feasible solution found." :
-        "Search complete."
+    return isnothing(inc) ? "No feasible solution found." : "Search complete."
 end
 
 function TreeSearch.ts_open_node_count(s::BranchCutPriceWorkspace)
@@ -312,12 +301,18 @@ end
 function TreeSearch.ts_branching_description(
     s::BranchCutPriceWorkspace, node::TreeSearch.SearchNode
 )
-    TreeSearch.is_root(node) && return nothing
+    if TreeSearch.is_root(node)
+        return nothing
+    end
     _, cut_diff = node.local_forward_diff
-    isempty(cut_diff.add_cuts) && return nothing
+    if isempty(cut_diff.add_cuts)
+        return nothing
+    end
     cut = cut_diff.add_cuts[1].cut
     orig_var = get(s.branching_cut_info, cut.id, nothing)
-    isnothing(orig_var) && return nothing
+    if isnothing(orig_var)
+        return nothing
+    end
     if cut.set isa MOI.LessThan
         rhs = cut.set.upper
         return "$(orig_var) <= $(Int(rhs))"
@@ -342,9 +337,7 @@ function run_branch_and_price(ws::BranchCutPriceWorkspace)
         return TreeSearch.search(ws.strategy, dot_ctx)
     end
     if ws.log_level > 0
-        ts_ctx = TreeSearch.TreeSearchLoggerContext(
-            ws, evaluator, ws.log_level
-        )
+        ts_ctx = TreeSearch.TreeSearchLoggerContext(ws, evaluator, ws.log_level)
         return TreeSearch.search(ws.strategy, ts_ctx)
     end
     return TreeSearch.search(ws.strategy, ws, evaluator)

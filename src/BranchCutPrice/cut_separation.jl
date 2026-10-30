@@ -13,12 +13,16 @@ the column's subproblem solution.
 function _build_cut_saf(decomp, pool, master, cut)
     terms = MOI.ScalarAffineTerm{Float64}[]
     for (col_var, rec) in columns(pool)
-        MOI.is_valid(master, col_var) || continue
+        if !(MOI.is_valid(master, col_var))
+            continue
+        end
         sp_id = column_sp_id(rec)
         coeff = 0.0
         for (sp_var, val) in column_nonzero_entries(rec)
             ov = mapped_original_var(decomp, sp_id, sp_var)
-            ov === nothing && continue
+            if ov === nothing
+                continue
+            end
             c = get(cut.coefficients, ov, 0.0)
             if !iszero(c)
                 coeff += c * val
@@ -39,15 +43,10 @@ it in the CG context.
 """
 function _add_robust_cut!(space::BranchCutPriceWorkspace, cut::SeparatedCut)
     ws = space.ws
-    saf = _build_cut_saf(
-        bp_decomp(ws), bp_pool(ws), space.backend, cut
-    )
+    saf = _build_cut_saf(bp_decomp(ws), bp_pool(ws), space.backend, cut)
     ci = MOI.add_constraint(space.backend, saf, cut.set)
     tagged = TaggedCI(ci)
-    push!(
-        bp_robust_cuts(ws),
-        ColGen.ActiveRobustCut(tagged, cut.coefficients)
-    )
+    push!(bp_robust_cuts(ws), ColGen.ActiveRobustCut(tagged, cut.coefficients))
     return tagged
 end
 
@@ -60,15 +59,16 @@ and add them to the master. Returns the number of cuts added.
 function _separate_and_add_cuts!(
     space::BranchCutPriceWorkspace, cg_output::ColGen.ColGenOutput
 )::Int
-    isnothing(space.separator) && return 0
-    cg_output.status != ColGen.optimal && return 0
+    if isnothing(space.separator)
+        return 0
+    end
+    if cg_output.status != ColGen.optimal
+        return 0
+    end
     decomp = bp_decomp(space.ws)
     pool = bp_pool(space.ws)
     primal_cache = get_primal_solution(space.backend)
-    x = project_to_original(
-        decomp, pool,
-        v -> get(primal_cache, v, 0.0)
-    )
+    x = project_to_original(decomp, pool, v -> get(primal_cache, v, 0.0))
     cuts = separate(space.separator, x)
     for cut in cuts
         _add_robust_cut!(space, cut)

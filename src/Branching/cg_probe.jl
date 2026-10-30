@@ -9,11 +9,11 @@ CG probe: run column generation with limited iterations in both
 directions. Delegates to `run_sb_probe`.
 """
 function probe_candidate(
-    bctx::BranchingContext, phase::CGProbePhase, space,
-    candidate::BranchingCandidate, parent_lp::Float64
+    bctx::BranchingContext,
+    phase::CGProbePhase,
+    space,
+    candidate::BranchingCandidate,
+    parent_lp::Float64,
 )
-    return run_sb_probe(
-        bctx, phase, space, candidate,
-        phase.max_cg_iterations, parent_lp
-    )
+    return run_sb_probe(bctx, phase, space, candidate, phase.max_cg_iterations, parent_lp)
 end

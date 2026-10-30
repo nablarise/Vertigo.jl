@@ -24,8 +24,12 @@ end
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function _sb_delta(probe::SBProbeResult, parent_lp_obj::Float64)
-    probe.is_infeasible && return Inf
-    isnothing(probe.dual_bound) && return 0.0
+    if probe.is_infeasible
+        return Inf
+    end
+    if isnothing(probe.dual_bound)
+        return 0.0
+    end
     return max(0.0, probe.dual_bound - parent_lp_obj)
 end
 
@@ -38,8 +42,7 @@ Infeasible child → Δ = Inf.
 function sb_score(result::SBCandidateResult; mu::Float64=1.0/6.0)
     d_left = _sb_delta(result.left, result.parent_lp_obj)
     d_right = _sb_delta(result.right, result.parent_lp_obj)
-    return (1 - mu) * min(d_left, d_right) +
-           mu * max(d_left, d_right)
+    return (1 - mu) * min(d_left, d_right) + mu * max(d_left, d_right)
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -75,9 +78,7 @@ function add_branching_constraint!(backend, ws, terms, set, orig_var)
     f = MOI.ScalarAffineFunction(terms, 0.0)
     ci = MOI.add_constraint(backend, f, set)
     bcs = bp_branching_constraints(ws)
-    push!(bcs, ColGen.ActiveBranchingConstraint(
-        TaggedCI(ci), orig_var
-    ))
+    push!(bcs, ColGen.ActiveBranchingConstraint(TaggedCI(ci), orig_var))
     return ci
 end
 
@@ -94,7 +95,7 @@ function remove_branching_constraint!(backend, ws, ci)
     bcs = bp_branching_constraints(ws)
     tagged = TaggedCI(ci)
     filter!(bc -> bc.constraint_index != tagged, bcs)
-    return
+    return nothing
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -111,11 +112,11 @@ end
 
 function _capture_probe_state(ws, space)
     return (
-        max_iter = ColGen.max_cg_iterations(ws),
-        ip_inc = bp_ip_incumbent(ws),
-        ip_bound = bp_ip_primal_bound(ws),
-        bcs = copy(bp_branching_constraints(ws)),
-        basis = _try_capture_basis(space.backend),
+        max_iter=ColGen.max_cg_iterations(ws),
+        ip_inc=bp_ip_incumbent(ws),
+        ip_bound=bp_ip_primal_bound(ws),
+        bcs=copy(bp_branching_constraints(ws)),
+        basis=_try_capture_basis(space.backend),
     )
 end
 
@@ -129,9 +130,7 @@ function _restore_probe_state!(ws, space, snapshot)
     if !isnothing(snapshot.basis)
         try
             MathOptState.apply_change!(
-                space.backend,
-                MathOptState.LPBasisDiff(snapshot.basis),
-                nothing
+                space.backend, MathOptState.LPBasisDiff(snapshot.basis), nothing
             )
         catch
             # Basis restore failed (e.g., variable mismatch
@@ -139,7 +138,7 @@ function _restore_probe_state!(ws, space, snapshot)
             # Fall through — solver will re-solve from scratch.
         end
     end
-    return
+    return nothing
 end
 
 function _run_one_direction(space, candidate, set, max_cg_iter)
@@ -149,19 +148,16 @@ function _run_one_direction(space, candidate, set, max_cg_iter)
     pool = bp_pool(ws)
 
     terms = build_branching_terms(decomp, pool, candidate.orig_var)
-    ci = add_branching_constraint!(
-        backend, ws, terms, set, candidate.orig_var
-    )
+    ci = add_branching_constraint!(backend, ws, terms, set, candidate.orig_var)
     ColGen.set_max_cg_iterations!(ws, max_cg_iter)
 
     try
         cg_output = ColGen.run_column_generation(ws)
-        is_inf = cg_output.status == ColGen.master_infeasible ||
-                 cg_output.status == ColGen.subproblem_infeasible
+        is_inf =
+            cg_output.status == ColGen.master_infeasible ||
+            cg_output.status == ColGen.subproblem_infeasible
         return SBProbeResult(
-            cg_output.incumbent_dual_bound,
-            cg_output.master_lp_obj,
-            is_inf
+            cg_output.incumbent_dual_bound, cg_output.master_lp_obj, is_inf
         )
     finally
         remove_branching_constraint!(backend, ws, ci)
@@ -178,33 +174,28 @@ around both probes. Returns `SBCandidateResult`.
 """
 function run_sb_probe(
     bctx::BranchingContext,
-    phase::AbstractBranchingPhase, space,
+    phase::AbstractBranchingPhase,
+    space,
     candidate::BranchingCandidate,
-    max_cg_iterations::Int, parent_lp_obj::Float64
+    max_cg_iterations::Int,
+    parent_lp_obj::Float64,
 )
     snapshot = _capture_probe_state(space.ws, space)
     try
         before_probe(bctx, phase, candidate, :left)
         left = _run_one_direction(
-            space, candidate,
-            MOI.LessThan(candidate.floor_val),
-            max_cg_iterations
+            space, candidate, MOI.LessThan(candidate.floor_val), max_cg_iterations
         )
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
         _restore_probe_state!(space.ws, space, snapshot)
         before_probe(bctx, phase, candidate, :right)
         right = _run_one_direction(
-            space, candidate,
-            MOI.GreaterThan(candidate.ceil_val),
-            max_cg_iterations
+            space, candidate, MOI.GreaterThan(candidate.ceil_val), max_cg_iterations
         )
         after_probe(bctx, phase, candidate, :right, right)
-        return SBCandidateResult(
-            candidate, parent_lp_obj, left, right
-        )
+        return SBCandidateResult(candidate, parent_lp_obj, left, right)
     finally
         _restore_probe_state!(space.ws, space, snapshot)
     end
 end
-

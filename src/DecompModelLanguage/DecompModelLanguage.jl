@@ -5,26 +5,25 @@
 """
     DML — Decomposition Modeling Language
 
-High-level annotation-based syntax for Dantzig-Wolfe decomposition.
+High-level declarative syntax for Dantzig-Wolfe decomposition.
 Partitions a JuMP model into master + subproblems and builds a
-`DWReformulation` automatically.
+`DWDecomposition` automatically.
 """
 module DML
 
 using JuMP
 using MathOptInterface
 const MOI = MathOptInterface
-using ..Reformulation
+using ..Decomposition
 
-include("annotations.jl")
-include("indexes.jl")
-include("partition.jl")
-include("models.jl")
-include("bridge.jl")
-include("macro.jl")
+include("UserProblemDescription.jl")
+include("Checker.jl")
+include("Mappings.jl")
+include("Transition.jl")
+include("DantzigWolfe.jl")
 
-export @dantzig_wolfe
 export dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export MasterProblemUserDescription, SubproblemUserDescription
+export MasterProblemOptions, SubproblemOptions
 
 end # module DML

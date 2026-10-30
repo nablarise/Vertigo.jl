@@ -25,25 +25,26 @@ for the next depth level. Nodes are transferred between queues when the
 current level is exhausted or the beam width is reached.
 """
 mutable struct BeamSearchContainer{N}
-    current_queue::PriorityQueue{N, Float64}
-    next_queue::PriorityQueue{N, Float64}
+    current_queue::PriorityQueue{N,Float64}
+    next_queue::PriorityQueue{N,Float64}
     nodes_at_current_depth::Int
     max_width::Int
 end
 
 function init_container(strategy::BeamSearchStrategy, root::SearchNode)
     N = typeof(root)
-    current = PriorityQueue{N, Float64}()
-    next = PriorityQueue{N, Float64}()
+    current = PriorityQueue{N,Float64}()
+    next = PriorityQueue{N,Float64}()
     enqueue!(current, root, get_priority(strategy.inner_strategy, root))
     return BeamSearchContainer{N}(current, next, 0, strategy.max_width)
 end
 
 function select_node!(strategy::BeamSearchStrategy, container::BeamSearchContainer)
     # If current queue is exhausted or beam width reached, swap queues
-    if isempty(container.current_queue) || container.nodes_at_current_depth >= container.max_width
+    if isempty(container.current_queue) ||
+        container.nodes_at_current_depth >= container.max_width
         container.current_queue = container.next_queue
-        container.next_queue = PriorityQueue{keytype(container.current_queue), Float64}()
+        container.next_queue = PriorityQueue{keytype(container.current_queue),Float64}()
         container.nodes_at_current_depth = 0
     end
 
@@ -51,15 +52,18 @@ function select_node!(strategy::BeamSearchStrategy, container::BeamSearchContain
     return dequeue!(container.current_queue)
 end
 
-function insert_node!(strategy::BeamSearchStrategy, container::BeamSearchContainer, node::SearchNode)
+function insert_node!(
+    strategy::BeamSearchStrategy, container::BeamSearchContainer, node::SearchNode
+)
     enqueue!(container.next_queue, node, get_priority(strategy.inner_strategy, node))
-    return
+    return nothing
 end
 
 function is_empty_container(container::BeamSearchContainer)
     # The current level is exhausted if it's empty or the beam width has been reached.
     # If so, only the next level matters.
-    exhausted_current = isempty(container.current_queue) ||
-                        container.nodes_at_current_depth >= container.max_width
+    exhausted_current =
+        isempty(container.current_queue) ||
+        container.nodes_at_current_depth >= container.max_width
     return exhausted_current && isempty(container.next_queue)
 end

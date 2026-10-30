@@ -14,7 +14,7 @@ abstract type AbstractCutSeparator end
     SeparatedCut{X}
 
 A robust cut expressed as a linear function of original variables.
-`X` is the original variable key type (matching `DWReformulation{X}`).
+`X` is the original variable key type (matching `DWDecomposition{X}`).
 
 # Fields
 - `coefficients`: mapping from original variable to coefficient.
@@ -22,11 +22,7 @@ A robust cut expressed as a linear function of original variables.
 """
 struct SeparatedCut{X}
     coefficients::Dict{X,Float64}
-    set::Union{
-        MOI.LessThan{Float64},
-        MOI.GreaterThan{Float64},
-        MOI.EqualTo{Float64}
-    }
+    set::Union{MOI.LessThan{Float64},MOI.GreaterThan{Float64},MOI.EqualTo{Float64}}
 end
 
 """

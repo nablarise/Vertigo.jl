@@ -14,12 +14,11 @@ Returns a `ColGen.MasterIpPrimalSol` if a feasible IP solution
 is found, `nothing` otherwise.
 """
 function solve_restricted_master_ip!(
-    space::BranchCutPriceWorkspace,
-    cg_output::ColGen.ColGenOutput
+    space::BranchCutPriceWorkspace, cg_output::ColGen.ColGenOutput
 )
     if cg_output.status == ColGen.master_infeasible ||
-       cg_output.status == ColGen.subproblem_infeasible ||
-       cg_output.status == ColGen.ip_pruned
+        cg_output.status == ColGen.subproblem_infeasible ||
+        cg_output.status == ColGen.ip_pruned
         return nothing
     end
 
@@ -36,14 +35,14 @@ function solve_restricted_master_ip!(
     end
     for pmv in pure_master_variables(decomp)
         if pure_master_is_integer(decomp, pmv)
-            ci = MOI.add_constraint(
-                backend, pmv.id, MOI.Integer()
-            )
+            ci = MOI.add_constraint(backend, pmv.id, MOI.Integer())
             push!(int_cis, ci)
         end
     end
 
-    isempty(int_cis) && return nothing
+    if isempty(int_cis)
+        return nothing
+    end
 
     # Set time limit and solve MIP.
     MOI.set(backend, MOI.TimeLimitSec(), space.rmp_time_limit)
@@ -61,9 +60,7 @@ function solve_restricted_master_ip!(
             end
         end
         for pmv in pure_master_variables(decomp)
-            val = MOI.get(
-                backend, MOI.VariablePrimal(), pmv.id
-            )
+            val = MOI.get(backend, MOI.VariablePrimal(), pmv.id)
             if pure_master_is_integer(decomp, pmv)
                 if abs(val) > 0.5
                     push!(nz_int, (pmv.id, round(Int, val)))
@@ -75,9 +72,7 @@ function solve_restricted_master_ip!(
             end
         end
         if !isempty(nz_int) || !isempty(nz_cont)
-            result = ColGen.MasterIpPrimalSol(
-                obj, nz_int, nz_cont
-            )
+            result = ColGen.MasterIpPrimalSol(obj, nz_int, nz_cont)
         end
     end
 
