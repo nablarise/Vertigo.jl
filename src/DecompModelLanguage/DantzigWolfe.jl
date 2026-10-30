@@ -153,25 +153,6 @@ function _create_reformulated_jump_models(model, master, subproblems, optimizer)
     return (; master_model, sp_models, var_mapping, constr_mapping)
 end
 
-# Builds the `DWDecomposition` of the original `model` from the JuMP models, and returns it
-# with the map from the identifiers of the subproblem descriptions to `PricingSubproblemId`.
-function _build_decomposition(model, master, subproblems, jump_models)
-    builder, sp_id_map = _fill_builder(model, master, subproblems, jump_models)
-
-    # A user-overridden subproblem has no model: the user installs a pricer.
-    sp_backends = Dict{PricingSubproblemId,Any}(
-        sp_id_map[sp.id] => (
-            if haskey(jump_models.sp_models, sp.id)
-                JuMP.backend(jump_models.sp_models[sp.id])
-            else
-                nothing
-            end
-        ) for sp in subproblems
-    )
-    decomp = build(builder, JuMP.backend(jump_models.master_model), sp_backends)
-    return (decomp, sp_id_map)
-end
-
 # Registers in a Decomposition builder what the original `model` and the mappings say about
 # the subproblems, the coupling constraints and the pure master variables. Returns the builder
 # and the map from the identifiers of the subproblem descriptions to `PricingSubproblemId`.
@@ -199,7 +180,7 @@ function _fill_builder(model, master, subproblems, jump_models)
     orig_obj = JuMP.objective_function(model)
     orig_costs = _extract_costs(orig_obj)
 
-    # Register subproblem variables and coupling coefficients
+    # Add the subproblem variables
     sp_var_index = _subproblem_variable_indices(
         sp_vars, var_mapping, user_overridden_sp_ids
     )
@@ -213,17 +194,35 @@ function _fill_builder(model, master, subproblems, jump_models)
         end
     end
 
-    # Register coupling constraints and coefficients
-    _register_coupling_data!(
-        builder, master_constrs, constr_mapping, sp_id_map, sp_var_index
-    )
+    # Add the coupling constraints and coefficients
+    _add_coupling_data!(builder, master_constrs, constr_mapping, sp_id_map, sp_var_index)
 
-    # Register pure master variables
-    _register_pure_master_data!(
+    # Add the pure master variables
+    _add_pure_master_data!(
         builder, master_vars, master_constrs, constr_mapping, var_mapping, orig_costs
     )
 
     return (builder, sp_id_map)
+end
+
+# Builds the `DWDecomposition` of the original `model` from the JuMP models, and returns it
+# with the map from the identifiers of the subproblem descriptions to `PricingSubproblemId`.
+function _build_decomposition(model, master, subproblems, jump_models)
+    builder, sp_id_map = _fill_builder(model, master, subproblems, jump_models)
+
+    # A user-overridden subproblem has no model: the user installs a pricer.
+    sp_backends = Dict{PricingSubproblemId,Any}(
+        sp_id_map[sp.id] => (
+            if haskey(jump_models.sp_models, sp.id)
+                JuMP.backend(jump_models.sp_models[sp.id])
+            else
+                nothing
+            end
+        ) for sp in subproblems
+    )
+
+    decomp = build(builder, JuMP.backend(jump_models.master_model), sp_backends)
+    return (decomp, sp_id_map)
 end
 
 # The variables or constraints in the order they were created in the JuMP model. The order
@@ -282,7 +281,7 @@ function _extract_costs(obj)
     return Dict{JuMP.VariableRef,Float64}()
 end
 
-function _register_coupling_data!(
+function _add_coupling_data!(
     builder, master_constrs, constr_mapping, sp_id_map, sp_var_index
 )
     for orig_constr in master_constrs
@@ -329,7 +328,7 @@ function _add_coupling_coefficient!(
     return add_coupling_coefficient!(builder, sp_id_map[user_id], moi_idx, cstr_moi, coeff)
 end
 
-function _register_pure_master_data!(
+function _add_pure_master_data!(
     builder, master_vars, master_constrs, constr_mapping, var_mapping, orig_costs
 )
     for orig_var in master_vars

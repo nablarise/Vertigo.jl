@@ -9,7 +9,7 @@ everything after it works on MathOptInterface models and indices.
     The DML and the internals are being reworked. The `@dantzig_wolfe` macro is not part of the
     build at the moment; it will be adapted to build the descriptions described below.
 
-## From the descriptions to the reformulation
+## From the descriptions to the decomposition
 
 ```text
 += the user's script ========================================================================+
