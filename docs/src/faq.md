@@ -21,12 +21,6 @@ Issue #76. A node whose solution is `FEASIBLE` while a gap remains ends the
 search instead of continuing. The examples reproducing both bugs are on the
 branch `debug/buggedexamples`.
 
-### Why does `examples/gap/runner.jl` fail?
-
-It calls `BranchCutPriceContext`, which was renamed
-`BranchCutPriceWorkspace`. Build the workspace with
-`BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(...))`.
-
 ## Using Vertigo
 
 ### Which variables and constraints go to the master?
