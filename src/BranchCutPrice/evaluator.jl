@@ -111,6 +111,15 @@ function TreeSearch.evaluate!(
         return TreeSearch.CUTOFF
     end
 
+    # The time ran out inside column generation: the master LP does not
+    # hold the last columns, so the node can be neither branched nor read.
+    # Its bound stays among the open ones and the search stops.
+    if cg_output.status == ColGen.time_limit
+        space.open_node_bounds[node.id] = node.dual_bound
+        _recompute_global_dual_bound!(space)
+        return TreeSearch.CUTOFF
+    end
+
     # Detect new IP-feasible solution from CG
     ip_sol = cg_output.ip_incumbent
     if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
@@ -123,7 +132,7 @@ function TreeSearch.evaluate!(
     end
 
     # Restricted master IP heuristic
-    if space.rmp_heuristic
+    if space.rmp_heuristic && !_time_is_up(space)
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
         if !isnothing(rmp_sol) &&
                 _is_improving_incumbent(space, rmp_sol)

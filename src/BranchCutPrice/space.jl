@@ -57,6 +57,8 @@ mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparato
     tol::Float64
     rmp_time_limit::Float64
     rmp_heuristic::Bool
+    time_limit::Float64
+    deadline::Float64      # absolute `time()` of the end of the search
     separator::S
     cutcolgen_ctx::CutColGenContext
     total_cuts_separated::Int
@@ -109,6 +111,8 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
         config.tol,
         config.rmp_time_limit,
         config.rmp_heuristic,
+        config.time_limit,
+        Inf,
         config.separator,
         CutColGenContext(config.max_cut_rounds, config.min_gap_improvement),
         0,
@@ -150,17 +154,28 @@ function TreeSearch.new_root(space::BranchCutPriceWorkspace)
     return node
 end
 
+_time_is_up(space::BranchCutPriceWorkspace) = time() >= space.deadline
+
 function TreeSearch.stop(space::BranchCutPriceWorkspace, _)
-    return space.nodes_explored >= space.node_limit
+    return space.nodes_explored >= space.node_limit || _time_is_up(space)
+end
+
+# Why a search that is not proven optimal has stopped.
+function _stop_status(space::BranchCutPriceWorkspace)
+    return _time_is_up(space) ? :time_limit : :node_limit
 end
 
 function TreeSearch.output(space::BranchCutPriceWorkspace)
     status = if !isnothing(space.incumbent)
         db = space.best_dual_bound
         ub = space.incumbent.obj_value
-        abs(ub - db) < space.tol ? :optimal : :node_limit
-    elseif space.nodes_explored >= space.node_limit
-        :node_limit
+        if abs(ub - db) < space.tol
+            :optimal
+        else
+            _stop_status(space)
+        end
+    elseif space.nodes_explored >= space.node_limit || _time_is_up(space)
+        _stop_status(space)
     else
         :infeasible
     end
@@ -336,6 +351,8 @@ end
 Run the branch-and-price algorithm described by `ws`.
 """
 function run_branch_and_price(ws::BranchCutPriceWorkspace)
+    ws.deadline = time() + ws.time_limit
+    ColGen.set_deadline!(ws.ws, ws.deadline)
     evaluator = BPEvaluator()
     if !isnothing(ws.dot_file)
         dot_ctx = BPDotLoggerContext(ws, evaluator, ws.dot_file)

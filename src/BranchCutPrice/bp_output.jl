@@ -8,7 +8,8 @@
 Result of a branch-and-price run.
 
 # Fields
-- `status::Symbol`: `:optimal`, `:infeasible`, or `:node_limit`.
+- `status::Symbol`: `:optimal`, `:infeasible`, `:node_limit` or
+  `:time_limit`.
 - `incumbent`: Best integer-feasible solution found, or `nothing`.
 - `best_dual_bound::Float64`: Best dual bound across all nodes.
 - `nodes_explored::Int`: Total number of nodes evaluated.

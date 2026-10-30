@@ -30,6 +30,10 @@ Cheap to construct, copy, and compare.
   (default: 0).
 - `min_gap_improvement::Float64`: Minimum relative gap improvement to
   continue cut rounds (default: 0.01).
+- `time_limit::Float64`: Wall-clock limit in seconds of the whole search
+  (default: `Inf`). It is checked between nodes and, through the column
+  generation workspace, between column generation iterations; the
+  restricted master heuristic gets at most the time left.
 - `branching_strategy`: Branching strategy
   (default: `MostFractionalBranching()`).
 - `log_level::Int`: BCP tree / branching logger verbosity (0 = off,
@@ -45,6 +49,7 @@ struct BranchCutPriceConfig
     tol::Float64
     rmp_time_limit::Float64
     rmp_heuristic::Bool
+    time_limit::Float64
     separator::Union{Nothing,AbstractCutSeparator}
     max_cut_rounds::Int
     min_gap_improvement::Float64
@@ -59,6 +64,7 @@ struct BranchCutPriceConfig
         tol::Float64 = 1e-6,
         rmp_time_limit::Float64 = 60.0,
         rmp_heuristic::Bool = true,
+        time_limit::Float64 = Inf,
         separator::Union{Nothing,AbstractCutSeparator} = nothing,
         max_cut_rounds::Int = 0,
         min_gap_improvement::Float64 = 0.01,
@@ -68,7 +74,7 @@ struct BranchCutPriceConfig
         dot_file::Union{Nothing,String} = nothing
     )
         new(colgen, cg_log_level, strategy, node_limit, tol,
-            rmp_time_limit, rmp_heuristic, separator, max_cut_rounds,
+            rmp_time_limit, rmp_heuristic, time_limit, separator, max_cut_rounds,
             min_gap_improvement, branching_strategy,
             log_level, dot_file)
     end

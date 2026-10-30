@@ -46,7 +46,10 @@ function solve_restricted_master_ip!(
     isempty(int_cis) && return nothing
 
     # Set time limit and solve MIP.
-    MOI.set(backend, MOI.TimeLimitSec(), space.rmp_time_limit)
+    time_left = max(space.deadline - time(), 0.0)
+    MOI.set(
+        backend, MOI.TimeLimitSec(), min(space.rmp_time_limit, time_left)
+    )
     MOI.optimize!(backend)
 
     result = nothing

@@ -54,7 +54,7 @@ export ColumnPool
 # Context and solver entry point
 export ColGenConfig, ColGenWorkspace, ColGenLoggerWorkspace
 export run_col_gen, run_column_generation, ColGenOutput
-export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned
+export ColGenStatus, optimal, master_infeasible, subproblem_infeasible, iteration_limit, ip_pruned, time_limit
 export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions
