@@ -46,6 +46,7 @@ include("test_cut_col_gen_e2e.jl")
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 include("test_time_limit_e2e.jl")
+include("test_artificial_vars_e2e.jl")
 include("test_dual_bound_e2e.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ function run()
     test_cut_col_gen_e2e()
     test_time_limit_e2e()
     test_dual_bound_e2e()
+    test_artificial_vars_e2e()
 end
 
 end # module VertigoE2eTests

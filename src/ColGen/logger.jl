@@ -46,6 +46,7 @@ new_output(O, lws::ColGenLoggerWorkspace, args...)                    = new_outp
 stop_colgen_phase(lws::ColGenLoggerWorkspace, args...)                = stop_colgen_phase(lws.inner, args...)
 is_better_dual_bound(lws::ColGenLoggerWorkspace, args...)             = is_better_dual_bound(lws.inner, args...)
 colgen_phase_output_type(lws::ColGenLoggerWorkspace)                  = colgen_phase_output_type(lws.inner)
+has_artificial_vars_in_solution(lws::ColGenLoggerWorkspace, args...)   = has_artificial_vars_in_solution(lws.inner, args...)
 new_phase_output(O, lws::ColGenLoggerWorkspace, args...)              = new_phase_output(O, lws.inner, args...)
 is_minimization(lws::ColGenLoggerWorkspace)                           = is_minimization(lws.inner)
 get_master(lws::ColGenLoggerWorkspace)                                = get_master(lws.inner)
