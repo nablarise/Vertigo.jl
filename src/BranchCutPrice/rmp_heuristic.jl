@@ -52,8 +52,11 @@ function solve_restricted_master_ip!(
     )
     MOI.optimize!(backend)
 
+    # A solution that uses an artificial variable does not cover the master
+    # constraints with columns only: it is not an IP-feasible solution.
     result = nothing
-    if MOI.get(backend, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT
+    if MOI.get(backend, MOI.PrimalStatus()) == MOI.FEASIBLE_POINT &&
+       !ColGen.has_artificial_vars_in_solution(space.ws)
         obj = MOI.get(backend, MOI.ObjectiveValue())
         nz_int = Tuple{MOI.VariableIndex,Int}[]
         nz_cont = Tuple{MOI.VariableIndex,Float64}[]
