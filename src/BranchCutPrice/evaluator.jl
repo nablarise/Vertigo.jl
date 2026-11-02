@@ -52,7 +52,6 @@ function TreeSearch.evaluate!(
     ::BPEvaluator, space::BranchCutPriceWorkspace, node
 )
     space.nodes_explored += 1
-    delete!(space.open_node_bounds, node.id)
 
     _set_incumbent_bound!(space)
     _rebuild_branching_constraints!(space)
@@ -95,6 +94,7 @@ function TreeSearch.evaluate!(
     if cg_output.status == ColGen.master_infeasible ||
        cg_output.status == ColGen.subproblem_infeasible ||
        cg_output.status == ColGen.ip_pruned
+        delete!(space.open_node_bounds, node.id)
         _recompute_global_dual_bound!(space)
         return TreeSearch.CUTOFF
     end
@@ -107,6 +107,7 @@ function TreeSearch.evaluate!(
 
     # Prune by bound
     if _should_prune(space, db)
+        delete!(space.open_node_bounds, node.id)
         _recompute_global_dual_bound!(space)
         return TreeSearch.CUTOFF
     end
@@ -126,10 +127,16 @@ function TreeSearch.evaluate!(
         space.last_ip_incumbent = ip_sol
         if _is_improving_incumbent(space, ip_sol)
             space.incumbent = ip_sol
+            delete!(space.open_node_bounds, node.id)
             _recompute_global_dual_bound!(space)
             return TreeSearch.FEASIBLE
         end
     end
+
+    # The node stays open until it is branched, so the global dual bound
+    # (read by the logger right after this call) accounts for it.
+    space.open_node_bounds[node.id] = node.dual_bound
+    _recompute_global_dual_bound!(space)
 
     # Restricted master IP heuristic
     if space.rmp_heuristic && !_time_is_up(space)
