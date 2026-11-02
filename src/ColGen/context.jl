@@ -273,8 +273,29 @@ stop_colgen(ws::ColGenWorkspace, _) = time_limit_reached(ws)
 # SETUP REFORMULATION (phase 1 artificial variables + integrality relaxation)
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+# Delete the artificial variables of the workspace from the master.
+function _remove_artificial_vars!(ws::ColGenWorkspace)
+    model = master_model(ws.decomp)
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
+        MOI.delete(model, s_pos)
+        MOI.delete(model, s_neg)
+    end
+    for (_, s) in ws.leq_art_vars
+        MOI.delete(model, s)
+    end
+    for (_, s) in ws.geq_art_vars
+        MOI.delete(model, s)
+    end
+    empty!(ws.eq_art_vars)
+    empty!(ws.leq_art_vars)
+    empty!(ws.geq_art_vars)
+    return nothing
+end
+
 function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
     model = master_model(ws.decomp)
+    # Artificial variables left by a previous run are replaced, not stacked.
+    _remove_artificial_vars!(ws)
     sense = is_minimization(ws.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
     convexity_cost = sense * phase.convexity_artificial_var_cost
@@ -395,19 +416,7 @@ function setup_reformulation!(ws::ColGenWorkspace, ::Phase2)
     model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
 
-    for (_, (s_pos, s_neg)) in ws.eq_art_vars
-        MOI.delete(model, s_pos)
-        MOI.delete(model, s_neg)
-    end
-    for (_, s) in ws.leq_art_vars
-        MOI.delete(model, s)
-    end
-    for (_, s) in ws.geq_art_vars
-        MOI.delete(model, s)
-    end
-    empty!(ws.eq_art_vars)
-    empty!(ws.leq_art_vars)
-    empty!(ws.geq_art_vars)
+    _remove_artificial_vars!(ws)
 
     for (col_var, rec) in columns(ws.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec)))
