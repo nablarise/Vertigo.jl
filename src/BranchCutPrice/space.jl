@@ -199,8 +199,12 @@ end
 function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        space.best_dual_bound = is_minimization(space.ws) ?
-            -Inf : Inf
+        # No open node left: the incumbent is proved optimal.
+        space.best_dual_bound = if !isnothing(space.incumbent)
+            space.incumbent.obj_value
+        else
+            is_minimization(space.ws) ? -Inf : Inf
+        end
         return
     end
     space.best_dual_bound = is_minimization(space.ws) ?
@@ -211,12 +215,14 @@ end
 function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     primal_values = get_primal_solution(space.backend)
 
+    # The node leaves the open set: its children (if any) replace it.
+    delete!(space.open_node_bounds, node.id)
+
     result = select_branching_variable(
         space.branching_strategy, space, node, primal_values
     )
-    if result.status == all_integral
-        return typeof(node)[]
-    elseif result.status == node_infeasible
+    if result.status == all_integral || result.status == node_infeasible
+        _recompute_global_dual_bound!(space)
         return typeof(node)[]
     end
     orig_var = result.orig_var
