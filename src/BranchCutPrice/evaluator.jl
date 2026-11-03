@@ -39,6 +39,15 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
+# The bound a node inherits from its parent stays valid: a column generation
+# stopped early (time limit) can end with a weaker one.
+function _tighter_bound(space::BranchCutPriceWorkspace, inherited, found)
+    if !isfinite(inherited)
+        return found
+    end
+    return is_minimization(space.ws) ? max(inherited, found) : min(inherited, found)
+end
+
 function _set_incumbent_bound!(space::BranchCutPriceWorkspace)
     bp_set_ip_primal_bound!(
         space.ws,
@@ -102,7 +111,7 @@ function TreeSearch.evaluate!(
     # Update node dual bound
     db = cg_output.incumbent_dual_bound
     if !isnothing(db)
-        node.dual_bound = db
+        node.dual_bound = _tighter_bound(space, node.dual_bound, db)
     end
 
     # Prune by bound
