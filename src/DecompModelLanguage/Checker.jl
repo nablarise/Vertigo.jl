@@ -25,6 +25,47 @@ function _check_subproblem_ids(subproblems)
     return nothing
 end
 
+# The functions of a linear model: an affine expression, or a single variable (a bound).
+const _LINEAR_FUNCTIONS = (JuMP.AffExpr, JuMP.VariableRef)
+
+"""
+    _check_linear(model)
+
+Check that the objective and every constraint of `model` are linear: a decomposition of the
+model assumes it. A constraint of another kind (quadratic, nonlinear, a vector function) or a
+nonlinear objective would only fail later, while the master and the subproblem models are
+built.
+
+Throws an `ArgumentError` naming the objective, or the first constraint of the offending kind.
+
+TODO: JuMP should answer this (a query on the model, such as whether it is a linear or mixed
+integer linear program), not Vertigo. Replace this function when JuMP provides one.
+"""
+function _check_linear(model)
+    objective_type = JuMP.objective_function_type(model)
+    if !(objective_type in _LINEAR_FUNCTIONS)
+        throw(
+            ArgumentError(
+                "the objective of the model is a $(objective_type); a decomposed model " *
+                "must be linear",
+            ),
+        )
+    end
+    for (function_type, set_type) in JuMP.list_of_constraint_types(model)
+        if function_type in _LINEAR_FUNCTIONS
+            continue
+        end
+        constr = first(JuMP.all_constraints(model, function_type, set_type))
+        throw(
+            ArgumentError(
+                "constraint `$(_label(constr))` is a $(function_type) in $(set_type); a " *
+                "decomposed model must be linear",
+            ),
+        )
+    end
+    return nothing
+end
+
 """
     _check_ownerships(model, master, subproblems)
 
