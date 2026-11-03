@@ -25,10 +25,10 @@ makedocs(;
             ["user-api/decomposition.md", "user-api/solving.md", "user-api/errors.md"],
         "Internal API" => [
             "internal-api/introduction.md",
-            "internal-api/dml.md",
-            "internal-api/decomposition.md",
             "internal-api/master.md",
             "internal-api/subproblem.md",
+            "internal-api/dml.md",
+            "internal-api/decomposition.md",
             "internal-api/column-generation.md",
             "internal-api/branch-and-price.md",
             "internal-api/branching.md",

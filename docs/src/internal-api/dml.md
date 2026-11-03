@@ -1,13 +1,13 @@
-# Module Decomposition Modeling Language
+# Module: DecompModelLanguage
 
-The DML (`src/DecompModelLanguage/`) turns a JuMP model and a description of the master and of the
-subproblems into a `DWDecomposition`. It is the only part of Vertigo that reads JuMP objects;
-everything after it works on MathOptInterface models and indices.
+The Decomposition Modeling Language (DML, `src/DecompModelLanguage/`) turns a JuMP model and a
+description of the master and of the subproblems into a `DWDecomposition`. It is the only part of
+Vertigo that reads JuMP objects; everything after it works on MathOptInterface models and indices.
 
 !!! note
 
-    The DML and the internals are being reworked. The `@dantzig_wolfe` macro is not part of the
-    build at the moment; it will be adapted to build the descriptions described below.
+    The `@dantzig_wolfe` macro is not part of the build at the moment; it will be adapted to build
+    the descriptions described below.
 
 ## From the descriptions to the decomposition
 

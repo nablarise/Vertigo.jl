@@ -1,4 +1,8 @@
-# Module Branching
+# Module: Branching
+
+!!! warning
+
+    This page is experimental and has not been reviewed.
 
 `Branching` (`src/BranchCutPrice/Branching/`) is a submodule of `BranchCutPrice`. It chooses the
 original variable on which a node is branched; `BranchCutPrice` turns the choice into two children.

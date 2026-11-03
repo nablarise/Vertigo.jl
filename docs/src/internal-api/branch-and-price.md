@@ -1,4 +1,8 @@
-# Module Branch-and-price
+# Module: Branch-and-price
+
+!!! warning
+
+    This page is experimental and has not been reviewed.
 
 `run_branch_and_price` (`src/BranchCutPrice/`) embeds column generation in a
 tree search. The search loop itself is generic (`src/TreeSearch/`); the
