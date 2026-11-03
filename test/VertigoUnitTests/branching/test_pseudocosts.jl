@@ -2,14 +2,23 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.Branching: PseudocostRecord, PseudocostTracker,
-    update_pseudocosts!, estimate_score, is_reliable,
+using Vertigo.Branching:
+    PseudocostRecord,
+    PseudocostTracker,
+    update_pseudocosts!,
+    estimate_score,
+    is_reliable,
     global_average_pseudocost,
-    BranchingCandidate, SBProbeResult, SBCandidateResult,
-    MultiPhaseStrongBranching, CGProbePhase, select_branching_variable,
-    bp_master_model, branching_ok
+    BranchingCandidate,
+    SBProbeResult,
+    SBCandidateResult,
+    MultiPhaseStrongBranching,
+    CGProbePhase,
+    select_branching_variable,
+    bp_master_model,
+    branching_ok
 using Vertigo.BranchCutPrice: BPNodeData
-using Vertigo.Reformulation: get_primal_solution
+using Vertigo.Decomposition: get_primal_solution
 
 function test_pseudocosts()
     @testset "[pseudocosts] cold start" begin
@@ -58,13 +67,8 @@ function test_pseudocosts()
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
 
         for i in 1:3
-            left = SBProbeResult(
-                10.0 + Float64(i), 10.0 + Float64(i), false
-            )
-            right = SBProbeResult(
-                10.0 + 2.0 * Float64(i),
-                10.0 + 2.0 * Float64(i), false
-            )
+            left = SBProbeResult(10.0 + Float64(i), 10.0 + Float64(i), false)
+            right = SBProbeResult(10.0 + 2.0 * Float64(i), 10.0 + 2.0 * Float64(i), false)
             result = SBCandidateResult(c, 10.0, left, right)
             update_pseudocosts!(tracker, c, result)
         end
@@ -107,9 +111,7 @@ function test_pseudocosts()
     end
 
     @testset "[pseudocosts] is_reliable" begin
-        tracker = PseudocostTracker{Int}(
-            reliability_threshold=2
-        )
+        tracker = PseudocostTracker{Int}(reliability_threshold=2)
         c = BranchingCandidate(1, 2.3, 2.0, 3.0, 0.3)
         @test !is_reliable(tracker, c)
 
@@ -150,14 +152,11 @@ function test_pseudocosts()
         decomp = build_gap_decomp(inst)
         rb = MultiPhaseStrongBranching(
             max_candidates=10,
-            phases=[CGProbePhase(
-                max_cg_iterations=5, lookahead=8
-            )],
-            reliability_threshold=2
+            phases=[CGProbePhase(max_cg_iterations=5, lookahead=8)],
+            reliability_threshold=2,
         )
         space = BranchCutPriceWorkspace(
-            decomp,
-            BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
+            decomp, BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
         )
         cg_out = run_column_generation(space.ws)
         primal = get_primal_solution(bp_master_model(space.ws))
@@ -167,9 +166,7 @@ function test_pseudocosts()
         node_data.cg_output = cg_out
         mock_node = (user_data=node_data,)
 
-        result = select_branching_variable(
-            rb, space, mock_node, primal
-        )
+        result = select_branching_variable(rb, space, mock_node, primal)
         @test result.status == branching_ok
         frac = result.value - floor(result.value)
         @test frac > 1e-6
@@ -182,14 +179,11 @@ function test_pseudocosts()
         # lookahead=1, all unreliable -> at most 2 probed
         rb = MultiPhaseStrongBranching(
             max_candidates=100,
-            phases=[CGProbePhase(
-                max_cg_iterations=5, lookahead=1
-            )],
-            reliability_threshold=100
+            phases=[CGProbePhase(max_cg_iterations=5, lookahead=1)],
+            reliability_threshold=100,
         )
         space = BranchCutPriceWorkspace(
-            decomp,
-            BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
+            decomp, BranchCutPriceConfig(node_limit=1, branching_strategy=rb)
         )
         cg_out = run_column_generation(space.ws)
         primal = get_primal_solution(bp_master_model(space.ws))
@@ -197,9 +191,7 @@ function test_pseudocosts()
         node_data.cg_output = cg_out
         mock_node = (user_data=node_data,)
 
-        result = select_branching_variable(
-            rb, space, mock_node, primal
-        )
+        result = select_branching_variable(rb, space, mock_node, primal)
         @test result.status == branching_ok
 
         # Verify lookahead actually cut the loop
@@ -211,17 +203,12 @@ function test_pseudocosts()
         inst = random_gap_instance(2, 5; seed=10)
         rb = MultiPhaseStrongBranching(
             max_candidates=10,
-            phases=[CGProbePhase(
-                max_cg_iterations=5, lookahead=8
-            )],
-            reliability_threshold=2
+            phases=[CGProbePhase(max_cg_iterations=5, lookahead=8)],
+            reliability_threshold=2,
         )
         decomp = build_gap_decomp(inst)
         bcp_ws = BranchCutPriceWorkspace(
-            decomp,
-            BranchCutPriceConfig(
-                node_limit=100, branching_strategy=rb
-            )
+            decomp, BranchCutPriceConfig(node_limit=100, branching_strategy=rb)
         )
         output = run_branch_and_price(bcp_ws)
         @test output.status in (:optimal, :node_limit)

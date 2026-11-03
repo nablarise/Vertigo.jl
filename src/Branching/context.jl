@@ -28,54 +28,38 @@ struct DefaultBranchingContext <: BranchingContext end
 
 # ── Hook stubs (no-ops) ─────────────────────────────────────
 
-function before_branching_selection(
-    ::BranchingContext, candidates, phases
-)
-    return
+function before_branching_selection(::BranchingContext, candidates, phases)
+    return nothing
 end
 
-function before_probe(
-    ::BranchingContext, phase, candidate, direction::Symbol
-)
-    return
+function before_probe(::BranchingContext, phase, candidate, direction::Symbol)
+    return nothing
 end
 
-function after_probe(
-    ::BranchingContext, phase, candidate,
-    direction::Symbol, result
-)
-    return
+function after_probe(::BranchingContext, phase, candidate, direction::Symbol, result)
+    return nothing
 end
 
 function after_reliability_skip(
-    ::BranchingContext, phase, idx::Int, candidate,
-    score::Float64
+    ::BranchingContext, phase, idx::Int, candidate, score::Float64
 )
-    return
+    return nothing
 end
 
 function after_candidate_probed(
-    ::BranchingContext, phase, idx::Int, candidate,
-    score::Float64, result
+    ::BranchingContext, phase, idx::Int, candidate, score::Float64, result
 )
-    return
+    return nothing
 end
 
-function on_both_infeasible(
-    ::BranchingContext, phase, idx::Int, candidate
-)
-    return
+function on_both_infeasible(::BranchingContext, phase, idx::Int, candidate)
+    return nothing
 end
 
-function after_phase_filter(
-    ::BranchingContext, label::String,
-    before::Int, after::Int
-)
-    return
+function after_phase_filter(::BranchingContext, label::String, before::Int, after::Int)
+    return nothing
 end
 
-function after_branching_selection(
-    ::BranchingContext, candidate, score::Float64
-)
-    return
+function after_branching_selection(::BranchingContext, candidate, score::Float64)
+    return nothing
 end

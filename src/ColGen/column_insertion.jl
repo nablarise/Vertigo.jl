@@ -20,8 +20,7 @@ Insert a single column into the master. Returns the new column variable
 index, or `nothing` if the column was already in the pool.
 """
 function _insert_column!(
-    ws::ColGenWorkspace, phase::CGPhase,
-    pricing_sol::PricingPrimalSolution
+    ws::ColGenWorkspace, phase::CGPhase, pricing_sol::PricingPrimalSolution
 )
     decomp = ws.decomp
     model = master_model(decomp)
@@ -29,13 +28,13 @@ function _insert_column!(
     sp_id = pricing_sol.sp_id
     sol = pricing_sol.solution
 
-    has_column(ws.pool, sp_id, sol) && return nothing
+    if has_column(ws.pool, sp_id, sol)
+        return nothing
+    end
 
     col_cost = compute_column_original_cost(decomp, sp_id, sol)
 
-    coupling_coeffs = compute_column_coupling_coefficients(
-        decomp, sp_id, sol
-    )
+    coupling_coeffs = compute_column_coupling_coefficients(decomp, sp_id, sol)
     # TODO: compute non-robust cut coefficients for new columns
 
     all_coeffs = Dict{TaggedCI,Float64}()
@@ -44,9 +43,7 @@ function _insert_column!(
     end
 
     for bc in ws.branching_constraints
-        coeff = compute_branching_column_coefficient(
-            decomp, bc.orig_var, sp_id, sol
-        )
+        coeff = compute_branching_column_coefficient(decomp, bc.orig_var, sp_id, sol)
         if !iszero(coeff)
             all_coeffs[bc.constraint_index] = coeff
         end
@@ -56,7 +53,9 @@ function _insert_column!(
         coeff = 0.0
         for (sp_var_inner, val_inner) in nonzero_entries(sol)
             ov = mapped_original_var(decomp, sp_id, sp_var_inner)
-            isnothing(ov) && continue
+            if isnothing(ov)
+                continue
+            end
             c = get(cut.coefficients, ov, 0.0)
             if !iszero(c)
                 coeff += c * val_inner
@@ -75,20 +74,15 @@ function _insert_column!(
     end
 
     obj_coeff = _objective_cost(phase, col_cost)
-    col_var = add_variable!(model;
-        lower_bound = 0.0,
-        constraint_coeffs = all_coeffs,
-        objective_coeff = obj_coeff
+    col_var = add_variable!(
+        model; lower_bound=0.0, constraint_coeffs=all_coeffs, objective_coeff=obj_coeff
     )
     record_column!(ws.pool, col_var, sp_id, sol, col_cost)
 
     return col_var
 end
 
-function insert_columns!(
-    ws::ColGenWorkspace, phase::CGPhase,
-    columns::GeneratedColumns
-)
+function insert_columns!(ws::ColGenWorkspace, phase::CGPhase, columns::GeneratedColumns)
     cols_inserted = 0
     for pricing_sol in columns.collection
         col_var = _insert_column!(ws, phase, pricing_sol)

@@ -20,7 +20,7 @@ select_node!(::DepthFirstStrategy, stack::Stack) = pop!(stack)
 
 function insert_node!(::DepthFirstStrategy, stack::Stack, node::SearchNode)
     push!(stack, node)
-    return
+    return nothing
 end
 
 is_empty_container(stack::Stack) = isempty(stack)
@@ -36,5 +36,5 @@ function insert_children!(::DepthFirstStrategy, stack::Stack, children)
     for i in length(collected):-1:1
         push!(stack, collected[i])
     end
-    return
+    return nothing
 end

@@ -35,7 +35,7 @@ function ColumnPool()
     return ColumnPool(
         Dict{_VI,ColumnRecord}(),
         Dict{PricingSubproblemId,Vector{_VI}}(),
-        Dict{PricingSubproblemId,Set{UInt64}}()
+        Dict{PricingSubproblemId,Set{UInt64}}(),
     )
 end
 
@@ -46,8 +46,11 @@ Register a column in the pool, indexing it by column variable, subproblem,
 and fingerprint.
 """
 function record_column!(
-    pool::ColumnPool, col_var::_VI, sp_id::PricingSubproblemId,
-    sol::_SpSolution, original_cost::Float64
+    pool::ColumnPool,
+    col_var::_VI,
+    sp_id::PricingSubproblemId,
+    sol::_SpSolution,
+    original_cost::Float64,
 )
     pool.by_column_var[col_var] = ColumnRecord(sp_id, sol, original_cost)
     sp_cols = get!(Vector{_VI}, pool.by_subproblem, sp_id)
@@ -71,7 +74,9 @@ end
 get_column_sp_id(pool::ColumnPool, col_var) = column_sp_id(pool.by_column_var[col_var])
 
 "Return the original cost of the column associated with `col_var`."
-get_column_cost(pool::ColumnPool, col_var) = column_original_cost(pool.by_column_var[col_var])
+function get_column_cost(pool::ColumnPool, col_var)
+    return column_original_cost(pool.by_column_var[col_var])
+end
 
 """
     columns(pool) -> iterator of (col_var, ColumnRecord)
@@ -89,10 +94,7 @@ Iterate over columns belonging to subproblem `sp_id`.
 """
 function columns_for_subproblem(pool::ColumnPool, sp_id::PricingSubproblemId)
     col_vars = get(pool.by_subproblem, sp_id, _VI[])
-    return (
-        (cv, pool.by_column_var[cv])
-        for cv in col_vars
-    )
+    return ((cv, pool.by_column_var[cv]) for cv in col_vars)
 end
 
 """
@@ -102,6 +104,8 @@ Check if a column with the same fingerprint already exists for `sp_id`.
 """
 function has_column(pool::ColumnPool, sp_id, sol::_SpSolution)
     fp_set = get(pool.fingerprints, sp_id, nothing)
-    isnothing(fp_set) && return false
+    if isnothing(fp_set)
+        return false
+    end
     return sol.fingerprint in fp_set
 end

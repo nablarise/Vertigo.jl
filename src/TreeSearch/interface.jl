@@ -181,5 +181,5 @@ function insert_children!(strategy::AbstractSearchStrategy, container, children)
     for child in children
         insert_node!(strategy, container, child)
     end
-    return
+    return nothing
 end

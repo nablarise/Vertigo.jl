@@ -13,10 +13,7 @@ mutable struct BranchingLoggerContext <: BranchingContext
     log_level::Int
     t0::Float64
 
-    function BranchingLoggerContext(;
-        io::IO = stdout,
-        log_level::Int = 1
-    )
+    function BranchingLoggerContext(; io::IO=stdout, log_level::Int=1)
         return new(io, log_level, 0.0)
     end
 end
@@ -24,70 +21,81 @@ end
 # ── Formatting helpers ──────────────────────────────────────
 
 function _sb_fmt_bound(probe::SBProbeResult)
-    probe.is_infeasible && return "infeasible"
-    isnothing(probe.dual_bound) && return "N/A"
+    if probe.is_infeasible
+        return "infeasible"
+    end
+    if isnothing(probe.dual_bound)
+        return "N/A"
+    end
     return @sprintf("%.4f", probe.dual_bound)
 end
 
 # ── Hook overrides ──────────────────────────────────────────
 
-function before_branching_selection(
-    lctx::BranchingLoggerContext, candidates, phases
-)
+function before_branching_selection(lctx::BranchingLoggerContext, candidates, phases)
     lctx.t0 = time()
     println(lctx.io, "**** Strong branching ****")
-    return
+    return nothing
 end
 
 function before_probe(
     lctx::BranchingLoggerContext,
     phase::AbstractBranchingPhase,
-    candidate, direction::Symbol
+    candidate,
+    direction::Symbol,
 )
-    lctx.log_level < 2 && return
+    if lctx.log_level < 2
+        return nothing
+    end
     label = phase_label(phase)
-    println(lctx.io,
-        "  [$(label)] probing $(candidate.orig_var)" *
-        " direction=$(direction)"
+    println(
+        lctx.io, "  [$(label)] probing $(candidate.orig_var)" * " direction=$(direction)"
     )
-    return
+    return nothing
 end
 
 function after_probe(
     lctx::BranchingLoggerContext,
     phase::AbstractBranchingPhase,
-    candidate, direction::Symbol, result
+    candidate,
+    direction::Symbol,
+    result,
 )
-    lctx.log_level < 2 && return
+    if lctx.log_level < 2
+        return nothing
+    end
     label = phase_label(phase)
     bound_str = _sb_fmt_bound(result)
-    println(lctx.io,
-        "  [$(label)] probe $(direction)" *
-        " $(candidate.orig_var): $(bound_str)"
+    println(
+        lctx.io, "  [$(label)] probe $(direction)" * " $(candidate.orig_var): $(bound_str)"
     )
-    return
+    return nothing
 end
 
 function after_reliability_skip(
-    lctx::BranchingLoggerContext, phase, idx::Int,
-    candidate, score::Float64
+    lctx::BranchingLoggerContext, phase, idx::Int, candidate, score::Float64
 )
     label = phase_label(phase)
     et = @sprintf("%.2f", time() - lctx.t0)
     lhs = @sprintf("%.4f", candidate.value)
     sc = @sprintf("%.2f", score)
-    println(lctx.io,
+    println(
+        lctx.io,
         "  [$(label)] cand. $(lpad(idx, 2))" *
         " branch on $(candidate.orig_var)" *
         " (lhs=$(lhs)): reliable," *
-        " score = $(sc)  <et=$(et)>"
+        " score = $(sc)  <et=$(et)>",
     )
-    return
+    return nothing
 end
 
 function after_candidate_probed(
-    lctx::BranchingLoggerContext, phase, idx::Int,
-    candidate, score::Float64, result::SBCandidateResult
+    lctx::BranchingLoggerContext,
+    phase,
+    idx::Int,
+    candidate,
+    score::Float64,
+    result::SBCandidateResult,
 )
     label = phase_label(phase)
     et = @sprintf("%.2f", time() - lctx.t0)
@@ -95,45 +103,36 @@ function after_candidate_probed(
     sc = @sprintf("%.2f", score)
     left_str = _sb_fmt_bound(result.left)
     right_str = _sb_fmt_bound(result.right)
-    println(lctx.io,
+    println(
+        lctx.io,
         "  [$(label)] cand. $(lpad(idx, 2)) branch on " *
         "$(candidate.orig_var) (lhs=$(lhs)): " *
         "[$(left_str), $(right_str)], " *
-        "score = $(sc)  <et=$(et)>"
+        "score = $(sc)  <et=$(et)>",
     )
-    return
+    return nothing
 end
 
-function on_both_infeasible(
-    lctx::BranchingLoggerContext, phase, idx::Int, candidate
-)
+function on_both_infeasible(lctx::BranchingLoggerContext, phase, idx::Int, candidate)
     label = phase_label(phase)
-    println(lctx.io,
+    println(
+        lctx.io,
         "  [$(label)] cand. $(lpad(idx, 2))" *
         " branch on $(candidate.orig_var):" *
-        " both infeasible"
+        " both infeasible",
     )
-    return
+    return nothing
 end
 
 function after_phase_filter(
-    lctx::BranchingLoggerContext, label::String,
-    before::Int, after::Int
+    lctx::BranchingLoggerContext, label::String, before::Int, after::Int
 )
-    println(lctx.io,
-        "  [$(label)] filtered: " *
-        "$(before) -> $(after) candidates"
-    )
-    return
+    println(lctx.io, "  [$(label)] filtered: " * "$(before) -> $(after) candidates")
+    return nothing
 end
 
-function after_branching_selection(
-    lctx::BranchingLoggerContext, candidate, score::Float64
-)
+function after_branching_selection(lctx::BranchingLoggerContext, candidate, score::Float64)
     sc = @sprintf("%.2f", score)
-    println(lctx.io,
-        "  SB selected: $(candidate.orig_var)" *
-        " (score = $(sc))"
-    )
-    return
+    println(lctx.io, "  SB selected: $(candidate.orig_var)" * " (score = $(sc))")
+    return nothing
 end

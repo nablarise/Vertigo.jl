@@ -9,9 +9,7 @@ function test_time_limit_e2e()
 
     @testset "[time limit] column generation stops with status time_limit" begin
         decomp = build_gap_decomp(inst)
-        output = run_col_gen(
-            decomp, ColGenConfig(time_limit=0.0, silent=true)
-        )
+        output = run_col_gen(decomp, ColGenConfig(time_limit=0.0, silent=true))
         @test output.status == time_limit
     end
 
@@ -23,8 +21,7 @@ function test_time_limit_e2e()
 
     @testset "[time limit] branch-and-price with an expired limit" begin
         bcp_ws = BranchCutPriceWorkspace(
-            build_gap_decomp(inst),
-            BranchCutPriceConfig(time_limit=0.0)
+            build_gap_decomp(inst), BranchCutPriceConfig(time_limit=0.0)
         )
         output = run_branch_and_price(bcp_ws)
         @test output.status == :time_limit
@@ -37,8 +34,9 @@ function test_time_limit_e2e()
             build_gap_decomp(inst),
             BranchCutPriceConfig(
                 colgen=ColGenConfig(smoothing_alpha=0.5, silent=true),
-                node_limit=1_000_000, time_limit=limit
-            )
+                node_limit=1_000_000,
+                time_limit=limit,
+            ),
         )
         elapsed = @elapsed output = run_branch_and_price(bcp_ws)
         @test output.status in (:time_limit, :optimal)

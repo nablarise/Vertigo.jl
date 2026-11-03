@@ -19,45 +19,59 @@ mutable struct StrategyTestSpace <: TreeSearch.AbstractSearchSpace
 end
 
 function StrategyTestSpace(; max_depth=2)
-    StrategyTestSpace(max_depth, NodeIdCounter(), Int[], Ref(1))
+    return StrategyTestSpace(max_depth, NodeIdCounter(), Int[], Ref(1))
 end
 
 function TreeSearch.new_root(space::StrategyTestSpace)
-    return root_node(space.counter, SEMPTY, SEMPTY, SData(1), dual_bound=0.0)
+    return root_node(space.counter, SEMPTY, SEMPTY, SData(1); dual_bound=0.0)
 end
 
 TreeSearch.stop(::StrategyTestSpace, _) = false
 
 TreeSearch.output(space::StrategyTestSpace) = space.visited_values
 
-function TreeSearch.transition!(space::StrategyTestSpace, current::SearchNode, next::SearchNode)
-    transition_to!(current, next,
+function TreeSearch.transition!(
+    space::StrategyTestSpace, current::SearchNode, next::SearchNode
+)
+    return transition_to!(
+        current,
+        next,
         diff -> (space.model_val[] += diff.delta),
-        diff -> (space.model_val[] += diff.delta)
+        diff -> (space.model_val[] += diff.delta),
     )
 end
 
 function TreeSearch.branch!(space::StrategyTestSpace, node::SearchNode)
     if node.depth >= space.max_depth
-        return SearchNode{SDiff, SData}[]
+        return SearchNode{SDiff,SData}[]
     end
     pv = node.user_data.value
     lv = pv * 2
     rv = pv * 2 + 1
-    left = child_node(space.counter, node,
-        SDiff(lv - pv), SDiff(pv - lv),
-        dual_bound = Float64(lv),
-        user_data = SData(lv))
-    right = child_node(space.counter, node,
-        SDiff(rv - pv), SDiff(pv - rv),
-        dual_bound = Float64(rv),
-        user_data = SData(rv))
+    left = child_node(
+        space.counter,
+        node,
+        SDiff(lv - pv),
+        SDiff(pv - lv);
+        dual_bound=Float64(lv),
+        user_data=SData(lv),
+    )
+    right = child_node(
+        space.counter,
+        node,
+        SDiff(rv - pv),
+        SDiff(pv - rv);
+        dual_bound=Float64(rv),
+        user_data=SData(rv),
+    )
     return [left, right]
 end
 
 struct StrategyEvaluator <: TreeSearch.AbstractNodeEvaluator end
 
-function TreeSearch.evaluate!(::StrategyEvaluator, space::StrategyTestSpace, node::SearchNode)
+function TreeSearch.evaluate!(
+    ::StrategyEvaluator, space::StrategyTestSpace, node::SearchNode
+)
     push!(space.visited_values, node.user_data.value)
     if node.depth >= space.max_depth
         return CUTOFF
@@ -67,7 +81,9 @@ end
 
 # Must be at module level — Julia does not allow struct definitions inside functions.
 struct ValuePriorityStrategy <: AbstractBestFirstStrategy end
-TreeSearch.get_priority(::ValuePriorityStrategy, node::SearchNode) = Float64(node.user_data.value)
+function TreeSearch.get_priority(::ValuePriorityStrategy, node::SearchNode)
+    return Float64(node.user_data.value)
+end
 
 function test_treesearch_strategies_best_first()
     @testset "[treesearch] best-first priority order" begin
@@ -135,5 +151,5 @@ function test_treesearch_strategies()
     test_treesearch_strategies_best_first()
     test_treesearch_strategies_beam_search()
     test_treesearch_strategies_bfs_consistency()
-    test_treesearch_strategies_dfs_child_order()
+    return test_treesearch_strategies_dfs_child_order()
 end

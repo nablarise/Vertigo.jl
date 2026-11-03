@@ -54,14 +54,24 @@ include("test_dual_bound_e2e.jl")
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
 
+# See VertigoUnitTests.run: a failing test must not hide the ones after it.
 function run()
-    test_column_generation_e2e()
-    test_bp_gap_a_instances()
-    test_dml_e2e()
-    test_cut_col_gen_e2e()
-    test_time_limit_e2e()
-    test_dual_bound_e2e()
-    test_artificial_vars_e2e()
+    @testset "VertigoE2eTests" begin
+        for test in (
+            test_column_generation_e2e,
+            test_bp_gap_a_instances,
+            test_dml_e2e,
+            test_cut_col_gen_e2e,
+            test_time_limit_e2e,
+            test_artificial_vars_e2e,
+            test_dual_bound_e2e,
+        )
+            @testset "$(nameof(test))" begin
+                test()
+            end
+        end
+    end
+    return nothing
 end
 
 end # module VertigoE2eTests

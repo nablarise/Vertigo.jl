@@ -2,9 +2,15 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-using Vertigo.ColGen: ColGenLoggerWorkspace, max_cg_iterations,
-    set_max_cg_iterations!, stop_colgen_phase,
-    ColGenIterationOutput, Phase0, Phase1, Phase2
+using Vertigo.ColGen:
+    ColGenLoggerWorkspace,
+    max_cg_iterations,
+    set_max_cg_iterations!,
+    stop_colgen_phase,
+    ColGenIterationOutput,
+    Phase0,
+    Phase1,
+    Phase2
 
 function test_max_cg_iterations()
     @testset "[max_cg_iterations] stop_colgen_phase respects limit" begin
@@ -18,7 +24,7 @@ function test_max_cg_iterations()
             1,       # nb_columns_added (not zero)
             nothing, # master_lp_dual_sol
             nothing, # master_ip_primal_sol
-            false    # subproblem_infeasible
+            false,    # subproblem_infeasible
         )
 
         # Phase0: iteration 4 (≤ 5) → don't stop
@@ -35,9 +41,7 @@ function test_max_cg_iterations()
         ws = build_gap_context(inst; max_cg_iterations=5)
 
         # Phase1 iter output: columns still being added
-        iter_output = ColGenIterationOutput(
-            100.0, nothing, 1, nothing, nothing, false
-        )
+        iter_output = ColGenIterationOutput(100.0, nothing, 1, nothing, nothing, false)
 
         # Phase1 does not stop even beyond limit
         @test !stop_colgen_phase(ws, Phase1(), iter_output, nothing, nothing, 100)

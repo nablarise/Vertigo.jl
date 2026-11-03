@@ -30,7 +30,7 @@ get_priority(::DualBoundBestFirstStrategy, node::SearchNode) = node.dual_bound
 
 # Container: PriorityQueue (min-heap by default)
 function init_container(strategy::AbstractBestFirstStrategy, root::SearchNode)
-    pq = PriorityQueue{typeof(root), Float64}()
+    pq = PriorityQueue{typeof(root),Float64}()
     enqueue!(pq, root, get_priority(strategy, root))
     return pq
 end
@@ -39,9 +39,11 @@ function select_node!(::AbstractBestFirstStrategy, pq::PriorityQueue)
     return dequeue!(pq)
 end
 
-function insert_node!(strategy::AbstractBestFirstStrategy, pq::PriorityQueue, node::SearchNode)
+function insert_node!(
+    strategy::AbstractBestFirstStrategy, pq::PriorityQueue, node::SearchNode
+)
     enqueue!(pq, node, get_priority(strategy, node))
-    return
+    return nothing
 end
 
 is_empty_container(pq::PriorityQueue) = isempty(pq)

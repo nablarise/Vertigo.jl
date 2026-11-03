@@ -39,9 +39,7 @@ function _run_one_lp_direction(space, candidate, set)
     pool = bp_pool(ws)
 
     terms = build_branching_terms(decomp, pool, candidate.orig_var)
-    ci = add_branching_constraint!(
-        backend, ws, terms, set, candidate.orig_var
-    )
+    ci = add_branching_constraint!(backend, ws, terms, set, candidate.orig_var)
 
     try
         obj, is_inf = solve_master_lp_only!(backend)
@@ -58,28 +56,23 @@ LP probe: solve master LP only (no CG) in both directions.
 Uses same state capture/restore as CG probes.
 """
 function probe_candidate(
-    bctx::BranchingContext, phase::LPProbePhase, space,
-    candidate::BranchingCandidate, parent_lp::Float64
+    bctx::BranchingContext,
+    phase::LPProbePhase,
+    space,
+    candidate::BranchingCandidate,
+    parent_lp::Float64,
 )
     snapshot = _capture_probe_state(space.ws, space)
     try
         before_probe(bctx, phase, candidate, :left)
-        left = _run_one_lp_direction(
-            space, candidate,
-            MOI.LessThan(candidate.floor_val)
-        )
+        left = _run_one_lp_direction(space, candidate, MOI.LessThan(candidate.floor_val))
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
         _restore_probe_state!(space.ws, space, snapshot)
         before_probe(bctx, phase, candidate, :right)
-        right = _run_one_lp_direction(
-            space, candidate,
-            MOI.GreaterThan(candidate.ceil_val)
-        )
+        right = _run_one_lp_direction(space, candidate, MOI.GreaterThan(candidate.ceil_val))
         after_probe(bctx, phase, candidate, :right, right)
-        return SBCandidateResult(
-            candidate, parent_lp, left, right
-        )
+        return SBCandidateResult(candidate, parent_lp, left, right)
     finally
         _restore_probe_state!(space.ws, space, snapshot)
     end

@@ -32,21 +32,23 @@ function gap_maximization()
     # Maximization GAP: negate gap_small_feasible2 costs.
     inst = gap_small_feasible2()
     cost = -inst.cost
-    return GAPInstance(
-        inst.n_machines, inst.n_tasks, cost, inst.weight, inst.capacity
-    )
+    return GAPInstance(inst.n_machines, inst.n_tasks, cost, inst.weight, inst.capacity)
 end
 
 # Root dual bound is 32
 # Optimal value is 32
 function gap_two_identical_machines()
     # 3 machines, 7 tasks — machines 1 and 2 are identical
-    cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
-            5.0  8.0  3.0  12.0  7.0  4.0  9.0;
-            8.0  6.0  10.0  4.0  11.0  7.0  3.0]
-    weight = [2.0  3.0  1.0  4.0  2.0  1.0  3.0;
-              2.0  3.0  1.0  4.0  2.0  1.0  3.0;
-              3.0  1.0  2.0  2.0  4.0  3.0  1.0]
+    cost = [
+        5.0 8.0 3.0 12.0 7.0 4.0 9.0;
+        5.0 8.0 3.0 12.0 7.0 4.0 9.0;
+        8.0 6.0 10.0 4.0 11.0 7.0 3.0
+    ]
+    weight = [
+        2.0 3.0 1.0 4.0 2.0 1.0 3.0;
+        2.0 3.0 1.0 4.0 2.0 1.0 3.0;
+        3.0 1.0 2.0 2.0 4.0 3.0 1.0
+    ]
     capacity = [10.0, 10.0, 12.0]
     return GAPInstance(3, 7, cost, weight, capacity)
 end
@@ -56,24 +58,30 @@ end
 # Same as gap_two_identical_machines but with 2 machine types:
 #   type 1 = identical pair (multiplicity 2), type 2 = machine 3
 function gap_identical_machines()
-    cost = [5.0  8.0  3.0  12.0  7.0  4.0  9.0;
-            8.0  6.0  10.0  4.0  11.0  7.0  3.0]
-    weight = [2.0  3.0  1.0  4.0  2.0  1.0  3.0;
-              3.0  1.0  2.0  2.0  4.0  3.0  1.0]
+    cost = [
+        5.0 8.0 3.0 12.0 7.0 4.0 9.0;
+        8.0 6.0 10.0 4.0 11.0 7.0 3.0
+    ]
+    weight = [
+        2.0 3.0 1.0 4.0 2.0 1.0 3.0;
+        3.0 1.0 2.0 2.0 4.0 3.0 1.0
+    ]
     capacity = [10.0, 12.0]
-    return GAPInstanceWithIdenticalMachines(
-        2, 7, cost, weight, capacity, [2, 1]
-    )
+    return GAPInstanceWithIdenticalMachines(2, 7, cost, weight, capacity, [2, 1])
 end
 
 # Root dual bound is 63
 # Optimal value is 63
 function gap_small_feasible()
     # 2 machines, 7 tasks — small feasible instance.
-    cost = [5.0 8.0 14.0 20.0 5.0 4.0 13.0;
-            18.0 14.0 15.0 16.0 3.0 8.0 19.0]
-    weight = [1.0 1.0 1.0 5.0 2.0 1.0 4.0;
-              5.0 3.0 4.0 1.0 4.0 1.0 1.0]
+    cost = [
+        5.0 8.0 14.0 20.0 5.0 4.0 13.0;
+        18.0 14.0 15.0 16.0 3.0 8.0 19.0
+    ]
+    weight = [
+        1.0 1.0 1.0 5.0 2.0 1.0 4.0;
+        5.0 3.0 4.0 1.0 4.0 1.0 1.0
+    ]
     capacity = [11.0, 14.0]
     return GAPInstance(2, 7, cost, weight, capacity)
 end
@@ -82,13 +90,18 @@ end
 # Optimal solution is 75
 function gap_small_feasible2()
     return GAPInstance(
-      2, 7,
-      [8 5 11 21 6 5 19;
-       1 12 11 12 14 8 5],
-      [2 3 3 1 2 1 1;
-       5 1 1 3 1 5 4],
-      [5, 8]
-  )
+        2,
+        7,
+        [
+            8 5 11 21 6 5 19;
+            1 12 11 12 14 8 5
+        ],
+        [
+            2 3 3 1 2 1 1;
+            5 1 1 3 1 5 4
+        ],
+        [5, 8],
+    )
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -99,11 +112,11 @@ end
 # Subset of Pigatti et al. (2005) Table 1 — tractable at the root node.
 # Instance name (letter, number of machine, number of items, Root LB, Optimal solution)
 const BENCHMARK_INSTANCES = [
-    #('C', 5,  100, 1930),
-    #('C', 10, 100, 1400),
+#('C', 5,  100, 1930),
+#('C', 10, 100, 1400),
     ('C', 20, 100, 1242),
-    #('E', 10, 100, 11568),
-    #('E', 20, 100, 8431),
+#('E', 10, 100, 11568),
+#('E', 20, 100, 8431),
 ]
 
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -153,7 +166,7 @@ end
 function test_gap_infeasible_master(; smoothing_alpha=0.0)
     @testset "[gap] infeasible master (3 machines, 30 jobs, max 27 coverable)" begin
         inst = gap_infeasible_master()
-        ws  = build_gap_context(inst; smoothing_alpha)
+        ws = build_gap_context(inst; smoothing_alpha)
         output = run_column_generation(ws)
         # Phase0 converges with art vars → Phase1 confirms infeasibility
         @test output.status == master_infeasible

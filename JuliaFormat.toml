@@ -1,0 +1,4 @@
+style = "blue"
+
+[options]
+short_circuit_to_if = true

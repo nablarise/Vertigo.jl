@@ -28,12 +28,12 @@ function build_test_tree()
     counter = NodeIdCounter()
 
     R = root_node(counter, EMPTY_DIFF, EMPTY_DIFF, nothing)
-    A = child_node(counter, R, TestDiff(1), TestDiff(-1), user_data=nothing)
-    B = child_node(counter, R, TestDiff(2), TestDiff(-2), user_data=nothing)
-    C = child_node(counter, A, TestDiff(10), TestDiff(-10), user_data=nothing)
-    D = child_node(counter, A, TestDiff(20), TestDiff(-20), user_data=nothing)
-    E = child_node(counter, B, TestDiff(30), TestDiff(-30), user_data=nothing)
-    F = child_node(counter, D, TestDiff(100), TestDiff(-100), user_data=nothing)
+    A = child_node(counter, R, TestDiff(1), TestDiff(-1); user_data=nothing)
+    B = child_node(counter, R, TestDiff(2), TestDiff(-2); user_data=nothing)
+    C = child_node(counter, A, TestDiff(10), TestDiff(-10); user_data=nothing)
+    D = child_node(counter, A, TestDiff(20), TestDiff(-20); user_data=nothing)
+    E = child_node(counter, B, TestDiff(30), TestDiff(-30); user_data=nothing)
+    F = child_node(counter, D, TestDiff(100), TestDiff(-100); user_data=nothing)
 
     return (; R, A, B, C, D, E, F, counter)
 end
@@ -42,8 +42,7 @@ function test_treesearch_node_construction()
     @testset "[treesearch] tree construction" begin
         tree = build_test_tree()
 
-        ids = [tree.R.id, tree.A.id, tree.B.id, tree.C.id,
-               tree.D.id, tree.E.id, tree.F.id]
+        ids = [tree.R.id, tree.A.id, tree.B.id, tree.C.id, tree.D.id, tree.E.id, tree.F.id]
         @test length(unique(ids)) == 7
 
         @test tree.R.depth == 0
@@ -200,5 +199,5 @@ function test_treesearch_node()
     test_treesearch_node_transition_accumulator()
     test_treesearch_node_active_flags()
     test_treesearch_node_self_transition()
-    test_treesearch_node_collect_path()
+    return test_treesearch_node_collect_path()
 end

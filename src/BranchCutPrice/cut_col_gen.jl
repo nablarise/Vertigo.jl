@@ -27,15 +27,27 @@ function stop_cutcolgen(
     nb_cuts::Int,
     cg_status::ColGen.ColGenStatus,
     prev_lp::Float64,
-    lp::Float64
+    lp::Float64,
 )::Bool
-    round >= ctx.max_rounds && return true
-    nb_cuts == 0 && return true
-    cg_status != ColGen.optimal && return true
-    isinf(prev_lp) && return false
-    iszero(prev_lp) && return iszero(lp)
+    if round >= ctx.max_rounds
+        return true
+    end
+    if nb_cuts == 0
+        return true
+    end
+    if cg_status != ColGen.optimal
+        return true
+    end
+    if isinf(prev_lp)
+        return false
+    end
+    if iszero(prev_lp)
+        return iszero(lp)
+    end
     improvement = abs(lp - prev_lp) / abs(prev_lp)
-    improvement < ctx.min_gap_improvement && return true
+    if improvement < ctx.min_gap_improvement
+        return true
+    end
     return false
 end
 
@@ -45,9 +57,9 @@ end
 Extract master LP objective from CG output, or `Inf` if
 unavailable.
 """
-function _master_lp_obj(
-    output::ColGen.ColGenOutput
-)::Float64
-    isnothing(output.master_lp_obj) && return Inf
+function _master_lp_obj(output::ColGen.ColGenOutput)::Float64
+    if isnothing(output.master_lp_obj)
+        return Inf
+    end
     return output.master_lp_obj
 end

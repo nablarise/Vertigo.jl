@@ -32,7 +32,7 @@ Whatever `output(space)` returns.
 function search(
     strategy::AbstractSearchStrategy,
     space::AbstractSearchSpace,
-    evaluator::AbstractNodeEvaluator
+    evaluator::AbstractNodeEvaluator,
 )
     root = new_root(space)
     container = init_container(strategy, root)

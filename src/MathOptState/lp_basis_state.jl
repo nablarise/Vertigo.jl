@@ -8,9 +8,7 @@
 Union of scalar set types used in LP constraints that participate in basis tracking.
 """
 const LinearConstraintSet = Union{
-    MOI.GreaterThan{Float64},
-    MOI.LessThan{Float64},
-    MOI.EqualTo{Float64},
+    MOI.GreaterThan{Float64},MOI.LessThan{Float64},MOI.EqualTo{Float64}
 }
 
 """
@@ -23,8 +21,8 @@ A snapshot of the LP basis: the status of all variables and linear constraints.
 - `constr_status`: maps each SAF constraint index to its `MOI.BasisStatusCode`.
 """
 struct LPBasisState
-    var_status::Dict{MOI.VariableIndex, MOI.BasisStatusCode}
-    constr_status::Dict{TaggedCI, MOI.BasisStatusCode}
+    var_status::Dict{MOI.VariableIndex,MOI.BasisStatusCode}
+    constr_status::Dict{TaggedCI,MOI.BasisStatusCode}
 end
 
 """
@@ -36,7 +34,7 @@ Diff carrying an optional LP basis snapshot.
 - Backward diff: always empty (`nothing` basis) — the next LP solve overwrites it.
 """
 struct LPBasisDiff <: AbstractMathOptStateDiff
-    basis::Union{LPBasisState, Nothing}
+    basis::Union{LPBasisState,Nothing}
 end
 
 """
@@ -56,29 +54,29 @@ If the solver does not support setting basis statuses, the attempt is silently
 abandoned (warm-start is best-effort). Does nothing if `diff.basis` is `nothing`.
 """
 function apply_change!(backend, diff::LPBasisDiff, ::Nothing)
-    isnothing(diff.basis) && return
+    if isnothing(diff.basis)
+        return nothing
+    end
     for (vi, status) in diff.basis.var_status
-        MOI.is_valid(backend, vi) || error(
-            "invalid variable index $vi in basis snapshot"
-        )
+        if !(MOI.is_valid(backend, vi))
+            error("invalid variable index $vi in basis snapshot")
+        end
         try
             MOI.set(backend, MOI.VariableBasisStatus(), vi, status)
         catch e
             @debug "Basis warm-start unsupported: $e"
-            return
+            return nothing
         end
     end
     for (tagged, status) in diff.basis.constr_status
         with_typed_ci(tagged) do ci
-            MOI.is_valid(backend, ci) || error(
-                "invalid constraint $ci in basis snapshot"
-            )
-            MOI.set(
-                backend, MOI.ConstraintBasisStatus(), ci, status
-            )
+            if !(MOI.is_valid(backend, ci))
+                error("invalid constraint $ci in basis snapshot")
+            end
+            return MOI.set(backend, MOI.ConstraintBasisStatus(), ci, status)
         end
     end
-    return
+    return nothing
 end
 
 """
@@ -107,17 +105,15 @@ Captures the `VariableBasisStatus` for every variable and the
 `GreaterThan`, `LessThan`, or `EqualTo` set.
 """
 function capture_basis(backend)
-    var_status = Dict{MOI.VariableIndex, MOI.BasisStatusCode}()
+    var_status = Dict{MOI.VariableIndex,MOI.BasisStatusCode}()
     for vi in MOI.get(backend, MOI.ListOfVariableIndices())
         var_status[vi] = MOI.get(backend, MOI.VariableBasisStatus(), vi)
     end
-    constr_status = Dict{TaggedCI, MOI.BasisStatusCode}()
+    constr_status = Dict{TaggedCI,MOI.BasisStatusCode}()
     F = MOI.ScalarAffineFunction{Float64}
     for S in (MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64})
-        for ci in MOI.get(backend, MOI.ListOfConstraintIndices{F, S}())
-            constr_status[TaggedCI(ci)] = MOI.get(
-                backend, MOI.ConstraintBasisStatus(), ci
-            )
+        for ci in MOI.get(backend, MOI.ListOfConstraintIndices{F,S}())
+            constr_status[TaggedCI(ci)] = MOI.get(backend, MOI.ConstraintBasisStatus(), ci)
         end
     end
     return LPBasisState(var_status, constr_status)
@@ -156,8 +152,9 @@ root_state(::LPBasisTracker, backend) = ModelState(LPBasisDiff(), LPBasisDiff())
 
 Wrap forward and backward diffs into a `ModelState`.
 """
-new_state(::LPBasisTracker, forward_diff::LPBasisDiff, backward_diff::LPBasisDiff) =
-    ModelState(forward_diff, backward_diff)
+function new_state(::LPBasisTracker, forward_diff::LPBasisDiff, backward_diff::LPBasisDiff)
+    return ModelState(forward_diff, backward_diff)
+end
 
 """
     transform_model!(::LPBasisTracker, backend)

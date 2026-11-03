@@ -57,8 +57,15 @@ function setup_stabilization!(ws::ColGenWorkspace, _master)
     if ws.smoothing_alpha > 0.0
         init_lb = is_minimization(ws) ? -Inf : Inf
         return WentgesSmoothing(
-            ws, ws.smoothing_alpha, ws.smoothing_alpha,
-            nothing, init_lb, 0, nothing, nothing, nothing
+            ws,
+            ws.smoothing_alpha,
+            ws.smoothing_alpha,
+            nothing,
+            init_lb,
+            0,
+            nothing,
+            nothing,
+            nothing,
         )
     end
     return NoStabilization()
@@ -91,9 +98,7 @@ end
 # ── Get smoothed dual solution ───────────────────────────────────────────────
 
 function _convex_combination(
-    center::MasterDualSolution,
-    out::MasterDualSolution,
-    alpha::Float64
+    center::MasterDualSolution, out::MasterDualSolution, alpha::Float64
 )
     one_minus_alpha = 1.0 - alpha
     d_in = center.sol.constraint_duals
@@ -105,16 +110,14 @@ function _convex_combination(
         combined[idx] = alpha * val + one_minus_alpha * out_val
     end
     for (idx, val) in d_out
-        haskey(combined, idx) && continue
+        if haskey(combined, idx)
+            continue
+        end
         combined[idx] = one_minus_alpha * val
     end
 
-    obj = alpha * center.sol.obj_value +
-        one_minus_alpha * out.sol.obj_value
-    return MasterDualSolution(
-        DualMoiSolution(obj, combined),
-        out.coupling_constraint_ids
-    )
+    obj = alpha * center.sol.obj_value + one_minus_alpha * out.sol.obj_value
+    return MasterDualSolution(DualMoiSolution(obj, combined), out.coupling_constraint_ids)
 end
 
 function get_stab_dual_sol(
@@ -136,7 +139,7 @@ function update_stabilization_after_pricing_optim!(
     generated_columns,
     _master,
     pseudo_db,
-    sep_mast_dual_sol
+    sep_mast_dual_sol,
 )
     stab.last_generated_columns = generated_columns
     stab.last_sep_dual_sol = sep_mast_dual_sol
@@ -160,9 +163,11 @@ end
 function check_misprice(
     stab::WentgesSmoothing,
     generated_columns::GeneratedColumns,
-    mast_dual_sol::MasterDualSolution
+    mast_dual_sol::MasterDualSolution,
 )
-    stab.cur_smooth_dual_sol_coeff <= 0.0 && return false
+    if stab.cur_smooth_dual_sol_coeff <= 0.0
+        return false
+    end
 
     ws = stab.ws
     decomp = ws.decomp
@@ -177,13 +182,13 @@ function check_misprice(
         ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id)
         ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
 
-        rc = compute_column_reduced_cost(
-            decomp, sp_id, sol, sp_rc_at_out, (ν_lb, ν_ub)
-        )
+        rc = compute_column_reduced_cost(decomp, sp_id, sol, sp_rc_at_out, (ν_lb, ν_ub))
 
         # If any column improves at π^out, no misprice
         is_imp = is_minimization(ws) ? (rc < -RC_IMPROVING_TOL) : (rc > RC_IMPROVING_TOL)
-        is_imp && return false
+        if is_imp
+            return false
+        end
     end
 
     return true
@@ -191,16 +196,13 @@ end
 
 # ── After misprice ───────────────────────────────────────────────────────────
 
-function update_stabilization_after_misprice!(
-    stab::WentgesSmoothing, _mast_dual_sol
-)
+function update_stabilization_after_misprice!(stab::WentgesSmoothing, _mast_dual_sol)
     stab.nb_misprices += 1
     if stab.nb_misprices >= stab.ws.max_misprice_iterations
         stab.cur_smooth_dual_sol_coeff = 0.0
     else
         stab.cur_smooth_dual_sol_coeff = max(
-            0.0,
-            1.0 - stab.nb_misprices * (1.0 - stab.smooth_dual_sol_coeff)
+            0.0, 1.0 - stab.nb_misprices * (1.0 - stab.smooth_dual_sol_coeff)
         )
     end
     return nothing
@@ -211,9 +213,15 @@ end
 function update_stabilization_after_iter!(
     stab::WentgesSmoothing, mast_dual_sol::MasterDualSolution
 )
-    isnothing(stab.stab_center) && return nothing
-    isnothing(stab.last_generated_columns) && return nothing
-    isnothing(stab.last_sep_dual_sol) && return nothing
+    if isnothing(stab.stab_center)
+        return nothing
+    end
+    if isnothing(stab.last_generated_columns)
+        return nothing
+    end
+    if isnothing(stab.last_sep_dual_sol)
+        return nothing
+    end
 
     ws = stab.ws
     decomp = ws.decomp
@@ -240,8 +248,8 @@ function update_stabilization_after_iter!(
         for (sp_var, val) in nonzero_entries(sol)
             for entry in coupling_coefficients(decomp, sp_id, sp_var)
                 cstr = entry.constraint_id
-                col_contrib[cstr] = get(col_contrib, cstr, 0.0) +
-                    entry.coefficient * val * mult
+                col_contrib[cstr] =
+                    get(col_contrib, cstr, 0.0) + entry.coefficient * val * mult
             end
         end
     end
@@ -256,13 +264,9 @@ function update_stabilization_after_iter!(
 
     # Adjust α based on direction product
     if direction_product > 0
-        stab.smooth_dual_sol_coeff = max(
-            0.0, stab.smooth_dual_sol_coeff - 0.1
-        )
+        stab.smooth_dual_sol_coeff = max(0.0, stab.smooth_dual_sol_coeff - 0.1)
     else
-        stab.smooth_dual_sol_coeff += (
-            1.0 - stab.smooth_dual_sol_coeff
-        ) * 0.1
+        stab.smooth_dual_sol_coeff += (1.0 - stab.smooth_dual_sol_coeff) * 0.1
     end
 
     return nothing
@@ -278,7 +282,7 @@ function after_colgen_iteration(
     ::WentgesSmoothing,
     ::ColGenIterationOutput,
     _incumbent_dual_bound,
-    _ip_primal_sol
+    _ip_primal_sol,
 )
     return nothing
 end

@@ -28,13 +28,14 @@ struct ColGenConfig
     silent::Bool
     time_limit::Float64
     function ColGenConfig(;
-        smoothing_alpha::Float64 = 0.0,
-        max_cg_iterations::Int = 1000,
-        max_misprice_iterations::Int = 10,
-        silent::Bool = false,
-        time_limit::Float64 = Inf
+        smoothing_alpha::Float64=0.0,
+        max_cg_iterations::Int=1000,
+        max_misprice_iterations::Int=10,
+        silent::Bool=false,
+        time_limit::Float64=Inf,
     )
-        new(smoothing_alpha, max_cg_iterations,
-            max_misprice_iterations, silent, time_limit)
+        return new(
+            smoothing_alpha, max_cg_iterations, max_misprice_iterations, silent, time_limit
+        )
     end
 end

@@ -17,7 +17,7 @@ function get_cut_constraint(backend, helper::LocalCutTrackerHelper, cut_id::Int)
     return with_typed_ci(tagged) do ci
         f = MOI.get(backend, MOI.ConstraintFunction(), ci)
         s = MOI.get(backend, MOI.ConstraintSet(), ci)
-        (f, s)
+        return (f, s)
     end
 end
 
@@ -40,7 +40,11 @@ function _build_simple_backend()
     MOI.add_constraint(m, y, MOI.GreaterThan(0.0))
     MOI.add_constraint(m, z, MOI.GreaterThan(0.0))
     obj = MOI.ScalarAffineFunction(
-        [MOI.ScalarAffineTerm(1.0, x), MOI.ScalarAffineTerm(1.0, y), MOI.ScalarAffineTerm(1.0, z)],
+        [
+            MOI.ScalarAffineTerm(1.0, x),
+            MOI.ScalarAffineTerm(1.0, y),
+            MOI.ScalarAffineTerm(1.0, z),
+        ],
         0.0,
     )
     MOI.set(m, MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(), obj)
@@ -135,12 +139,7 @@ function test_local_cut_tracker_simple_tree()
         state4 = new_state(tracker, fwd4, bwd4)
 
         states = [state1, state2, state3, state4]
-        expected = [
-            (0, Int[]),
-            (1, [c1.id]),
-            (1, [c2.id]),
-            (2, [c1.id, c3.id]),
-        ]
+        expected = [(0, Int[]), (1, [c1.id]), (1, [c2.id]), (2, [c1.id, c3.id])]
 
         # Start at root
         prev = state1
@@ -201,12 +200,7 @@ function test_local_cut_tracker_permutations_4()
         state4 = new_state(tracker, fwd4, bwd4)
 
         states = [state1, state2, state3, state4]
-        expected = [
-            (0, Int[]),
-            (1, [c1.id]),
-            (1, [c2.id]),
-            (2, [c1.id, c3.id]),
-        ]
+        expected = [(0, Int[]), (1, [c1.id]), (1, [c2.id]), (2, [c1.id, c3.id])]
 
         # Track the actual current model state across all permutations
         current_state = state1
@@ -251,20 +245,12 @@ function test_local_cut_tracker_deeper_tree()
         x, y, z = vars
 
         c1 = LocalCut(
-            next_id!(tracker),
-            [MOI.ScalarAffineTerm(1.0, x)],
-            MOI.GreaterThan(0.1),
+            next_id!(tracker), [MOI.ScalarAffineTerm(1.0, x)], MOI.GreaterThan(0.1)
         )
         c2 = LocalCut(
-            next_id!(tracker),
-            [MOI.ScalarAffineTerm(1.0, y)],
-            MOI.GreaterThan(0.2),
+            next_id!(tracker), [MOI.ScalarAffineTerm(1.0, y)], MOI.GreaterThan(0.2)
         )
-        c3 = LocalCut(
-            next_id!(tracker),
-            [MOI.ScalarAffineTerm(1.0, z)],
-            MOI.LessThan(3.0),
-        )
+        c3 = LocalCut(next_id!(tracker), [MOI.ScalarAffineTerm(1.0, z)], MOI.LessThan(3.0))
         c4 = LocalCut(
             next_id!(tracker),
             [MOI.ScalarAffineTerm(2.0, x), MOI.ScalarAffineTerm(1.0, z)],
@@ -330,5 +316,5 @@ end
 function test_local_cut_tracker()
     test_local_cut_tracker_simple_tree()
     test_local_cut_tracker_permutations_4()
-    test_local_cut_tracker_deeper_tree()
+    return test_local_cut_tracker_deeper_tree()
 end

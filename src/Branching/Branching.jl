@@ -9,7 +9,7 @@ const MOI = MathOptInterface
 
 using Printf
 
-using ..Reformulation
+using ..Decomposition
 using ..ColGen
 using ..MathOptState
 

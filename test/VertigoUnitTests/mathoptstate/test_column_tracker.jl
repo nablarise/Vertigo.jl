@@ -42,9 +42,7 @@ function test_column_tracker_add_remove_basic()
         helper = transform_model!(t, m)
 
         z_data = ColumnData(
-            next_id!(t),
-            3.0, 0.0, 10.0,
-            [(TaggedCI(c1), 2.0), (TaggedCI(c2), 1.0)],
+            next_id!(t), 3.0, 0.0, 10.0, [(TaggedCI(c1), 2.0), (TaggedCI(c2), 1.0)]
         )
 
         local_fwd = ColumnChangeDiff([AddColumnChange(z_data)], RemoveColumnChange[])
@@ -99,9 +97,9 @@ end
 
 struct _CTMixedModel
     backend
-    c_ge::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.GreaterThan{Float64}}
-    c_le::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.LessThan{Float64}}
-    c_eq::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64}, MOI.EqualTo{Float64}}
+    c_ge::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.GreaterThan{Float64}}
+    c_le::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.LessThan{Float64}}
+    c_eq::MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}
 end
 
 function _build_ct_mixed_backend()
@@ -118,14 +116,10 @@ function _build_ct_mixed_backend()
         MOI.GreaterThan(3.0),
     )
     c_le = MOI.add_constraint(
-        m,
-        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0),
-        MOI.LessThan(10.0),
+        m, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0), MOI.LessThan(10.0)
     )
     c_eq = MOI.add_constraint(
-        m,
-        MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0),
-        MOI.EqualTo(5.0),
+        m, MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, x)], 0.0), MOI.EqualTo(5.0)
     )
     return _CTMixedModel(m, c_ge, c_le, c_eq)
 end
@@ -139,12 +133,16 @@ function test_column_tracker_mixed_constraints()
 
         z1_data = ColumnData(
             next_id!(t),
-            1.0, 0.0, 5.0,
+            1.0,
+            0.0,
+            5.0,
             [(TaggedCI(mdl.c_ge), 1.5), (TaggedCI(mdl.c_le), 0.5)],
         )
         z2_data = ColumnData(
             next_id!(t),
-            2.0, 0.0, 3.0,
+            2.0,
+            0.0,
+            3.0,
             [(TaggedCI(mdl.c_eq), 1.0), (TaggedCI(mdl.c_ge), 0.25)],
         )
 
@@ -262,5 +260,5 @@ end
 function test_column_tracker()
     test_column_tracker_add_remove_basic()
     test_column_tracker_mixed_constraints()
-    test_column_tracker_deep_tree()
+    return test_column_tracker_deep_tree()
 end

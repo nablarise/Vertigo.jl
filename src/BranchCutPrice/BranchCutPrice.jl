@@ -8,15 +8,21 @@ using MathOptInterface
 const MOI = MathOptInterface
 
 using Printf
-using ..Reformulation
+using ..Decomposition
 using ..ColGen
 using ..TreeSearch
 using ..MathOptState
 using ..Branching
-using ..Branching: bp_decomp, bp_pool, bp_branching_constraints,
-    bp_ip_incumbent, bp_ip_primal_bound,
-    bp_set_ip_primal_bound!, bp_set_ip_incumbent!,
-    bp_master_model, bp_robust_cuts,
+using ..Branching:
+    bp_decomp,
+    bp_pool,
+    bp_branching_constraints,
+    bp_ip_incumbent,
+    bp_ip_primal_bound,
+    bp_set_ip_primal_bound!,
+    bp_set_ip_incumbent!,
+    bp_master_model,
+    bp_robust_cuts,
     most_fractional_original_variable
 
 include("bp_output.jl")

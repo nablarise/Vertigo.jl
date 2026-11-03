@@ -14,8 +14,7 @@ Left child:  Σ_j λ_j · a_{i,j} ≤ ⌊x_val⌋
 Right child: Σ_j λ_j · a_{i,j} ≥ ⌈x_val⌉
 """
 function create_branching_children(
-    id_counter, parent, orig_var, x_val,
-    ws, dual_bound, cut_tracker
+    id_counter, parent, orig_var, x_val, ws, dual_bound, cut_tracker
 )
     decomp = bp_decomp(ws)
     pool = bp_pool(ws)
@@ -35,53 +34,51 @@ function create_branching_children(
 
     # Left child: ≤ floor(x_val)
     id_left = MathOptState.next_id!(cut_tracker)
-    left_cut = MathOptState.LocalCut(
-        id_left, terms, MOI.LessThan(floor_val)
-    )
+    left_cut = MathOptState.LocalCut(id_left, terms, MOI.LessThan(floor_val))
     left_fwd = (
         MathOptState.DomainChangeDiff(),
         MathOptState.LocalCutChangeDiff(
-            [MathOptState.AddLocalCutChange(left_cut)],
-            MathOptState.RemoveLocalCutChange[]
-        )
+            [MathOptState.AddLocalCutChange(left_cut)], MathOptState.RemoveLocalCutChange[]
+        ),
     )
     left_bwd = (
         MathOptState.DomainChangeDiff(),
         MathOptState.LocalCutChangeDiff(
-            MathOptState.AddLocalCutChange[],
-            [MathOptState.RemoveLocalCutChange(left_cut)]
-        )
+            MathOptState.AddLocalCutChange[], [MathOptState.RemoveLocalCutChange(left_cut)]
+        ),
     )
 
     # Right child: ≥ ceil(x_val)
     id_right = MathOptState.next_id!(cut_tracker)
-    right_cut = MathOptState.LocalCut(
-        id_right, terms, MOI.GreaterThan(ceil_val)
-    )
+    right_cut = MathOptState.LocalCut(id_right, terms, MOI.GreaterThan(ceil_val))
     right_fwd = (
         MathOptState.DomainChangeDiff(),
         MathOptState.LocalCutChangeDiff(
-            [MathOptState.AddLocalCutChange(right_cut)],
-            MathOptState.RemoveLocalCutChange[]
-        )
+            [MathOptState.AddLocalCutChange(right_cut)], MathOptState.RemoveLocalCutChange[]
+        ),
     )
     right_bwd = (
         MathOptState.DomainChangeDiff(),
         MathOptState.LocalCutChangeDiff(
-            MathOptState.AddLocalCutChange[],
-            [MathOptState.RemoveLocalCutChange(right_cut)]
-        )
+            MathOptState.AddLocalCutChange[], [MathOptState.RemoveLocalCutChange(right_cut)]
+        ),
     )
 
     left = TreeSearch.child_node(
-        id_counter, parent, left_fwd, left_bwd;
-        dual_bound = dual_bound,
-        user_data = BPNodeData()
+        id_counter,
+        parent,
+        left_fwd,
+        left_bwd;
+        dual_bound=dual_bound,
+        user_data=BPNodeData(),
     )
     right = TreeSearch.child_node(
-        id_counter, parent, right_fwd, right_bwd;
-        dual_bound = dual_bound,
-        user_data = BPNodeData()
+        id_counter,
+        parent,
+        right_fwd,
+        right_bwd;
+        dual_bound=dual_bound,
+        user_data=BPNodeData(),
     )
     return [left, right], [(id_left, orig_var), (id_right, orig_var)]
 end

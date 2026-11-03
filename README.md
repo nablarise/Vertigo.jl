@@ -4,7 +4,7 @@ A Julia framework for branch-cut-and-price.
 
 ## Features
 
-- **Declarative Dantzig-Wolfe decomposition** via the `@dantzig_wolfe` macro: pattern-based assignment of variables and constraints to master/subproblems
+- **Declarative Dantzig-Wolfe decomposition** by describing which variables and constraints belong to the master and to each subproblem
 - **Column generation**
 - **Branch-and-price**
 - **Tree search** with multiple strategies
@@ -15,7 +15,7 @@ Built on [MathOptInterface](https://github.com/jump-dev/MathOptInterface.jl) and
 
 ## Example
 
-Generalized Assignment Problem solved with column generation via `@dantzig_wolfe`:
+Generalized Assignment Problem solved with column generation:
 
 ```julia
 using JuMP, HiGHS, Vertigo
@@ -37,11 +37,14 @@ set_silent(model)
 @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
 
 # Decompose: x and knapsack per machine, assign stays in master
-decomp, sp_map = @dantzig_wolfe model begin
-    x[k, _]      => subproblem(k)
-    assign[_]     => master()
-    knapsack[k]   => subproblem(k)
-end
+decomp, sp_map = dantzig_wolfe_decomposition(
+    model,
+    MasterProblemUserDescription(constraints = assign),
+    [
+        SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k]) for
+        k in K
+    ],
+)
 
 # Solve via column generation
 config = ColGenConfig()
@@ -52,6 +55,16 @@ output = run_column_generation(ctx)
 println("Status: ", output.status)           # optimal
 println("Dual bound: ", output.incumbent_dual_bound)  # 63.0
 ```
+
+## Tests
+
+```julia
+using Pkg; Pkg.test("Vertigo")
+```
+
+`test/VertigoUnitTests/` has one folder per module. `test/VertigoE2eTests/`
+runs column generation and branch-and-price on small GAP instances, including
+decompositions built with `dantzig_wolfe_decomposition`.
 
 ## Status
 

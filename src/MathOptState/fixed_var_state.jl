@@ -25,9 +25,9 @@ Asserts that the variable is not already fixed. Removes any existing lower and u
 bound constraints, then adds a new equality constraint fixing the variable.
 """
 function apply_change!(backend, change::FixVarChange, helper::DomainChangeTrackerHelper)
-    haskey(helper.map_eq, change.var_id) && error(
-        "variable $(change.var_id) is already fixed"
-    )
+    if haskey(helper.map_eq, change.var_id)
+        error("variable $(change.var_id) is already fixed")
+    end
     if haskey(helper.map_lb, change.var_id)
         MOI.delete(backend, helper.map_lb[change.var_id])
         delete!(helper.map_lb, change.var_id)
@@ -38,7 +38,7 @@ function apply_change!(backend, change::FixVarChange, helper::DomainChangeTracke
     end
     eq_ci = MOI.add_constraint(backend, change.var_id, MOI.EqualTo(change.value))
     helper.map_eq[change.var_id] = eq_ci
-    return
+    return nothing
 end
 
 """
@@ -69,12 +69,14 @@ function apply_change!(backend, change::UnfixVarChange, helper::DomainChangeTrac
     if haskey(helper.map_eq, change.var_id)
         MOI.delete(backend, helper.map_eq[change.var_id])
         delete!(helper.map_eq, change.var_id)
-        lb_ci = MOI.add_constraint(backend, change.var_id, MOI.GreaterThan(change.lower_bound))
+        lb_ci = MOI.add_constraint(
+            backend, change.var_id, MOI.GreaterThan(change.lower_bound)
+        )
         ub_ci = MOI.add_constraint(backend, change.var_id, MOI.LessThan(change.upper_bound))
         helper.map_lb[change.var_id] = lb_ci
         helper.map_ub[change.var_id] = ub_ci
     end
-    return
+    return nothing
 end
 
 """
@@ -96,16 +98,24 @@ end
 
 Create an empty fix variable change difference with no changes.
 """
-FixVarChangeDiff() = FixVarChangeDiff(Dict{ColId,FixVarChange}(), Dict{ColId,UnfixVarChange}())
+function FixVarChangeDiff()
+    return FixVarChangeDiff(Dict{ColId,FixVarChange}(), Dict{ColId,UnfixVarChange}())
+end
 
 """
     FixVarChangeDiff(fix_var_changes, unfix_var_changes)
 
 Create a fix variable change difference from vectors of fix and unfix changes.
 """
-function FixVarChangeDiff(fix_var_changes::Vector{FixVarChange}, unfix_var_changes::Vector{UnfixVarChange})
-    fix_vars = Dict{ColId,FixVarChange}(change.var_id.value => change for change in fix_var_changes)
-    unfix_vars = Dict{ColId,UnfixVarChange}(change.var_id.value => change for change in unfix_var_changes)
+function FixVarChangeDiff(
+    fix_var_changes::Vector{FixVarChange}, unfix_var_changes::Vector{UnfixVarChange}
+)
+    fix_vars = Dict{ColId,FixVarChange}(
+        change.var_id.value => change for change in fix_var_changes
+    )
+    unfix_vars = Dict{ColId,UnfixVarChange}(
+        change.var_id.value => change for change in unfix_var_changes
+    )
     return FixVarChangeDiff(fix_vars, unfix_vars)
 end
 
@@ -115,7 +125,9 @@ end
 Merge a local forward fix variable change difference into a parent forward fix variable change difference.
 Local changes take precedence when there are conflicts.
 """
-function merge_forward_change_diff(parent_forward_diff::FixVarChangeDiff, local_forward_change::FixVarChangeDiff)
+function merge_forward_change_diff(
+    parent_forward_diff::FixVarChangeDiff, local_forward_change::FixVarChangeDiff
+)
     child_fix_vars = copy(parent_forward_diff.fix_vars)
     for (col_id, change) in local_forward_change.fix_vars
         child_fix_vars[col_id] = change
@@ -134,7 +146,9 @@ end
 Merge a parent backward fix variable change difference into a local backward fix variable change difference.
 Parent changes take precedence when there are conflicts.
 """
-function merge_backward_change_diff(parent_backward_diff::FixVarChangeDiff, local_backward_change::FixVarChangeDiff)
+function merge_backward_change_diff(
+    parent_backward_diff::FixVarChangeDiff, local_backward_change::FixVarChangeDiff
+)
     child_fix_vars = copy(local_backward_change.fix_vars)
     for (col_id, change) in parent_backward_diff.fix_vars
         child_fix_vars[col_id] = change
@@ -159,7 +173,7 @@ function apply_change!(backend, diff::FixVarChangeDiff, helper::DomainChangeTrac
     for change in values(diff.unfix_vars)
         apply_change!(backend, change, helper)
     end
-    return
+    return nothing
 end
 
 """
@@ -174,14 +188,20 @@ struct FixVarChangeTracker <: AbstractMathOptStateTracker end
 
 Create the root state for fix variable change tracking with empty forward and backward differences.
 """
-root_state(::FixVarChangeTracker, backend) = ModelState(FixVarChangeDiff(), FixVarChangeDiff())
+function root_state(::FixVarChangeTracker, backend)
+    return ModelState(FixVarChangeDiff(), FixVarChangeDiff())
+end
 
 """
     new_state(::FixVarChangeTracker, backward::FixVarChangeDiff, forward::FixVarChangeDiff)
 
 Create a new model state with the given backward and forward fix variable change differences.
 """
-new_state(::FixVarChangeTracker, backward::FixVarChangeDiff, forward::FixVarChangeDiff) = ModelState(backward, forward)
+function new_state(
+    ::FixVarChangeTracker, backward::FixVarChangeDiff, forward::FixVarChangeDiff
+)
+    return ModelState(backward, forward)
+end
 
 """
     transform_model!(::FixVarChangeTracker, backend)

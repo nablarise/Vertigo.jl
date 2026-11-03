@@ -12,7 +12,7 @@ end
 function _permute!(arr, k, result)
     if k == length(arr)
         push!(result, copy(arr))
-        return
+        return nothing
     end
     for i in k:length(arr)
         arr[k], arr[i] = arr[i], arr[k]

@@ -9,17 +9,13 @@ function test_ts_logger_default_protocol_methods()
         @test TreeSearch.ts_best_dual_bound(space) === nothing
         @test TreeSearch.ts_is_minimization(space) == true
         @test TreeSearch.ts_nodes_explored(space) == 0
-        @test TreeSearch.ts_search_status_message(space) ==
-            "Search complete."
+        @test TreeSearch.ts_search_status_message(space) == "Search complete."
         @test TreeSearch.ts_open_node_count(space) == 0
         @test TreeSearch.ts_total_columns(space) == 0
         @test TreeSearch.ts_active_columns(space) == 0
         @test TreeSearch.ts_total_cuts(space) == 0
-        node = TreeSearch.root_node(
-            TreeSearch.NodeIdCounter(), (), (), nothing
-        )
-        @test TreeSearch.ts_branching_description(space, node) ===
-            nothing
+        node = TreeSearch.root_node(TreeSearch.NodeIdCounter(), (), (), nothing)
+        @test TreeSearch.ts_branching_description(space, node) === nothing
     end
 end
 
@@ -40,9 +36,7 @@ end
 
 function test_ts_logger_feasible_with_logger()
     @testset "[ts_logger] feasible detection with logger" begin
-        space = MockSearchSpace(
-            max_depth=2, feasible_values=Set([2, 6])
-        )
+        space = MockSearchSpace(max_depth=2, feasible_values=Set([2, 6]))
         evaluator = MockEvaluator()
         ctx = TreeSearchLoggerContext(space, evaluator)
 
@@ -113,5 +107,5 @@ function test_tree_search_logger()
     test_ts_logger_constructor_backward_compat()
     test_ts_logger_constructor_3arg()
     test_ts_logger_level2_traversal_order()
-    test_ts_logger_level2_output_contains_banner()
+    return test_ts_logger_level2_output_contains_banner()
 end

@@ -39,20 +39,15 @@ mutable struct BPDotLoggerContext
 end
 
 function BPDotLoggerContext(
-    space::BranchCutPriceWorkspace,
-    evaluator::BPEvaluator,
-    filepath::String
+    space::BranchCutPriceWorkspace, evaluator::BPEvaluator, filepath::String
 )
-    return BPDotLoggerContext(
-        space, evaluator, filepath, Dict{Int,String}()
-    )
+    return BPDotLoggerContext(space, evaluator, filepath, Dict{Int,String}())
 end
 
 # ── Status derivation ────────────────────────────────────────────────────
 
 function _derive_dot_status(
-    ts_status::TreeSearch.NodeStatus,
-    cg_output::Union{Nothing,ColGen.ColGenOutput}
+    ts_status::TreeSearch.NodeStatus, cg_output::Union{Nothing,ColGen.ColGenOutput}
 )
     if ts_status == TreeSearch.FEASIBLE
         return DotFeasible
@@ -71,44 +66,49 @@ end
 # ── Dot formatting ───────────────────────────────────────────────────────
 
 function _dot_shape_and_color(s::DotNodeStatus)
-    s == DotBranched && return ("ellipse", "lightblue")
-    s == DotPrunedInfeasible && return ("box", "gray")
-    s == DotPrunedBound && return ("box", "lightcoral")
+    if s == DotBranched
+        return ("ellipse", "lightblue")
+    end
+    if s == DotPrunedInfeasible
+        return ("box", "gray")
+    end
+    if s == DotPrunedBound
+        return ("box", "lightcoral")
+    end
     return ("doubleoctagon", "gold")
 end
 
 function _dot_status_text(s::DotNodeStatus)
-    s == DotBranched && return "branched"
-    s == DotPrunedInfeasible && return "infeasible"
-    s == DotPrunedBound && return "pruned (bound)"
+    if s == DotBranched
+        return "branched"
+    end
+    if s == DotPrunedInfeasible
+        return "infeasible"
+    end
+    if s == DotPrunedBound
+        return "pruned (bound)"
+    end
     return "IP feasible"
 end
 
-function _write_dot_node(io::IO, node, dot_status::DotNodeStatus,
-                         dual_bound, incumbent_value)
+function _write_dot_node(
+    io::IO, node, dot_status::DotNodeStatus, dual_bound, incumbent_value
+)
     shape, color = _dot_shape_and_color(dot_status)
-    db_str = isnothing(dual_bound) ? "N/A" :
-        @sprintf("%.2f", dual_bound)
-    ip_str = isnothing(incumbent_value) ? "\u2014" :
-        @sprintf("%.2f", incumbent_value)
+    db_str = isnothing(dual_bound) ? "N/A" : @sprintf("%.2f", dual_bound)
+    ip_str = isnothing(incumbent_value) ? "\u2014" : @sprintf("%.2f", incumbent_value)
     status_str = _dot_status_text(dot_status)
-    label = "Node $(node.id)\\nDB = $(db_str)" *
-        "\\nIP* = $(ip_str)\\n$(status_str)"
-    println(
+    label = "Node $(node.id)\\nDB = $(db_str)" * "\\nIP* = $(ip_str)\\n$(status_str)"
+    return println(
         io,
         "  n$(node.id) [label=\"$(label)\", " *
-        "shape=$(shape), fillcolor=$(color), style=filled];"
+        "shape=$(shape), fillcolor=$(color), style=filled];",
     )
 end
 
-function _write_dot_edge(io::IO, parent_id::Int, child_id::Int,
-                         label::String)
+function _write_dot_edge(io::IO, parent_id::Int, child_id::Int, label::String)
     escaped = replace(label, "\"" => "\\\"")
-    println(
-        io,
-        "  n$(parent_id) -> n$(child_id) " *
-        "[label=\"$(escaped)\"];"
-    )
+    return println(io, "  n$(parent_id) -> n$(child_id) " * "[label=\"$(escaped)\"];")
 end
 
 # ── Custom search loop with dot logging ──────────────────────────────────
@@ -120,8 +120,7 @@ Run tree search and write an incremental Graphviz `.dot` file with
 color-coded nodes and branching-decision edge labels.
 """
 function TreeSearch.search(
-    strategy::TreeSearch.AbstractSearchStrategy,
-    ctx::BPDotLoggerContext
+    strategy::TreeSearch.AbstractSearchStrategy, ctx::BPDotLoggerContext
 )
     space = ctx.space
     evaluator = ctx.evaluator
@@ -152,32 +151,21 @@ function TreeSearch.search(
             # Derive dot status and dual bound
             cg_out = next_node.user_data.cg_output
             dot_status = _derive_dot_status(status, cg_out)
-            dual_bound = isnothing(cg_out) ? nothing :
-                cg_out.incumbent_dual_bound
+            dual_bound = isnothing(cg_out) ? nothing : cg_out.incumbent_dual_bound
 
-            inc_val = isnothing(space.incumbent) ? nothing :
-                space.incumbent.obj_value
-            _write_dot_node(
-                io, next_node, dot_status, dual_bound, inc_val
-            )
+            inc_val = isnothing(space.incumbent) ? nothing : space.incumbent.obj_value
+            _write_dot_node(io, next_node, dot_status, dual_bound, inc_val)
 
             # Edge from parent
             if !isnothing(next_node.parent)
-                edge_label = get(
-                    ctx.branching_labels, next_node.id, ""
-                )
-                _write_dot_edge(
-                    io, next_node.parent.id,
-                    next_node.id, edge_label
-                )
+                edge_label = get(ctx.branching_labels, next_node.id, "")
+                _write_dot_edge(io, next_node.parent.id, next_node.id, edge_label)
             end
 
             if status == TreeSearch.BRANCH
                 children = TreeSearch.branch!(space, next_node)
                 _record_branching_labels!(ctx, children)
-                TreeSearch.insert_children!(
-                    strategy, container, children
-                )
+                TreeSearch.insert_children!(strategy, container, children)
             elseif status == TreeSearch.FEASIBLE
                 TreeSearch.on_feasible_solution!(space, next_node)
                 TreeSearch.prune!(space, container)
@@ -186,7 +174,7 @@ function TreeSearch.search(
             current_node = next_node
         end
 
-        println(io, "}")
+        return println(io, "}")
     end
 
     return TreeSearch.output(space)
@@ -197,20 +185,20 @@ end
 function _record_branching_labels!(ctx::BPDotLoggerContext, children)
     for child in children
         _, cut_diff = child.local_forward_diff
-        isempty(cut_diff.add_cuts) && continue
+        if isempty(cut_diff.add_cuts)
+            continue
+        end
         cut = cut_diff.add_cuts[1].cut
-        orig_var = get(
-            ctx.space.branching_cut_info, cut.id, nothing
-        )
-        isnothing(orig_var) && continue
+        orig_var = get(ctx.space.branching_cut_info, cut.id, nothing)
+        if isnothing(orig_var)
+            continue
+        end
         if cut.set isa MOI.LessThan
             rhs = cut.set.upper
-            ctx.branching_labels[child.id] =
-                "$(orig_var) <= $(Int(rhs))"
+            ctx.branching_labels[child.id] = "$(orig_var) <= $(Int(rhs))"
         elseif cut.set isa MOI.GreaterThan
             rhs = cut.set.lower
-            ctx.branching_labels[child.id] =
-                "$(orig_var) >= $(Int(rhs))"
+            ctx.branching_labels[child.id] = "$(orig_var) >= $(Int(rhs))"
         end
     end
 end

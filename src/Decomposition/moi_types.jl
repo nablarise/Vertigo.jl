@@ -25,11 +25,21 @@ const _VI = MOI.VariableIndex
 end
 
 function _ci_type(kind::CIKind)
-    kind == SAF_EQ  && return MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}
-    kind == SAF_LEQ && return MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}
-    kind == SAF_GEQ && return MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}
-    kind == VI_EQ   && return MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}
-    kind == VI_LEQ  && return MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}
+    if kind == SAF_EQ
+        return MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}
+    end
+    if kind == SAF_LEQ
+        return MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}
+    end
+    if kind == SAF_GEQ
+        return MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}
+    end
+    if kind == VI_EQ
+        return MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}
+    end
+    if kind == VI_LEQ
+        return MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}
+    end
     return MOI.ConstraintIndex{_VI,MOI.GreaterThan{Float64}}
 end
 
@@ -49,20 +59,17 @@ function Base.isless(a::TaggedCI, b::TaggedCI)
     return (a.kind, a.value) < (b.kind, b.value)
 end
 
-TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) =
-    TaggedCI(ci.value, SAF_EQ)
-TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) =
-    TaggedCI(ci.value, SAF_LEQ)
-TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}}) =
-    TaggedCI(ci.value, SAF_GEQ)
-TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}) =
-    TaggedCI(ci.value, VI_EQ)
-TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}) =
-    TaggedCI(ci.value, VI_LEQ)
-TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.GreaterThan{Float64}}) =
-    TaggedCI(ci.value, VI_GEQ)
-TaggedCI(ci::MOI.ConstraintIndex{F,S}) where {F,S} =
-    error("unsupported constraint type: $F-in-$S")
+TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.EqualTo{Float64}}) = TaggedCI(ci.value, SAF_EQ)
+TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.LessThan{Float64}}) = TaggedCI(ci.value, SAF_LEQ)
+function TaggedCI(ci::MOI.ConstraintIndex{_SAF,MOI.GreaterThan{Float64}})
+    return TaggedCI(ci.value, SAF_GEQ)
+end
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.EqualTo{Float64}}) = TaggedCI(ci.value, VI_EQ)
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.LessThan{Float64}}) = TaggedCI(ci.value, VI_LEQ)
+TaggedCI(ci::MOI.ConstraintIndex{_VI,MOI.GreaterThan{Float64}}) = TaggedCI(ci.value, VI_GEQ)
+function TaggedCI(ci::MOI.ConstraintIndex{F,S}) where {F,S}
+    return error("unsupported constraint type: $F-in-$S")
+end
 
 @inline function with_typed_ci(f, idx::TaggedCI)
     ci_type = _ci_type(idx.kind)

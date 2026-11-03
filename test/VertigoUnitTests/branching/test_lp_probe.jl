@@ -26,10 +26,7 @@ function test_lp_probe_infeasible()
 
         # Add contradictory constraints to make the LP infeasible
         x = MOI.get(backend, MOI.ListOfVariableIndices())
-        f = MOI.ScalarAffineFunction(
-            [MOI.ScalarAffineTerm(1.0, xi) for xi in x],
-            0.0
-        )
+        f = MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(1.0, xi) for xi in x], 0.0)
         MOI.add_constraint(backend, f, MOI.GreaterThan(1e8))
         MOI.add_constraint(backend, f, MOI.LessThan(-1e8))
 
@@ -41,5 +38,5 @@ end
 
 function test_lp_probe()
     test_lp_probe_feasible()
-    test_lp_probe_infeasible()
+    return test_lp_probe_infeasible()
 end

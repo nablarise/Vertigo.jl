@@ -22,12 +22,12 @@ Returns:
 """
 function add_variable!(
     model;
-    lower_bound = nothing,
-    upper_bound = nothing,
-    variable_type = nothing,
-    constraint_coeffs::Dict{TaggedCI,Float64} = Dict{TaggedCI,Float64}(),
-    objective_coeff::Float64 = 0.0,
-    name = nothing
+    lower_bound=nothing,
+    upper_bound=nothing,
+    variable_type=nothing,
+    constraint_coeffs::Dict{TaggedCI,Float64}=Dict{TaggedCI,Float64}(),
+    objective_coeff::Float64=0.0,
+    name=nothing,
 )
     var = MOI.add_variable(model)
 
@@ -49,10 +49,7 @@ function add_variable!(
     for (tagged_ci, coeff) in constraint_coeffs
         if coeff != 0.0
             with_typed_ci(tagged_ci) do ci
-                MOI.modify(
-                    model, ci,
-                    MOI.ScalarCoefficientChange(var, coeff)
-                )
+                return MOI.modify(model, ci, MOI.ScalarCoefficientChange(var, coeff))
             end
         end
     end
@@ -61,7 +58,7 @@ function add_variable!(
         MOI.modify(
             model,
             MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-            MOI.ScalarCoefficientChange(var, objective_coeff)
+            MOI.ScalarCoefficientChange(var, objective_coeff),
         )
     end
 
@@ -86,7 +83,7 @@ function add_constraint!(
     model,
     coeffs::Dict{MOI.VariableIndex,Float64},
     constraint_set::MOI.AbstractSet;
-    name = nothing
+    name=nothing,
 )
     terms = [MOI.ScalarAffineTerm(coeff, var) for (var, coeff) in coeffs if coeff != 0.0]
     func = MOI.ScalarAffineFunction(terms, 0.0)

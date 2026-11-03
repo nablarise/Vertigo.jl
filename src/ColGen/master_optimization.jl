@@ -16,7 +16,6 @@ end
 Base.show(io::IO, sol::MasterPrimalSolution) = show(io, sol.sol)
 Base.show(io::IO, sol::MasterDualSolution) = show(io, sol.sol)
 
-
 struct MasterSolution
     moi_termination_status::MOI.TerminationStatusCode
     moi_primal_status::MOI.ResultStatusCode
@@ -46,8 +45,7 @@ function optimize_master_lp_problem!(master, ::ColGenWorkspace)
     dual_obj_value = MOI.get(moi_master(master), MOI.DualObjectiveValue())
     constraint_duals = get_dual_solution(moi_master(master))
     dual_sol = MasterDualSolution(
-        DualMoiSolution(dual_obj_value, constraint_duals),
-        master.coupling_constraint_ids
+        DualMoiSolution(dual_obj_value, constraint_duals), master.coupling_constraint_ids
     )
 
     return MasterSolution(
@@ -55,7 +53,7 @@ function optimize_master_lp_problem!(master, ::ColGenWorkspace)
         MOI.get(moi_master(master), MOI.PrimalStatus()),
         MOI.get(moi_master(master), MOI.DualStatus()),
         primal_sol,
-        dual_sol
+        dual_sol,
     )
 end
 

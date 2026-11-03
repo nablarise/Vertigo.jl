@@ -121,7 +121,7 @@ function compute_column_reduced_cost(
     sp_id,
     sol::AbstractSubproblemSolution,
     sp_reduced_costs,
-    convexity_duals::Tuple{Float64,Float64}
+    convexity_duals::Tuple{Float64,Float64},
 )
     rc = subproblem_fixed_cost(decomp, sp_id)
     for (sp_var, val) in nonzero_entries(sol)
@@ -138,7 +138,9 @@ end
 Lagrangian contribution from pure master variables:
     Σₛ min{ (gₛ - Σᵢ φᵢₛ πᵢ) · Yₛ,  (gₛ - Σᵢ φᵢₛ πᵢ) · Ȳₛ }
 """
-function compute_dual_bound_pure_master_contribution(decomp::AbstractDecomposition, dual_values)
+function compute_dual_bound_pure_master_contribution(
+    decomp::AbstractDecomposition, dual_values
+)
     contrib = 0.0
     for y_var in pure_master_variables(decomp)
         rc_y = pure_master_cost(decomp, y_var)
@@ -158,8 +160,7 @@ Coefficient of a column λ in a branching constraint on original variable `orig_
 Equals Σ_{(z,v) ∈ sol} v · [z maps to orig_var].
 """
 function compute_branching_column_coefficient(
-    decomp::AbstractDecomposition, orig_var, sp_id,
-    sol::AbstractSubproblemSolution
+    decomp::AbstractDecomposition, orig_var, sp_id, sol::AbstractSubproblemSolution
 )
     coeff = 0.0
     for (sp_var, val) in nonzero_entries(sol)
@@ -176,13 +177,14 @@ end
 Project master LP solution (λ̄, ȳ) back to original variable space x̄.
 """
 function project_to_original(
-    decomp::AbstractDecomposition, pool::AbstractColumnPool,
-    master_primal_values
+    decomp::AbstractDecomposition, pool::AbstractColumnPool, master_primal_values
 )
     x_values = Dict{Any,Float64}()
     for (col_var, rec) in columns(pool)
         λ_val = master_primal_values(col_var)
-        iszero(λ_val) && continue
+        if iszero(λ_val)
+            continue
+        end
         sp_id = column_sp_id(rec)
         for (sp_var, z_val) in column_nonzero_entries(rec)
             orig_var = mapped_original_var(decomp, sp_id, sp_var)

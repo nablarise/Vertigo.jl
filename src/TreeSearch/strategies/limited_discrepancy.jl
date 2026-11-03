@@ -22,14 +22,17 @@ struct LimitedDiscrepancyStrategy{S<:AbstractSearchStrategy} <: AbstractSearchSt
 end
 
 # Delegate container operations to inner strategy
-init_container(s::LimitedDiscrepancyStrategy, root::SearchNode) =
-    init_container(s.inner_strategy, root)
+function init_container(s::LimitedDiscrepancyStrategy, root::SearchNode)
+    return init_container(s.inner_strategy, root)
+end
 
-select_node!(s::LimitedDiscrepancyStrategy, container) =
-    select_node!(s.inner_strategy, container)
+function select_node!(s::LimitedDiscrepancyStrategy, container)
+    return select_node!(s.inner_strategy, container)
+end
 
-insert_node!(s::LimitedDiscrepancyStrategy, container, node::SearchNode) =
-    insert_node!(s.inner_strategy, container, node)
+function insert_node!(s::LimitedDiscrepancyStrategy, container, node::SearchNode)
+    return insert_node!(s.inner_strategy, container, node)
+end
 
 """
     DiscrepancyData{U}

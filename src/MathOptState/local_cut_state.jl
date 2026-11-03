@@ -56,10 +56,9 @@ end
 
 Create an empty local cut change diff with no additions or removals.
 """
-LocalCutChangeDiff() = LocalCutChangeDiff(
-    Vector{AddLocalCutChange}(),
-    Vector{RemoveLocalCutChange}(),
-)
+function LocalCutChangeDiff()
+    return LocalCutChangeDiff(Vector{AddLocalCutChange}(), Vector{RemoveLocalCutChange}())
+end
 
 """
     LocalCutTrackerHelper
@@ -113,14 +112,12 @@ end
 
 Add the cut to the backend and register its constraint index in the helper.
 """
-function apply_change!(
-    backend, change::AddLocalCutChange, helper::LocalCutTrackerHelper
-)
+function apply_change!(backend, change::AddLocalCutChange, helper::LocalCutTrackerHelper)
     cut = change.cut
     f = MOI.ScalarAffineFunction(cut.terms, 0.0)
     ci = MOI.add_constraint(backend, f, cut.set)
     helper.active_cuts[cut.id] = TaggedCI(ci)
-    return
+    return nothing
 end
 
 """
@@ -128,16 +125,14 @@ end
 
 Delete the cut from the backend and unregister it from the helper.
 """
-function apply_change!(
-    backend, change::RemoveLocalCutChange, helper::LocalCutTrackerHelper
-)
+function apply_change!(backend, change::RemoveLocalCutChange, helper::LocalCutTrackerHelper)
     cut = change.cut
     tagged = helper.active_cuts[cut.id]
     with_typed_ci(tagged) do ci
-        MOI.delete(backend, ci)
+        return MOI.delete(backend, ci)
     end
     delete!(helper.active_cuts, cut.id)
-    return
+    return nothing
 end
 
 """
@@ -147,16 +142,14 @@ Apply a full diff: remove first, then add.
 
 Removals precede additions to avoid constraint conflicts when re-entering a node.
 """
-function apply_change!(
-    backend, diff::LocalCutChangeDiff, helper::LocalCutTrackerHelper
-)
+function apply_change!(backend, diff::LocalCutChangeDiff, helper::LocalCutTrackerHelper)
     for change in diff.remove_cuts
         apply_change!(backend, change, helper)
     end
     for change in diff.add_cuts
         apply_change!(backend, change, helper)
     end
-    return
+    return nothing
 end
 
 """

@@ -19,7 +19,7 @@ struct ColumnData
     obj_coeff::Float64
     lower_bound::Float64
     upper_bound::Float64
-    entries::Vector{Tuple{TaggedCI, Float64}}
+    entries::Vector{Tuple{TaggedCI,Float64}}
 end
 
 """
@@ -71,7 +71,7 @@ Maintains a mapping from column IDs to their active `MOI.VariableIndex`.
 - `active_columns::Dict{Int, MOI.VariableIndex}`: Maps column ID to variable index.
 """
 mutable struct ColumnTrackerHelper
-    active_columns::Dict{Int, MOI.VariableIndex}
+    active_columns::Dict{Int,MOI.VariableIndex}
 end
 
 """
@@ -79,7 +79,7 @@ end
 
 Create a helper with no active columns.
 """
-ColumnTrackerHelper() = ColumnTrackerHelper(Dict{Int, MOI.VariableIndex}())
+ColumnTrackerHelper() = ColumnTrackerHelper(Dict{Int,MOI.VariableIndex}())
 
 """
     ColumnTracker <: AbstractMathOptStateTracker
@@ -121,10 +121,12 @@ function apply_change!(backend, change::AddColumnChange, helper::ColumnTrackerHe
     col = change.column
     vi = MOI.add_variable(backend)
     helper.active_columns[col.id] = vi
-    isfinite(col.lower_bound) &&
+    if isfinite(col.lower_bound)
         MOI.add_constraint(backend, vi, MOI.GreaterThan(col.lower_bound))
-    isfinite(col.upper_bound) &&
+    end
+    if isfinite(col.upper_bound)
         MOI.add_constraint(backend, vi, MOI.LessThan(col.upper_bound))
+    end
     MOI.modify(
         backend,
         MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
@@ -132,12 +134,10 @@ function apply_change!(backend, change::AddColumnChange, helper::ColumnTrackerHe
     )
     for (tagged, coeff) in col.entries
         with_typed_ci(tagged) do ci
-            MOI.modify(
-                backend, ci, MOI.ScalarCoefficientChange(vi, coeff)
-            )
+            return MOI.modify(backend, ci, MOI.ScalarCoefficientChange(vi, coeff))
         end
     end
-    return
+    return nothing
 end
 
 """
@@ -153,7 +153,7 @@ function apply_change!(backend, change::RemoveColumnChange, helper::ColumnTracke
     vi = helper.active_columns[col.id]
     MOI.delete(backend, vi)
     delete!(helper.active_columns, col.id)
-    return
+    return nothing
 end
 
 """
@@ -170,7 +170,7 @@ function apply_change!(backend, diff::ColumnChangeDiff, helper::ColumnTrackerHel
     for change in diff.add_columns
         apply_change!(backend, change, helper)
     end
-    return
+    return nothing
 end
 
 """
@@ -181,9 +181,7 @@ Merge two forward diffs: parent operations first, local appended.
 Forward traversal accumulates columns from root downward, so the parent's
 operations must appear before the child's.
 """
-function merge_forward_change_diff(
-    parent::ColumnChangeDiff, local_diff::ColumnChangeDiff
-)
+function merge_forward_change_diff(parent::ColumnChangeDiff, local_diff::ColumnChangeDiff)
     return ColumnChangeDiff(
         vcat(parent.add_columns, local_diff.add_columns),
         vcat(parent.remove_columns, local_diff.remove_columns),
@@ -197,9 +195,7 @@ Merge two backward diffs: local unwind first, parent unwind appended.
 
 Backward traversal unwinds the child before unwinding the parent.
 """
-function merge_backward_change_diff(
-    parent::ColumnChangeDiff, local_diff::ColumnChangeDiff
-)
+function merge_backward_change_diff(parent::ColumnChangeDiff, local_diff::ColumnChangeDiff)
     return ColumnChangeDiff(
         vcat(local_diff.add_columns, parent.add_columns),
         vcat(local_diff.remove_columns, parent.remove_columns),
@@ -211,16 +207,16 @@ end
 
 Return the root state with empty forward and backward diffs (no columns at root).
 """
-root_state(::ColumnTracker, backend) =
-    ModelState(ColumnChangeDiff(), ColumnChangeDiff())
+root_state(::ColumnTracker, backend) = ModelState(ColumnChangeDiff(), ColumnChangeDiff())
 
 """
     new_state(::ColumnTracker, fwd, bwd) -> ModelState{ColumnChangeDiff}
 
 Wrap forward and backward diffs into a `ModelState`.
 """
-new_state(::ColumnTracker, fwd::ColumnChangeDiff, bwd::ColumnChangeDiff) =
-    ModelState(fwd, bwd)
+function new_state(::ColumnTracker, fwd::ColumnChangeDiff, bwd::ColumnChangeDiff)
+    return ModelState(fwd, bwd)
+end
 
 """
     transform_model!(::ColumnTracker, backend) -> ColumnTrackerHelper

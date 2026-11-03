@@ -23,7 +23,7 @@ function _build_sorted_duals(mast_dual_sol::MasterDualSolution)
     for (i, tagged) in enumerate(cc_ids)
         result[i] = (tagged, _dual_value(mast_dual_sol, tagged))
     end
-    sort!(result; by = first)
+    sort!(result; by=first)
     return SortedDualVector(result)
 end
 
@@ -34,8 +34,7 @@ Two-pointer merge of sorted coupling entries against sorted dual vector.
 Both sides must be sorted by TaggedCI. Returns Σ aᵢⱼ·πᵢ.
 """
 function _merge_dual_contrib(
-    coupling_view::AbstractVector{CouplingEntry},
-    sorted_duals::SortedDualVector
+    coupling_view::AbstractVector{CouplingEntry}, sorted_duals::SortedDualVector
 )
     contrib = 0.0
     duals = sorted_duals.entries
@@ -65,8 +64,11 @@ end
 
 # Hot path: sorted duals built once, shared across subproblems.
 function _compute_sp_reduced_costs(
-    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution,
-    sorted_duals::SortedDualVector, sp_id; zero_cost=false
+    ws::ColGenWorkspace,
+    mast_dual_sol::MasterDualSolution,
+    sorted_duals::SortedDualVector,
+    sp_id;
+    zero_cost=false,
 )
     decomp = ws.decomp
     sp_rc = Dict{MOI.VariableIndex,Float64}()
@@ -78,14 +80,18 @@ function _compute_sp_reduced_costs(
         # TODO: adjust reduced costs for non-robust cut duals
         for bc in ws.branching_constraints
             σ = _dual_value(mast_dual_sol, bc.constraint_index)
-            iszero(σ) && continue
+            if iszero(σ)
+                continue
+            end
             if mapped_original_var(decomp, sp_id, sp_var) == bc.orig_var
                 rc -= σ
             end
         end
         for cut in ws.robust_cuts
             σ = _dual_value(mast_dual_sol, cut.constraint_index)
-            iszero(σ) && continue
+            if iszero(σ)
+                continue
+            end
             ov = mapped_original_var(decomp, sp_id, sp_var)
             if ov !== nothing
                 c = get(cut.coefficients, ov, 0.0)
@@ -101,8 +107,7 @@ end
 
 # Fallback: builds sorted duals per call (used by dw_stabilization.jl).
 function _compute_sp_reduced_costs(
-    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id;
-    zero_cost=false
+    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id; zero_cost=false
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
     return _compute_sp_reduced_costs(
@@ -111,28 +116,28 @@ function _compute_sp_reduced_costs(
 end
 
 function compute_reduced_costs!(
-    ws::ColGenWorkspace, ::Union{Phase0,Phase2},
-    mast_dual_sol::MasterDualSolution
+    ws::ColGenWorkspace, ::Union{Phase0,Phase2}, mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
-    return ReducedCosts(Dict(
-        sp_id => _compute_sp_reduced_costs(
-            ws, mast_dual_sol, sorted_duals, sp_id
-        )
-        for sp_id in subproblem_ids(ws.decomp)
-    ))
+    return ReducedCosts(
+        Dict(
+            sp_id => _compute_sp_reduced_costs(ws, mast_dual_sol, sorted_duals, sp_id) for
+            sp_id in subproblem_ids(ws.decomp)
+        ),
+    )
 end
 
 function compute_reduced_costs!(
     ws::ColGenWorkspace, ::Phase1, mast_dual_sol::MasterDualSolution
 )
     sorted_duals = _build_sorted_duals(mast_dual_sol)
-    return ReducedCosts(Dict(
-        sp_id => _compute_sp_reduced_costs(
-            ws, mast_dual_sol, sorted_duals, sp_id; zero_cost=true
-        )
-        for sp_id in subproblem_ids(ws.decomp)
-    ))
+    return ReducedCosts(
+        Dict(
+            sp_id => _compute_sp_reduced_costs(
+                ws, mast_dual_sol, sorted_duals, sp_id; zero_cost=true
+            ) for sp_id in subproblem_ids(ws.decomp)
+        ),
+    )
 end
 
 function update_reduced_costs!(ws::ColGenWorkspace, ::CGPhase, red_costs::ReducedCosts)
@@ -142,7 +147,7 @@ function update_reduced_costs!(ws::ColGenWorkspace, ::CGPhase, red_costs::Reduce
             MOI.modify(
                 spm,
                 MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
-                MOI.ScalarCoefficientChange(var_index, rc_value)
+                MOI.ScalarCoefficientChange(var_index, rc_value),
             )
         end
     end
