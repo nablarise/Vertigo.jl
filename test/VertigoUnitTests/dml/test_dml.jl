@@ -686,6 +686,60 @@ function test_dml_ownership_errors()
     end
 end
 
+function test_dml_linear_check()
+    # A model without optimizer accepts functions that no solver is attached to yet.
+    function decompose(model)
+        return dantzig_wolfe_decomposition(
+            model,
+            MasterProblemUserDescription(constraints=model[:master]),
+            [SubproblemUserDescription(1; variables=model[:x], constraints=model[:sp])];
+            optimizer=HiGHS.Optimizer,
+        )
+    end
+    function linear_model()
+        model = JuMP.Model()
+        JuMP.@variable(model, x[1:2] >= 0)
+        JuMP.@constraint(model, master, x[1] + x[2] >= 1)
+        JuMP.@constraint(model, sp, x[1] <= 2)
+        JuMP.@objective(model, Min, x[1] + x[2])
+        return model
+    end
+
+    @testset "[dml] a linear model is accepted" begin
+        decomp, _ = decompose(linear_model())
+        @test decomp isa Vertigo.DWDecomposition
+    end
+
+    @testset "[dml] a quadratic constraint is rejected, and named" begin
+        model = linear_model()
+        JuMP.@constraint(model, quad, model[:x][1] * model[:x][2] <= 1)
+        err = _error_of(() -> decompose(model))
+        @test err isa ArgumentError
+        @test occursin("`quad`", err.msg)
+        @test occursin("QuadExpr", err.msg)
+        @test occursin("linear", err.msg)
+    end
+
+    @testset "[dml] a nonlinear constraint is rejected, and named" begin
+        model = linear_model()
+        JuMP.@constraint(model, nl, model[:x][1]^3 <= 4)
+        err = _error_of(() -> decompose(model))
+        @test err isa ArgumentError
+        @test occursin("`nl`", err.msg)
+        @test occursin("NonlinearExpr", err.msg)
+    end
+
+    @testset "[dml] a quadratic objective is rejected" begin
+        model = linear_model()
+        JuMP.@objective(model, Min, model[:x][1]^2 + model[:x][2])
+        err = _error_of(() -> decompose(model))
+        @test err isa ArgumentError
+        @test occursin("objective", err.msg)
+        @test occursin("QuadExpr", err.msg)
+    end
+    return nothing
+end
+
 function test_dml()
     test_dml_basic_gap()
     test_dml_descriptions()
@@ -695,5 +749,6 @@ function test_dml()
     test_dml_pure_master_bounds_and_types()
     test_dml_large_subproblem_objective()
     test_dml_decomposition_matches_flat_model()
+    test_dml_linear_check()
     return test_dml_ownership_errors()
 end

@@ -85,6 +85,7 @@ function dantzig_wolfe_decomposition(
         throw(ArgumentError("At least one subproblem is needed to decompose the model"))
     end
 
+    _check_linear(model)
     _check_subproblem_ids(subproblems)
     _check_ownerships(model, master, subproblems)
 
