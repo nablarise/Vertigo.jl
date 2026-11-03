@@ -1,4 +1,4 @@
-# Decomposition Modeling Language
+# Module Decomposition Modeling Language
 
 The DML (`src/DecompModelLanguage/`) turns a JuMP model and a description of the master and of the
 subproblems into a `DWDecomposition`. It is the only part of Vertigo that reads JuMP objects;

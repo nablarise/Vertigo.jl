@@ -31,6 +31,7 @@ makedocs(;
             "internal-api/subproblem.md",
             "internal-api/column-generation.md",
             "internal-api/branch-and-price.md",
+            "internal-api/branching.md",
         ],
         "API Reference" => [
             "reference/index.md",

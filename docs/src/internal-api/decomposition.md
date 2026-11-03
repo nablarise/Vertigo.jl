@@ -1,4 +1,4 @@
-# Decomposition
+# Module Decomposition
 
 The Decomposition module (`src/Decomposition/`) is the solver's own model of a
 decomposed problem. It holds what column generation needs: the subproblems, the

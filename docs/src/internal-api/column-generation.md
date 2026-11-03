@@ -1,4 +1,4 @@
-# Column generation
+# Module Column generation
 
 `run_column_generation` (`src/ColGen/`) solves the linear relaxation of the
 decomposed problem. It repeats an iteration over phases and stages until no
