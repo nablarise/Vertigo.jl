@@ -9,9 +9,9 @@ const MOI = MathOptInterface
 
 using Printf
 
-using ..Decomposition
-using ..ColGen
-using ..MathOptState
+using ...Decomposition
+using ...ColGen
+using ...MathOptState
 
 include("interface.jl")
 include("branching_utils.jl")

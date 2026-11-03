@@ -20,13 +20,12 @@ using .MathOptState
 include("TreeSearch/TreeSearch.jl")
 using .TreeSearch
 
-# ── Branching strategies ──────────────────────────────────────────────────────
-include("Branching/Branching.jl")
-using .Branching
-
 # ── Branch-cut-price ──────────────────────────────────────────────────────────
 include("BranchCutPrice/BranchCutPrice.jl")
 using .BranchCutPrice
+
+# Branching lives in BranchCutPrice; `Vertigo.Branching` keeps resolving for users and tests.
+const Branching = BranchCutPrice.Branching
 
 # ── Decomposition Modeling Language ───────────────────────────────────────────
 include("DecompModelLanguage/DecompModelLanguage.jl")

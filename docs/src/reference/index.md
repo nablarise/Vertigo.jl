@@ -9,6 +9,6 @@ Names that have no docstring yet do not appear.
 | [Decomposition](decomposition.md) | `Vertigo.Decomposition` |
 | [Column generation](column-generation.md) | `Vertigo.ColGen` |
 | [Branch-and-price](branch-and-price.md) | `Vertigo.BranchCutPrice` |
-| [Branching](branching.md) | `Vertigo.Branching` |
+| [Branching](branching.md) | `Vertigo.BranchCutPrice.Branching` |
 | [Tree search](tree-search.md) | `Vertigo.TreeSearch` |
 | [Model state](model-state.md) | `Vertigo.MathOptState` |

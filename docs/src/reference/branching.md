@@ -1,80 +1,80 @@
 # Branching
 
-Documented names of `Vertigo.Branching`, exported or not.
+Documented names of `Vertigo.BranchCutPrice.Branching`, exported or not.
 
 ## branching_utils.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/branching_utils.jl"]
+Pages = ["BranchCutPrice/Branching/branching_utils.jl"]
 ```
 
 ## branching_candidates.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/branching_candidates.jl"]
+Pages = ["BranchCutPrice/Branching/branching_candidates.jl"]
 ```
 
 ## branching_rules.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/branching_rules.jl"]
+Pages = ["BranchCutPrice/Branching/branching_rules.jl"]
 ```
 
 ## branching_strategy.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/branching_strategy.jl"]
+Pages = ["BranchCutPrice/Branching/branching_strategy.jl"]
 ```
 
 ## phases.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/phases.jl"]
+Pages = ["BranchCutPrice/Branching/phases.jl"]
 ```
 
 ## context.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/context.jl"]
+Pages = ["BranchCutPrice/Branching/context.jl"]
 ```
 
 ## strong_branching.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/strong_branching.jl"]
+Pages = ["BranchCutPrice/Branching/strong_branching.jl"]
 ```
 
 ## lp_probe.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/lp_probe.jl"]
+Pages = ["BranchCutPrice/Branching/lp_probe.jl"]
 ```
 
 ## cg_probe.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/cg_probe.jl"]
+Pages = ["BranchCutPrice/Branching/cg_probe.jl"]
 ```
 
 ## pseudocosts.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/pseudocosts.jl"]
+Pages = ["BranchCutPrice/Branching/pseudocosts.jl"]
 ```
 
 ## kernel.jl
 
 ```@autodocs
 Modules = [Vertigo.Branching]
-Pages = ["Branching/kernel.jl"]
+Pages = ["BranchCutPrice/Branching/kernel.jl"]
 ```

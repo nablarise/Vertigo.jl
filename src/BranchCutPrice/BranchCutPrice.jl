@@ -12,8 +12,10 @@ using ..Decomposition
 using ..ColGen
 using ..TreeSearch
 using ..MathOptState
-using ..Branching
-using ..Branching:
+
+include("Branching/Branching.jl")
+using .Branching
+using .Branching:
     bp_decomp,
     bp_pool,
     bp_branching_constraints,
