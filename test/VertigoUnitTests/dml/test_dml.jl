@@ -212,6 +212,99 @@ function test_dml_silent()
     end
 end
 
+function test_dml_multiplicities()
+    # The convexity constraints of the master, as (lower, upper) sets.
+    function master_bounds(decomp, sp_id)
+        master = Vertigo.Decomposition.master_model(decomp)
+        lb = with_typed_ci(
+            ci -> MOI.get(master, MOI.ConstraintSet(), ci).lower,
+            Vertigo.Decomposition.convexity_lb_ci(decomp, sp_id),
+        )
+        ub = with_typed_ci(
+            ci -> MOI.get(master, MOI.ConstraintSet(), ci).upper,
+            Vertigo.Decomposition.convexity_ub_ci(decomp, sp_id),
+        )
+        return (lb, ub)
+    end
+    bounds(decomp, sp_id) = Vertigo.Decomposition.convexity_bounds(decomp, sp_id)
+
+    @testset "[dml] multiplicities default to one solution per subproblem" begin
+        @test SubproblemOptions().lower_multiplicity == 1
+        @test SubproblemOptions().upper_multiplicity == 1
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        decomp, sp_map = _decompose_gap(model)
+        for k in 1:2
+            @test bounds(decomp, sp_map[k]) == (1.0, 1.0)
+            @test master_bounds(decomp, sp_map[k]) == (1.0, 1.0)
+        end
+    end
+
+    @testset "[dml] multiplicities are chosen per subproblem" begin
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        options = Dict(
+            1 => SubproblemOptions(lower_multiplicity=0, upper_multiplicity=3),
+            2 => SubproblemOptions(lower_multiplicity=2, upper_multiplicity=2),
+        )
+        decomp, sp_map = _decompose_gap(model; options=k -> options[k])
+        @test bounds(decomp, sp_map[1]) == (0.0, 3.0)
+        @test master_bounds(decomp, sp_map[1]) == (0.0, 3.0)
+        @test bounds(decomp, sp_map[2]) == (2.0, 2.0)
+        @test master_bounds(decomp, sp_map[2]) == (2.0, 2.0)
+
+        # One subproblem changed, the other keeps the default.
+        decomp, sp_map = _decompose_gap(
+            model; options=k -> SubproblemOptions(upper_multiplicity=(k == 2) ? 5 : 1)
+        )
+        @test master_bounds(decomp, sp_map[1]) == (1.0, 1.0)
+        @test master_bounds(decomp, sp_map[2]) == (1.0, 5.0)
+    end
+
+    @testset "[dml] multiplicities of a user-overridden subproblem" begin
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        decomp, sp_map = _decompose_gap(
+            model;
+            options=k -> SubproblemOptions(
+                user_overridden=(k == 1), lower_multiplicity=0, upper_multiplicity=4
+            ),
+        )
+        for k in 1:2
+            @test master_bounds(decomp, sp_map[k]) == (0.0, 4.0)
+        end
+    end
+
+    @testset "[dml] inconsistent multiplicities name the subproblem" begin
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        for (lb, ub) in ((-1, 2), (3, 2), (0, 0), (2, -1))
+            err = _error_of(
+                () -> _decompose_gap(
+                    model;
+                    options=k -> SubproblemOptions(
+                        lower_multiplicity=(k == 2) ? lb : 1,
+                        upper_multiplicity=(k == 2) ? ub : 1,
+                    ),
+                ),
+            )
+            @test err isa ArgumentError
+            @test occursin("subproblem 2", err.msg)
+            @test occursin("($lb, $ub)", err.msg)
+        end
+        # The boundary cases are accepted.
+        for (lb, ub) in ((0, 1), (1, 1), (0, 7), (5, 5))
+            decomp, sp_map = _decompose_gap(
+                model;
+                options=k -> SubproblemOptions(
+                    lower_multiplicity=lb, upper_multiplicity=ub
+                ),
+            )
+            @test master_bounds(decomp, sp_map[1]) == (Float64(lb), Float64(ub))
+        end
+    end
+end
+
 function test_dml_user_overridden_subproblem()
     @testset "[dml] user-overridden subproblem has no model" begin
         model = _build_gap_jump_model()
@@ -745,6 +838,7 @@ function test_dml()
     test_dml_descriptions()
     test_dml_pure_master_variables()
     test_dml_silent()
+    test_dml_multiplicities()
     test_dml_user_overridden_subproblem()
     test_dml_pure_master_bounds_and_types()
     test_dml_large_subproblem_objective()

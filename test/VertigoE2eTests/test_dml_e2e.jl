@@ -509,6 +509,73 @@ function test_dml_bp_over_containers()
     end
 end
 
+# Routes of one subproblem: a column serves one of the two customers `y[1]`, `y[2]`, at cost
+# `cost`. The master needs `y[1] >= 2` and `y[2] >= 1`, so it combines three columns at
+# least. `sense` is the sense of the objective, with the costs negated for a maximisation.
+function _dml_routes(; lower, upper, sense=JuMP.MIN_SENSE, nonempty=true)
+    cost = [4.0, 5.0]
+    sign = sense == JuMP.MIN_SENSE ? 1.0 : -1.0
+    model = Model()
+    @variable(model, y[1:2], Bin)
+    @constraint(model, need[i in 1:2], y[i] >= (i == 1 ? 2 : 1))
+    @constraint(model, one_customer, y[1] + y[2] <= 1)
+    nonempty && @constraint(model, not_empty, y[1] + y[2] >= 1)
+    @objective(model, sense, sign * sum(cost[i] * y[i] for i in 1:2))
+    return dantzig_wolfe_decomposition(
+        model,
+        MasterProblemUserDescription(constraints=need),
+        [
+            SubproblemUserDescription(
+                1;
+                variables=y,
+                constraints=nonempty ? [one_customer, not_empty] : [one_customer],
+                options=SubproblemOptions(
+                    lower_multiplicity=lower, upper_multiplicity=upper
+                ),
+            ),
+        ];
+        optimizer=HiGHS.Optimizer,
+    )
+end
+
+function test_dml_multiplicities(; smoothing_alpha=0.0)
+    @testset "[dml] multiplicities set the number of columns of a subproblem" begin
+        function solve(; kwargs...)
+            decomp, sp_map = _dml_routes(; kwargs...)
+            ws = _build_colgen_context_from_dml(decomp, sp_map; smoothing_alpha)
+            return run_column_generation(ws)
+        end
+
+        # Three columns (two for customer 1, one for customer 2) cover the needs: 2*4 + 5.
+        for upper in (3, 4, 10)
+            output = solve(lower=0, upper=upper)
+            @test output.status == optimal
+            @test output.master_lp_obj ≈ 13.0 atol = 1e-4
+            @test output.incumbent_dual_bound ≈ 13.0 atol = 1e-4
+        end
+
+        # The lower multiplicity forces useless columns: four non-empty columns cost 4 more.
+        output = solve(lower=4, upper=4)
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ 17.0 atol = 1e-4
+        @test output.incumbent_dual_bound ≈ 17.0 atol = 1e-4
+
+        # With empty columns allowed, the same lower multiplicity costs nothing.
+        output = solve(lower=4, upper=4, nonempty=false)
+        @test output.status == optimal
+        @test output.incumbent_dual_bound ≈ 13.0 atol = 1e-4
+
+        # Maximisation: the upper multiplicity is the one that is paid for.
+        output = solve(lower=0, upper=3, sense=JuMP.MAX_SENSE)
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ -13.0 atol = 1e-4
+        @test output.incumbent_dual_bound ≈ -13.0 atol = 1e-4
+        output = solve(lower=4, upper=4, sense=JuMP.MAX_SENSE)
+        @test output.status == optimal
+        @test output.incumbent_dual_bound ≈ -17.0 atol = 1e-4
+    end
+end
+
 function test_dml_e2e()
     test_dml_bp_over_containers()
     test_dml_user_overridden_subproblem()
@@ -520,5 +587,6 @@ function test_dml_e2e()
         test_dml_with_penalty_cardinality(; smoothing_alpha)
         test_dml_fixed_master_cost(; smoothing_alpha)
         test_dml_dual_bound_pure_master(; smoothing_alpha)
+        test_dml_multiplicities(; smoothing_alpha)
     end
 end

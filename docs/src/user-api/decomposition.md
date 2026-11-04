@@ -53,6 +53,7 @@ description:
 |-----------|-------|--------|
 | `MasterProblemOptions` | `silent = true` | `false` shows the output of the solver of the master |
 | `SubproblemOptions` | `silent = true` | `false` shows the output of the solver of the subproblem |
+| `SubproblemOptions` | `lower_multiplicity = 1`, `upper_multiplicity = 1` | the number of solutions of the subproblem used by a solution, counted with repetitions, is between the two; `(0, fleet)` for identical vehicles |
 | `SubproblemOptions` | `user_overridden = false` | `true`: the subproblem is solved by your own algorithm; no MOI model is built |
 
 ```julia

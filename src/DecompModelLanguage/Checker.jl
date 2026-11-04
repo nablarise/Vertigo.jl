@@ -25,6 +25,32 @@ function _check_subproblem_ids(subproblems)
     return nothing
 end
 
+"""
+    _check_multiplicities(subproblems)
+
+Check that the multiplicities of every subproblem are consistent: `0 <= lower_multiplicity <=
+upper_multiplicity` and `upper_multiplicity >= 1` (a subproblem that can never be used has no
+reason to be described).
+
+Throws an `ArgumentError` naming the subproblem otherwise.
+"""
+function _check_multiplicities(subproblems)
+    for description in subproblems
+        lb = description.options.lower_multiplicity
+        ub = description.options.upper_multiplicity
+        if lb < 0 || ub < lb || ub < 1
+            throw(
+                ArgumentError(
+                    "the multiplicities of the subproblem $(description.id) are " *
+                    "($lb, $ub); they must satisfy 0 <= lower_multiplicity <= " *
+                    "upper_multiplicity and upper_multiplicity >= 1",
+                ),
+            )
+        end
+    end
+    return nothing
+end
+
 # The functions of a linear model: an affine expression, or a single variable (a bound).
 const _LINEAR_FUNCTIONS = (JuMP.AffExpr, JuMP.VariableRef)
 
