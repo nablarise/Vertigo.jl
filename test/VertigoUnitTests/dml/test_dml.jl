@@ -305,6 +305,50 @@ function test_dml_multiplicities()
     end
 end
 
+# A pure master variable without a lower bound is free below: the decomposition must record
+# `-Inf`, as the master model does, and not `0`. The Lagrangian contribution of a pure master
+# variable is `min(rc * lb, rc * ub)` for its reduced cost `rc`; it is `-Inf` when `rc` pushes
+# the variable towards an infinite bound, and `0` when `rc` is zero (not `NaN`, as `0 * Inf`).
+function test_dml_free_pure_master_variable()
+    # A decomposition whose only pure master variable is `y`, declared by `declare`, with the
+    # cost 3 and the coefficient 1 in each of the three `assign`: its reduced cost is 3 - 3π.
+    function decompose_with(declare)
+        model = Model()
+        @variable(model, x[k in 1:2, t in 1:3], Bin)
+        y = declare(model)
+        @constraint(model, assign[t in 1:3], sum(x[k, t] for k in 1:2) + y >= 1)
+        @constraint(model, knapsack[k in 1:2], sum(x[k, t] for t in 1:3) <= 2)
+        @objective(model, Min, sum(x) + 3y)
+        decomp, _ = _decompose_gap(model; variables=[y])
+        return decomp
+    end
+    bounds(decomp) = pure_master_bounds(decomp, only(pure_master_variables(decomp)))
+    function contribution(decomp, π)
+        return Vertigo.Decomposition.compute_dual_bound_pure_master_contribution(
+            decomp, _ -> π
+        )
+    end
+
+    # (name, declaration, expected bounds, expected contribution for π = 0, 1, 2), that is
+    # for the reduced costs 3, 0 and -3.
+    cases = [
+        ("free", m -> @variable(m), (-Inf, Inf), (-Inf, 0.0, -Inf)),
+        ("upper bound only", m -> @variable(m, upper_bound = 4), (-Inf, 4.0), (-Inf, 0.0, -12.0)),
+        ("lower bound only", m -> @variable(m, lower_bound = 2), (2.0, Inf), (6.0, 0.0, -Inf)),
+        ("non-negative", m -> @variable(m, lower_bound = 0), (0.0, Inf), (0.0, 0.0, -Inf)),
+        ("both bounds", m -> @variable(m, 2 <= y <= 7), (2.0, 7.0), (6.0, 0.0, -21.0)),
+    ]
+    for (name, declare, expected_bounds, expected_contributions) in cases
+        @testset "[dml] pure master variable, $name" begin
+            decomp = decompose_with(declare)
+            @test bounds(decomp) == expected_bounds
+            for (π, expected) in zip((0.0, 1.0, 2.0), expected_contributions)
+                @test contribution(decomp, π) == expected
+            end
+        end
+    end
+end
+
 function test_dml_user_overridden_subproblem()
     @testset "[dml] user-overridden subproblem has no model" begin
         model = _build_gap_jump_model()
@@ -841,6 +885,7 @@ function test_dml()
     test_dml_multiplicities()
     test_dml_user_overridden_subproblem()
     test_dml_pure_master_bounds_and_types()
+    test_dml_free_pure_master_variable()
     test_dml_large_subproblem_objective()
     test_dml_decomposition_matches_flat_model()
     test_dml_linear_check()
