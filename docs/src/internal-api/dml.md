@@ -54,50 +54,11 @@ Vertigo that reads JuMP objects; everything after it works on MathOptInterface m
 
 The [Decomposition page](decomposition.md) follows the flow from the hand-over on.
 
-## Basic structures
-
-The user describes what each model contains with the JuMP objects themselves:
-
-```julia
-SubproblemUserDescription(k; variables = x[k, :], constraints = knapsack[k])
-```
-
-**User descriptions** (`UserProblemDescription.jl`) hold one model each:
-
-| Field | `MasterProblemUserDescription` | `SubproblemUserDescription` |
-|-------|-------------------------------|-----------------------------|
-| `id` | none: the master has no id | the identifier of the subproblem; any value that can be sorted |
-| `options` | a `MasterProblemOptions` | a `SubproblemOptions` |
-| `owned_vars` | the `JuMP.VariableRef`s of the model that it owns | the same |
-| `owned_constrs` | the `JuMP.ConstraintRef`s of the model that it owns | the same |
-
-The keyword constructors take `variables` and `constraints` as a reference, a container of
-references or a nested vector of them, and flatten them into `owned_vars` and `owned_constrs`.
-A reference of the wrong kind is rejected there, by `_collect_varconstrs_refs!`.
-
-**Options** (`UserProblemDescription.jl`) are plain structures with defaults, one value per model:
-
-| Structure | Fields |
-|-----------|--------|
-| `MasterProblemOptions` | `silent = true` |
-| `SubproblemOptions` | `silent = true`, `user_overridden = false`, `lower_multiplicity = 1`, `upper_multiplicity = 1` |
-
-**Mappings** (`Mappings.jl`) `VariableMapping` and `ConstraintMapping` link each
-object of the original JuMP model to its copy in the master or a subproblem
-model while the new models are built.
-
-Every structure of the DML:
-
-| Structure | Defined in | Holds |
-|-----------|------------|-------|
-| `MasterProblemOptions`, `SubproblemOptions` | `UserProblemDescription.jl` | the options of one model |
-| `MasterProblemUserDescription` | `UserProblemDescription.jl` | the options, the variables and the constraints of the master |
-| `SubproblemUserDescription` | `UserProblemDescription.jl` | the id, the options, the variables and the constraints of one subproblem |
-| `VariableMapping`, `ConstraintMapping` | `Mappings.jl` | the link between each original object and its copy |
-
-The docstrings of these structures are in the [API Reference](../reference/dml.md).
-
 ## Steps
+
+!!! warning
+
+    This section is to be reviewed.
 
 The chart above, in words.
 
@@ -129,12 +90,3 @@ The chart above, in words.
 | `Transition.jl` | the functions that copy variables, constraints and the objective of the flat model into the new JuMP master and subproblem models |
 | `DantzigWolfe.jl` | `dantzig_wolfe_decomposition`, the entry point: it runs the checks, then `_create_reformulated_jump_models` builds the master and subproblem models and `_build_decomposition` registers everything in the `DWDecomposition` |
 | `macros/dantzig_wolfe.jl` | the `@dantzig_wolfe` macro and its parser, written for an earlier shape of the descriptions; not part of the build until it is adapted |
-
-## Details worth knowing
-
-- **Order.** Variables and constraints are copied in the order of the JuMP model, whatever the
-  order of the lists given to the descriptions.
-- **Overridden subproblems.** For `user_overridden = true`, no model is built and the
-  variables get fresh `MOI.VariableIndex` values `1, 2, …`, in the order of the model. See
-  `_subproblem_variable_indices` in `DantzigWolfe.jl`.
-- **Names.** The copies keep the name of the original object, if it has one.
