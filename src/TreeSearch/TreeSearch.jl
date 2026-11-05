@@ -27,6 +27,7 @@ include("strategies/depth_first.jl")
 include("strategies/best_first.jl")
 include("strategies/breadth_first.jl")
 include("strategies/beam_search.jl")
+include("strategies/plunging.jl")
 include("strategies/limited_discrepancy.jl")
 
 # Public API
@@ -41,6 +42,7 @@ export DepthFirstStrategy
 export BreadthFirstStrategy
 export AbstractBestFirstStrategy, DualBoundBestFirstStrategy, get_priority
 export BeamSearchStrategy
+export PlungingStrategy
 export LimitedDiscrepancyStrategy, DiscrepancyData, filter_by_discrepancy
 export TreeSearchLoggerContext
 export ts_incumbent_value, ts_best_dual_bound, ts_is_minimization

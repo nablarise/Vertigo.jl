@@ -89,7 +89,9 @@ function test_treesearch_node_view()
     @testset "[treesearch] NodeView is a read-only view of a node" begin
         counter = NodeIdCounter()
         root = root_node(counter, SEMPTY, SEMPTY, SData(7))
-        child = child_node(counter, root, SEMPTY, SEMPTY; dual_bound=2.5, user_data=SData(9))
+        child = child_node(
+            counter, root, SEMPTY, SEMPTY; dual_bound=2.5, user_data=SData(9)
+        )
         view = NodeView(child)
         @test view.id == child.id
         @test view.depth == 1
@@ -165,8 +167,40 @@ function test_treesearch_strategies_dfs_child_order()
     end
 end
 
+function test_treesearch_strategies_plunging()
+    @testset "[treesearch] plunging dives into the first child, then backtracks best-first" begin
+        # Same tree as the best-first test. The search dives 1 -> 2 -> 4; node 4 is
+        # closed, so it backtracks to the open node with the lowest dual bound (3),
+        # dives 3 -> 6, then backtracks to 5 and 7.
+        space = StrategyTestSpace(max_depth=2)
+        visited = search(PlungingStrategy(), space, StrategyEvaluator())
+        @test visited == [1, 2, 4, 3, 6, 5, 7]
+
+        # It differs from depth first (1, 2, 4, 5, 3, 6, 7), which does not backtrack
+        # to the best open node.
+        space = StrategyTestSpace(max_depth=2)
+        @test search(DepthFirstStrategy(), space, StrategyEvaluator()) != visited
+    end
+    @testset "[treesearch] plunging container" begin
+        counter = NodeIdCounter()
+        root = root_node(counter, SEMPTY, SEMPTY, SData(1); dual_bound=0.0)
+        strategy = PlungingStrategy()
+        container = init_container(strategy, root)
+        @test !is_empty_container(container)
+        @test select_node!(strategy, container) === root
+        @test is_empty_container(container)
+        a = child_node(counter, root, SEMPTY, SEMPTY; dual_bound=5.0, user_data=SData(2))
+        b = child_node(counter, root, SEMPTY, SEMPTY; dual_bound=1.0, user_data=SData(3))
+        insert_children!(strategy, container, [a, b])
+        @test select_node!(strategy, container) === a   # the first child is the dive node
+        @test select_node!(strategy, container) === b
+        @test is_empty_container(container)
+    end
+end
+
 function test_treesearch_strategies()
     test_treesearch_node_view()
+    test_treesearch_strategies_plunging()
     test_treesearch_strategies_best_first()
     test_treesearch_strategies_beam_search()
     test_treesearch_strategies_bfs_consistency()

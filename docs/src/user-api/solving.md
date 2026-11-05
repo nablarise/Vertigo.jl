@@ -61,8 +61,11 @@ wraps an existing workspace.
 | `log_level` | `0` | tree logger: `0` off, `1` table, `2` verbose |
 | `dot_file` | `nothing` | path of a Graphviz `.dot` file of the tree |
 
-Other tree strategies are `BreadthFirstStrategy` and
-`DualBoundBestFirstStrategy`. `MultiPhaseStrongBranching` is the alternative
+Other tree strategies are `BreadthFirstStrategy`, `DualBoundBestFirstStrategy` and
+`PlungingStrategy`, which dives into the first child of each branching and backtracks to the open
+node with the best dual bound. A custom best-first rule is a subtype of
+`TreeSearch.AbstractBestFirstStrategy` with a `TreeSearch.get_priority(strategy, node::NodeView)`
+method; the node with the lowest priority is selected first. `MultiPhaseStrongBranching` is the alternative
 branching strategy.
 
 ### `BPOutput`

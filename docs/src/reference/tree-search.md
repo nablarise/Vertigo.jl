@@ -65,6 +65,13 @@ Modules = [Vertigo.TreeSearch]
 Pages = ["TreeSearch/strategies/beam_search.jl"]
 ```
 
+## strategies/plunging.jl
+
+```@autodocs
+Modules = [Vertigo.TreeSearch]
+Pages = ["TreeSearch/strategies/plunging.jl"]
+```
+
 ## strategies/limited_discrepancy.jl
 
 ```@autodocs
