@@ -12,79 +12,71 @@ Plain data holder for user-defined branch-cut-and-price parameters.
 Cheap to construct, copy, and compare.
 
 # Fields
-- `colgen::ColGenConfig`: Column generation configuration applied to the
+- `cg_config::ColGenConfig`: Column generation configuration applied to the
   internal `ColGenWorkspace` built from the decomposition (default:
   `ColGenConfig()`).
-- `cg_log_level::Int`: CG-iteration logger verbosity. `0` uses a bare
-  `ColGenWorkspace`; values `> 0` wrap it in a `ColGenLoggerWorkspace`
-  with that level (default: `0`).
-- `strategy`: Tree search strategy (default: `DepthFirstStrategy()`).
-- `node_limit::Int`: Maximum nodes to explore (default: 10000).
-- `tol::Float64`: Numerical tolerance (default: 1e-6).
-- `rmp_time_limit::Float64`: Time limit in seconds for restricted master
-  IP heuristic at each node (default: 60.0).
-- `rmp_heuristic::Bool`: Run the restricted master IP heuristic at each
-  node to find feasible solutions (default: true).
-- `separator`: Robust cut separator (default: `nothing`).
-- `max_cut_rounds::Int`: Maximum cut separation rounds per node
-  (default: 0).
-- `min_gap_improvement::Float64`: Minimum relative gap improvement to
-  continue cut rounds (default: 0.01).
 - `time_limit::Float64`: Wall-clock limit in seconds of the whole search
   (default: `Inf`). It is checked between nodes and, through the column
   generation workspace, between column generation iterations; the
   restricted master heuristic gets at most the time left.
+- `node_limit::Int`: Maximum nodes to explore (default: 10000).
+- `rmp_heuristic_time_limit::Float64`: Time limit in seconds for restricted master
+  IP heuristic at each node (default: 60.0).
+- `rmp_use_heuristic::Bool`: Run the restricted master IP heuristic at each
+  node to find feasible solutions (default: true).
+- `node_select_strategy::TreeSearch.AbstractSearchStrategy`: Node selection strategy (default: `DepthFirstStrategy()`).
 - `branching_strategy`: Branching strategy
   (default: `MostFractionalBranching()`).
+- `cut_config::CutSeparationConfig`: Cut separator and the rounds of the
+  cut-and-column-generation loop (default: `CutSeparationConfig()`, no
+  cut separation).
+- `tolerance::Float64`: Numerical tolerance (default: 1e-6).
 - `log_level::Int`: BCP tree / branching logger verbosity (0 = off,
   1 = table, 2 = BaPCod-style verbose). Default: 0.
 - `dot_file::Union{Nothing,String}`: Path for Graphviz `.dot` tree output
   (default: `nothing` — no dot file written).
 """
 struct BranchCutPriceConfig
-    colgen::ColGen.ColGenConfig
-    cg_log_level::Int
-    strategy::Any
-    node_limit::Int
-    tol::Float64
-    rmp_time_limit::Float64
-    rmp_heuristic::Bool
+    cg_config::ColGen.ColGenConfig
+
     time_limit::Float64
-    separator::Union{Nothing,AbstractCutSeparator}
-    max_cut_rounds::Int
-    min_gap_improvement::Float64
+    node_limit::Int
+
+    rmp_heuristic_time_limit::Float64
+    rmp_use_heuristic::Bool
+
+    node_select_strategy::TreeSearch.AbstractSearchStrategy
     branching_strategy::AbstractBranchingStrategy
+    cut_config::CutSeparationConfig
+
+    tolerance::Float64
+
     log_level::Int
     dot_file::Union{Nothing,String}
+
     function BranchCutPriceConfig(;
-        colgen::ColGen.ColGenConfig=ColGen.ColGenConfig(),
-        cg_log_level::Int=0,
-        strategy=TreeSearch.DepthFirstStrategy(),
-        node_limit::Int=10_000,
-        tol::Float64=1e-6,
-        rmp_time_limit::Float64=60.0,
-        rmp_heuristic::Bool=true,
+        cg_config::ColGen.ColGenConfig=ColGen.ColGenConfig(),
         time_limit::Float64=Inf,
-        separator::Union{Nothing,AbstractCutSeparator}=nothing,
-        max_cut_rounds::Int=0,
-        min_gap_improvement::Float64=0.01,
+        node_limit::Int=10_000,
+        rmp_heuristic_time_limit::Float64=60.0,
+        rmp_use_heuristic::Bool=true,
+        node_select_strategy::TreeSearch.AbstractSearchStrategy=TreeSearch.DepthFirstStrategy(),
         branching_strategy::AbstractBranchingStrategy=MostFractionalBranching(),
+        cut_config::CutSeparationConfig=CutSeparationConfig(),
+        tolerance::Float64=1e-6,
         log_level::Int=0,
         dot_file::Union{Nothing,String}=nothing,
     )
         return new(
-            colgen,
-            cg_log_level,
-            strategy,
-            node_limit,
-            tol,
-            rmp_time_limit,
-            rmp_heuristic,
+            cg_config,
             time_limit,
-            separator,
-            max_cut_rounds,
-            min_gap_improvement,
+            node_limit,
+            rmp_heuristic_time_limit,
+            rmp_use_heuristic,
+            node_select_strategy,
             branching_strategy,
+            cut_config,
+            tolerance,
             log_level,
             dot_file,
         )

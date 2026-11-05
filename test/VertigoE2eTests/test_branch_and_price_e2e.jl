@@ -25,7 +25,7 @@ function test_bp_gap_a_instances()
             bcp_ws = BranchCutPriceWorkspace(
                 decomp,
                 BranchCutPriceConfig(
-                    colgen=ColGenConfig(smoothing_alpha=0.5),
+                    cg_config=ColGenConfig(smoothing_alpha=0.5),
                     node_limit=5_000,
                     dot_file=dot_path,
                 ),

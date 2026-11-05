@@ -35,7 +35,7 @@ function init_container(strategy::BeamSearchStrategy, root::SearchNode)
     N = typeof(root)
     current = PriorityQueue{N,Float64}()
     next = PriorityQueue{N,Float64}()
-    enqueue!(current, root, get_priority(strategy.inner_strategy, root))
+    enqueue!(current, root, get_priority(strategy.inner_strategy, NodeView(root)))
     return BeamSearchContainer{N}(current, next, 0, strategy.max_width)
 end
 
@@ -55,7 +55,9 @@ end
 function insert_node!(
     strategy::BeamSearchStrategy, container::BeamSearchContainer, node::SearchNode
 )
-    enqueue!(container.next_queue, node, get_priority(strategy.inner_strategy, node))
+    enqueue!(
+        container.next_queue, node, get_priority(strategy.inner_strategy, NodeView(node))
+    )
     return nothing
 end
 

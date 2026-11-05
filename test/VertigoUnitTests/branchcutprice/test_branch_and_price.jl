@@ -2,7 +2,37 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
+# A best-first strategy ordering the nodes by the BCP data of a `NodeView`.
+struct DeepestFirstByView <: Vertigo.TreeSearch.AbstractBestFirstStrategy end
+const VIEWED_NODES = Tuple{Int,Any,Any}[]
+function Vertigo.TreeSearch.get_priority(::DeepestFirstByView, node::Vertigo.TreeSearch.NodeView)
+    push!(
+        VIEWED_NODES,
+        (node.depth, Vertigo.branching_direction(node), Vertigo.parent_lp_obj(node)),
+    )
+    return -Float64(node.depth)
+end
+
 function test_branch_and_price()
+    @testset "[branch_and_price] a priority function reads the BCP data of a node view" begin
+        empty!(VIEWED_NODES)
+        inst = random_gap_instance(2, 4; seed=42)
+        ws = BranchCutPriceWorkspace(
+            build_gap_decomp(inst),
+            BranchCutPriceConfig(node_limit=100, node_select_strategy=DeepestFirstByView()),
+        )
+        output = run_branch_and_price(ws)
+        @test !isnothing(output.incumbent)
+        @test VIEWED_NODES[1] == (0, nothing, nothing)   # the root has no branching data
+        @test all(t -> t[1] == 0 || !isnothing(t[2]), VIEWED_NODES)   # children know their direction
+    end
+
+    @testset "[branch_and_price] the node selection strategy must be a search strategy" begin
+        config = BranchCutPriceConfig(node_select_strategy=Vertigo.TreeSearch.BreadthFirstStrategy())
+        @test config.node_select_strategy isa Vertigo.TreeSearch.AbstractSearchStrategy
+        @test_throws TypeError BranchCutPriceConfig(node_select_strategy=:depth_first)
+    end
+
     @testset "[branch_and_price] small GAP finds integer solution" begin
         inst = random_gap_instance(2, 4; seed=42)
         decomp = build_gap_decomp(inst)

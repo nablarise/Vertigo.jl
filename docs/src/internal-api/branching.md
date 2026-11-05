@@ -98,7 +98,7 @@ A `BranchingContext` receives a call before and after each step of the selection
 
 - The accessors `bp_decomp`, `bp_pool`, `bp_branching_constraints`, ... (`interface.jl`) exist so
   the module works on a `ColGenWorkspace` and on a `ColGenLoggerWorkspace` alike.
-- The strategies read `space.ws`, `space.backend` and `space.tol`, and `node.user_data.cg_output`,
+- The strategies read `space.ws`, `space.backend` and `space.tolerance`, and `node.user_data.cg_output`,
   without naming `BranchCutPriceWorkspace`.
 - A decision is one original variable. Branching on a sum of variables (an edge, the number of
   vehicles, a cutset) needs a way to map several subproblem variables to one original variable, or a

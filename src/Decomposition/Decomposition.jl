@@ -15,7 +15,6 @@ include("dw_decomposition.jl")
 include("subproblem_solution.jl")
 include("column_pool.jl")
 include("builder.jl")
-include("cut_separation.jl")
 
 # Abstract types
 export AbstractDecomposition, AbstractSubproblemSolution
@@ -52,7 +51,6 @@ export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
 # Cut separation
-export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 
 # Interface functions
 export original_cost, coupling_coefficients

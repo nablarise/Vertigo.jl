@@ -3,14 +3,29 @@
 # SPDX-License-Identifier: MIT
 
 """
-    CutColGenContext
+    CutSeparationConfig
 
-Parameters for the cut-and-column-generation loop at each node.
-`max_rounds = 0` means column generation only (no cut separation).
+Parameters of the cut-and-column-generation loop at each node.
+
+# Fields
+- `separator`: Robust cut separator, or `nothing` for no cut separation
+  (default: `nothing`).
+- `max_cut_rounds::Int`: Maximum cut separation rounds per node
+  (default: 0).
+- `min_gap_improvement::Float64`: Minimum relative improvement of the
+  master LP value to continue cut rounds (default: 0.01).
 """
-struct CutColGenContext
-    max_rounds::Int
+struct CutSeparationConfig
+    separator::Union{Nothing,AbstractCutSeparator}
+    max_cut_rounds::Int
     min_gap_improvement::Float64
+    function CutSeparationConfig(;
+        separator::Union{Nothing,AbstractCutSeparator}=nothing,
+        max_cut_rounds::Int=0,
+        min_gap_improvement::Float64=0.01,
+    )
+        return new(separator, max_cut_rounds, min_gap_improvement)
+    end
 end
 
 """
@@ -22,14 +37,14 @@ master LP objective between rounds and stops when improvement
 falls below `min_gap_improvement`.
 """
 function stop_cutcolgen(
-    ctx::CutColGenContext,
+    ctx::CutSeparationConfig,
     round::Int,
     nb_cuts::Int,
     cg_status::ColGen.ColGenStatus,
     prev_lp::Float64,
     lp::Float64,
 )::Bool
-    if round >= ctx.max_rounds
+    if round >= ctx.max_cut_rounds
         return true
     end
     if nb_cuts == 0

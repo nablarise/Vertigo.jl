@@ -21,7 +21,7 @@ output = run_branch_and_price(BranchCutPriceWorkspace(decomp, BranchCutPriceConf
 | `smoothing_alpha` | `0.0` | Wentges smoothing coefficient; `0.0` disables it |
 | `max_cg_iterations` | `1000` | hard limit on iterations per phase |
 | `max_misprice_iterations` | `10` | cap on misprice iterations per iteration |
-| `silent` | `false` | skip logging |
+| `log_level` | `0` | log verbosity: `0` prints nothing, `1` one line per iteration, `2` adds detail |
 
 ### `ColGenOutput`
 
@@ -40,8 +40,9 @@ differ, Vertigo warns that column generation converged with an open gap.
 
 ### Logging
 
-`ColGenLoggerWorkspace(workspace; log_level = 1)` wraps a workspace; level 2
-adds detail. `ColGenConfig(silent = true)` turns the log off.
+`ColGenConfig(log_level = 1)` prints one line per column generation iteration; level 2
+adds detail. The default, `0`, prints nothing. `ColGenLoggerWorkspace(workspace; log_level = 1)`
+wraps an existing workspace.
 
 ## Branch-and-price
 
@@ -49,16 +50,13 @@ adds detail. `ColGenConfig(silent = true)` turns the log off.
 
 | Keyword | Default | Meaning |
 |---------|---------|---------|
-| `colgen` | `ColGenConfig()` | configuration of the column generation at each node |
-| `cg_log_level` | `0` | `> 0` wraps column generation in a logger of that level |
-| `strategy` | `DepthFirstStrategy()` | tree search strategy |
+| `cg_config` | `ColGenConfig()` | configuration of the column generation at each node |
+| `node_select_strategy` | `DepthFirstStrategy()` | tree search strategy |
 | `node_limit` | `10_000` | maximum nodes to explore |
-| `tol` | `1e-6` | numerical tolerance |
-| `rmp_heuristic` | `true` | run the restricted master IP heuristic at each node |
-| `rmp_time_limit` | `60.0` | seconds allowed to that heuristic per node |
-| `separator` | `nothing` | robust cut separator |
-| `max_cut_rounds` | `0` | cut rounds per node |
-| `min_gap_improvement` | `0.01` | relative gap improvement needed to continue cut rounds |
+| `tolerance` | `1e-6` | numerical tolerance |
+| `rmp_use_heuristic` | `true` | run the restricted master IP heuristic at each node |
+| `rmp_heuristic_time_limit` | `60.0` | seconds allowed to that heuristic per node |
+| `cut_config` | `CutSeparationConfig()` | cut separation, see below |
 | `branching_strategy` | `MostFractionalBranching()` | how to choose the branching variable |
 | `log_level` | `0` | tree logger: `0` off, `1` table, `2` verbose |
 | `dot_file` | `nothing` | path of a Graphviz `.dot` file of the tree |
@@ -86,4 +84,14 @@ branching strategy.
 Implement `AbstractCutSeparator` (a `separate` method returning
 `SeparatedCut`s), or wrap a callback in `CustomCutSeparator(callback)`, where
 `callback(x::Dict{X,Float64})` returns a `Vector{SeparatedCut{X}}`. Pass it as
-`separator` with `max_cut_rounds > 0`.
+`separator` of a `CutSeparationConfig`, and set `max_cut_rounds > 0`:
+
+| Keyword | Default | Meaning |
+|---------|---------|---------|
+| `separator` | `nothing` | robust cut separator |
+| `max_cut_rounds` | `0` | cut rounds per node |
+| `min_gap_improvement` | `0.01` | relative improvement of the master LP value needed to continue cut rounds |
+
+```julia
+BranchCutPriceConfig(cut_config = CutSeparationConfig(separator = sep, max_cut_rounds = 5))
+```

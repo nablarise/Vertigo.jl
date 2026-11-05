@@ -310,7 +310,7 @@ function select_branching_variable(
         primal_values;
         max_candidates=mpsb.max_candidates,
         mu=mpsb.mu,
-        tol=space.tol,
+        tol=space.tolerance,
     )
 end
 

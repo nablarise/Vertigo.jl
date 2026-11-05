@@ -74,7 +74,6 @@ and branch and price then ask questions of the result.
 | Identifiers | `PricingSubproblemId`, `TaggedCI` (a constraint index that can be stored and sorted), `CouplingEntry` and `CouplingCoefficients` (the coefficients of a variable, as a slice of one flat array) | `moi_types.jl` |
 | A subproblem solution | `_SpSolution`: sorted entries, and a fingerprint to find duplicates | `subproblem_solution.jl` |
 | The columns found | `ColumnPool`, with one `ColumnRecord` per column | `column_pool.jl` |
-| Robust cuts | `AbstractCutSeparator`, `SeparatedCut`, `CustomCutSeparator` | `cut_separation.jl` |
 
 ## Files
 
@@ -87,4 +86,3 @@ and branch and price then ask questions of the result.
 | `subproblem_solution.jl` | the subproblem solution type |
 | `column_pool.jl` | the pool of columns, indexed by column variable, subproblem and fingerprint |
 | `builder.jl` | `DWDecompositionBuilder` and `build`, with or without the MOI models |
-| `cut_separation.jl` | the interface of a robust cut separator |

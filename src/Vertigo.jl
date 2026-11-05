@@ -26,6 +26,7 @@ using .BranchCutPrice
 
 # Branching lives in BranchCutPrice; `Vertigo.Branching` keeps resolving for users and tests.
 const Branching = BranchCutPrice.Branching
+const Cutting = BranchCutPrice.Cutting
 
 # ── Decomposition Modeling Language ───────────────────────────────────────────
 include("DecompModelLanguage/DecompModelLanguage.jl")
@@ -81,7 +82,7 @@ export convexity_ub_pairs, convexity_lb_pairs
 
 # Branch-and-price
 export BPEvaluator, BPOutput
-export BranchCutPriceConfig, BranchCutPriceWorkspace
+export BranchCutPriceConfig, BranchCutPriceWorkspace, CutSeparationConfig
 export run_branch_and_price
 export TreeSearchLoggerContext
 

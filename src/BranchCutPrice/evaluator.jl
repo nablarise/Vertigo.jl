@@ -28,9 +28,9 @@ function _should_prune(space::BranchCutPriceWorkspace, db)::Bool
         return false
     end
     if is_minimization(space.ws)
-        return db >= space.incumbent.obj_value - space.tol
+        return db >= space.incumbent.obj_value - space.tolerance
     end
-    return db <= space.incumbent.obj_value + space.tol
+    return db <= space.incumbent.obj_value + space.tolerance
 end
 
 function _is_improving_incumbent(
@@ -40,9 +40,9 @@ function _is_improving_incumbent(
         return true
     end
     if is_minimization(space.ws)
-        return sol.obj_value < space.incumbent.obj_value - space.tol
+        return sol.obj_value < space.incumbent.obj_value - space.tolerance
     end
-    return sol.obj_value > space.incumbent.obj_value + space.tol
+    return sol.obj_value > space.incumbent.obj_value + space.tolerance
 end
 
 # The bound a node inherits from its parent stays valid: a column generation
@@ -74,9 +74,7 @@ function TreeSearch.evaluate!(::BPEvaluator, space::BranchCutPriceWorkspace, nod
     prev_lp = Inf
 
     # Cut-and-column-generation loop
-    while !stop_cutcolgen(
-        space.cutcolgen_ctx, round, nb_cuts, cg_output.status, prev_lp, lp
-    )
+    while !stop_cutcolgen(space.cut_config, round, nb_cuts, cg_output.status, prev_lp, lp)
         prev_lp = lp
         round += 1
         _set_incumbent_bound!(space)
@@ -146,7 +144,7 @@ function TreeSearch.evaluate!(::BPEvaluator, space::BranchCutPriceWorkspace, nod
     _recompute_global_dual_bound!(space)
 
     # Restricted master IP heuristic
-    if space.rmp_heuristic && !_time_is_up(space)
+    if space.rmp_use_heuristic && !_time_is_up(space)
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
         if !isnothing(rmp_sol) && _is_improving_incumbent(space, rmp_sol)
             space.incumbent = rmp_sol

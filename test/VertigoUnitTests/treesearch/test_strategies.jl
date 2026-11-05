@@ -81,8 +81,26 @@ end
 
 # Must be at module level — Julia does not allow struct definitions inside functions.
 struct ValuePriorityStrategy <: AbstractBestFirstStrategy end
-function TreeSearch.get_priority(::ValuePriorityStrategy, node::SearchNode)
+function TreeSearch.get_priority(::ValuePriorityStrategy, node::NodeView)
     return Float64(node.user_data.value)
+end
+
+function test_treesearch_node_view()
+    @testset "[treesearch] NodeView is a read-only view of a node" begin
+        counter = NodeIdCounter()
+        root = root_node(counter, SEMPTY, SEMPTY, SData(7))
+        child = child_node(counter, root, SEMPTY, SEMPTY; dual_bound=2.5, user_data=SData(9))
+        view = NodeView(child)
+        @test view.id == child.id
+        @test view.depth == 1
+        @test view.dual_bound == 2.5
+        @test view.user_data === child.user_data
+        @test_throws ArgumentError view.parent
+        @test_throws ErrorException (view.dual_bound = 0.0)
+        # The view does not copy the node.
+        child.dual_bound = 4.0
+        @test view.dual_bound == 4.0
+    end
 end
 
 function test_treesearch_strategies_best_first()
@@ -148,6 +166,7 @@ function test_treesearch_strategies_dfs_child_order()
 end
 
 function test_treesearch_strategies()
+    test_treesearch_node_view()
     test_treesearch_strategies_best_first()
     test_treesearch_strategies_beam_search()
     test_treesearch_strategies_bfs_consistency()

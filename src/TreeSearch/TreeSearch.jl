@@ -32,7 +32,7 @@ include("strategies/limited_discrepancy.jl")
 # Public API
 export AbstractSearchStrategy, AbstractSearchSpace, AbstractNodeEvaluator
 export NodeStatus, CUTOFF, FEASIBLE, BRANCH
-export SearchNode, NodeIdCounter, root_node, child_node, is_root
+export SearchNode, NodeView, NodeIdCounter, root_node, child_node, is_root
 export find_common_ancestor, transition_to!, collect_path_from_ancestor
 export search, new_root, stop, output, transition!, branch!, evaluate!
 export on_feasible_solution!, prune!

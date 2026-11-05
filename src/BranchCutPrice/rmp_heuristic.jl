@@ -46,7 +46,7 @@ function solve_restricted_master_ip!(
 
     # Set time limit and solve MIP.
     time_left = max(space.deadline - time(), 0.0)
-    MOI.set(backend, MOI.TimeLimitSec(), min(space.rmp_time_limit, time_left))
+    MOI.set(backend, MOI.TimeLimitSec(), min(space.rmp_heuristic_time_limit, time_left))
     MOI.optimize!(backend)
 
     # A solution that uses an artificial variable does not cover the master

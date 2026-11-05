@@ -41,7 +41,7 @@ end
 Add a single separated robust cut to the master model and register
 it in the CG context.
 """
-function _add_robust_cut!(space::BranchCutPriceWorkspace, cut::SeparatedCut)
+function _add_robust_cut!(space, cut::SeparatedCut)
     ws = space.ws
     saf = _build_cut_saf(bp_decomp(ws), bp_pool(ws), space.backend, cut)
     ci = MOI.add_constraint(space.backend, saf, cut.set)
@@ -56,10 +56,8 @@ end
 Project the master LP solution to original space, separate cuts,
 and add them to the master. Returns the number of cuts added.
 """
-function _separate_and_add_cuts!(
-    space::BranchCutPriceWorkspace, cg_output::ColGen.ColGenOutput
-)::Int
-    if isnothing(space.separator)
+function _separate_and_add_cuts!(space, cg_output::ColGen.ColGenOutput)::Int
+    if isnothing(space.cut_config.separator)
         return 0
     end
     if cg_output.status != ColGen.optimal
@@ -69,7 +67,7 @@ function _separate_and_add_cuts!(
     pool = bp_pool(space.ws)
     primal_cache = get_primal_solution(space.backend)
     x = project_to_original(decomp, pool, v -> get(primal_cache, v, 0.0))
-    cuts = separate(space.separator, x)
+    cuts = separate(space.cut_config.separator, x)
     for cut in cuts
         _add_robust_cut!(space, cut)
     end

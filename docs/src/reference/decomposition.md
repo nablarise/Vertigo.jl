@@ -57,10 +57,3 @@ Pages = ["Decomposition/column_pool.jl"]
 Modules = [Vertigo.Decomposition]
 Pages = ["Decomposition/builder.jl"]
 ```
-
-## cut_separation.jl
-
-```@autodocs
-Modules = [Vertigo.Decomposition]
-Pages = ["Decomposition/cut_separation.jl"]
-```

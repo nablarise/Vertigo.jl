@@ -740,10 +740,12 @@ and `config`, then runs column generation.
 """
 function run_col_gen(decomp, config::ColGenConfig)
     workspace = ColGenWorkspace(decomp, config)
-    if config.silent
+    if config.log_level == 0
         return run_column_generation(workspace)
     end
-    return run_column_generation(ColGenLoggerWorkspace(workspace))
+    return run_column_generation(
+        ColGenLoggerWorkspace(workspace; log_level=config.log_level)
+    )
 end
 
 """

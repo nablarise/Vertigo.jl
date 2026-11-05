@@ -20,6 +20,39 @@ end
 
 BPNodeData() = BPNodeData(nothing, nothing, nothing, nothing, nothing)
 
+# ── Node view accessors ──────────────────────────────────────────────────
+# Stable, read-only surface for user code (e.g. a priority function) over the
+# BCP data of a node. `NodeView` itself comes from `TreeSearch`.
+
+"""
+    parent_lp_obj(node::NodeView) -> Union{Nothing,Float64}
+
+Master LP value of the parent node, or `nothing` for the root.
+"""
+parent_lp_obj(node::TreeSearch.NodeView) = node.user_data.parent_lp_obj
+
+"""
+    branching_var(node::NodeView)
+
+Original variable branched on to create `node`, or `nothing` for the root.
+"""
+branching_var(node::TreeSearch.NodeView) = node.user_data.branching_var
+
+"""
+    branching_direction(node::NodeView) -> Union{Nothing,BranchingDirection}
+
+`branch_down` or `branch_up`, or `nothing` for the root.
+"""
+branching_direction(node::TreeSearch.NodeView) = node.user_data.branching_direction
+
+"""
+    branching_frac(node::NodeView) -> Union{Nothing,Float64}
+
+Fractional part of the branching variable value at the parent, or `nothing`
+for the root.
+"""
+branching_frac(node::TreeSearch.NodeView) = node.user_data.branching_frac
+
 # ── Branch-cut-price workspace ───────────────────────────────────────────
 
 """
@@ -39,8 +72,7 @@ ws = BranchCutPriceWorkspace(decomp, BranchCutPriceConfig(...))
 output = run_branch_and_price(ws)
 ```
 """
-mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparator}} <:
-               TreeSearch.AbstractSearchSpace
+mutable struct BranchCutPriceWorkspace{Ws,B} <: TreeSearch.AbstractSearchSpace
     ws::Ws
     backend::B
     domain_helper::MathOptState.DomainChangeTrackerHelper
@@ -55,17 +87,16 @@ mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparato
     nodes_explored::Int
     root_lp_value::Union{Float64,Nothing}
     node_limit::Int
-    tol::Float64
-    rmp_time_limit::Float64
-    rmp_heuristic::Bool
+    tolerance::Float64
+    rmp_heuristic_time_limit::Float64
+    rmp_use_heuristic::Bool
     time_limit::Float64
     deadline::Float64      # absolute `time()` of the end of the search
-    separator::S
-    cutcolgen_ctx::CutColGenContext
+    cut_config::CutSeparationConfig
     total_cuts_separated::Int
     branching_strategy::AbstractBranchingStrategy
     log_level::Int
-    strategy::Any
+    node_select_strategy::TreeSearch.AbstractSearchStrategy
     dot_file::Union{Nothing,String}
 end
 
@@ -74,15 +105,15 @@ end
 
 Build a `BranchCutPriceWorkspace` from a Dantzig–Wolfe decomposition
 and a [`BranchCutPriceConfig`](@ref). Internally constructs a
-`ColGenWorkspace` from `config.colgen` (optionally wrapped in a
-`ColGenLoggerWorkspace` when `config.cg_log_level > 0`), wires the
+`ColGenWorkspace` from `config.cg_config` (optionally wrapped in a
+`ColGenLoggerWorkspace` when `config.cg_config.log_level > 0`), wires the
 branching logger context based on `config.log_level`, and registers
 domain/cut trackers on the master.
 """
 function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
-    inner = ColGen.ColGenWorkspace(decomp, config.colgen)
-    cg_ws = if config.cg_log_level > 0
-        ColGen.ColGenLoggerWorkspace(inner; log_level=config.cg_log_level)
+    inner = ColGen.ColGenWorkspace(decomp, config.cg_config)
+    cg_ws = if config.cg_config.log_level > 0
+        ColGen.ColGenLoggerWorkspace(inner; log_level=config.cg_config.log_level)
     else
         inner
     end
@@ -117,17 +148,16 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
         0,
         nothing,
         config.node_limit,
-        config.tol,
-        config.rmp_time_limit,
-        config.rmp_heuristic,
+        config.tolerance,
+        config.rmp_heuristic_time_limit,
+        config.rmp_use_heuristic,
         config.time_limit,
         Inf,
-        config.separator,
-        CutColGenContext(config.max_cut_rounds, config.min_gap_improvement),
+        config.cut_config,
         0,
         effective_strategy,
         config.log_level,
-        config.strategy,
+        config.node_select_strategy,
         config.dot_file,
     )
 end
@@ -165,7 +195,7 @@ function TreeSearch.output(space::BranchCutPriceWorkspace)
     status = if !isnothing(space.incumbent)
         db = space.best_dual_bound
         ub = space.incumbent.obj_value
-        if abs(ub - db) < space.tol
+        if abs(ub - db) < space.tolerance
             :optimal
         else
             _stop_status(space)
@@ -286,7 +316,7 @@ function TreeSearch.ts_search_status_message(s::BranchCutPriceWorkspace)
     inc = s.incumbent
     if !isnothing(inc)
         db = s.best_dual_bound
-        if abs(inc.obj_value - db) < s.tol
+        if abs(inc.obj_value - db) < s.tolerance
             return "Optimal solution found."
         end
     end
@@ -358,11 +388,11 @@ function run_branch_and_price(ws::BranchCutPriceWorkspace)
     evaluator = BPEvaluator()
     if !isnothing(ws.dot_file)
         dot_ctx = BPDotLoggerContext(ws, evaluator, ws.dot_file)
-        return TreeSearch.search(ws.strategy, dot_ctx)
+        return TreeSearch.search(ws.node_select_strategy, dot_ctx)
     end
     if ws.log_level > 0
         ts_ctx = TreeSearch.TreeSearchLoggerContext(ws, evaluator, ws.log_level)
-        return TreeSearch.search(ws.strategy, ts_ctx)
+        return TreeSearch.search(ws.node_select_strategy, ts_ctx)
     end
-    return TreeSearch.search(ws.strategy, ws, evaluator)
+    return TreeSearch.search(ws.node_select_strategy, ws, evaluator)
 end

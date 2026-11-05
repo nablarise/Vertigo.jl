@@ -110,9 +110,9 @@ function test_fenchel_cut_gap()
         bcp_ws = BranchCutPriceWorkspace(
             decomp,
             BranchCutPriceConfig(
-                separator=separator,
-                max_cut_rounds=20,
-                min_gap_improvement=0.0,
+                cut_config=CutSeparationConfig(
+                    separator=separator, max_cut_rounds=20, min_gap_improvement=0.0
+                ),
                 node_limit=1,
                 log_level=2,
             ),

@@ -16,7 +16,8 @@ Cheap to construct, copy, and compare.
 - `max_cg_iterations`: hard limit on CG iterations per phase.
 - `max_misprice_iterations`: hard cap on misprice iterations per CG
   iteration (default: 10).
-- `silent`: if `true`, skip logging (default: `false`).
+- `log_level`: verbosity of the column generation log: `0` prints nothing, `1` one
+  line per iteration, `2` adds detail (default: `0`).
 - `time_limit`: wall-clock limit in seconds of one column generation run
   (default: `Inf`). It is checked between iterations, so a running
   pricing or master solve is not interrupted.
@@ -25,17 +26,21 @@ struct ColGenConfig
     smoothing_alpha::Float64
     max_cg_iterations::Int
     max_misprice_iterations::Int
-    silent::Bool
+    log_level::Int
     time_limit::Float64
     function ColGenConfig(;
         smoothing_alpha::Float64=0.0,
         max_cg_iterations::Int=1000,
         max_misprice_iterations::Int=10,
-        silent::Bool=false,
+        log_level::Int=0,
         time_limit::Float64=Inf,
     )
         return new(
-            smoothing_alpha, max_cg_iterations, max_misprice_iterations, silent, time_limit
+            smoothing_alpha,
+            max_cg_iterations,
+            max_misprice_iterations,
+            log_level,
+            time_limit,
         )
     end
 end

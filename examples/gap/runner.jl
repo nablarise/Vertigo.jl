@@ -76,9 +76,9 @@ function run_one(json_path::String, cfg::BenchConfig, meta)::BenchResult
         try
             decomp = build_gap_model(inst)
             bcp_config = BranchCutPriceConfig(;
-                colgen=ColGenConfig(smoothing_alpha=cfg.smoothing_alpha, silent=true),
+                cg_config=ColGenConfig(smoothing_alpha=cfg.smoothing_alpha),
                 node_limit=cfg.node_limit,
-                rmp_time_limit=cfg.rmp_time_limit,
+                rmp_heuristic_time_limit=cfg.rmp_time_limit,
                 log_level=0,
             )
             output = run_branch_and_price(BranchCutPriceWorkspace(decomp, bcp_config))

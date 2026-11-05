@@ -10,7 +10,7 @@ function test_build_cut_saf_empty_pool()
         cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
-        saf = Vertigo.BranchCutPrice._build_cut_saf(ws.decomp, ws.pool, model, cut)
+        saf = Vertigo.Cutting._build_cut_saf(ws.decomp, ws.pool, model, cut)
 
         @test isempty(saf.terms)
         @test saf.constant ≈ 0.0
@@ -33,7 +33,7 @@ function test_build_cut_saf_single_column()
         cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
-        saf = Vertigo.BranchCutPrice._build_cut_saf(ws.decomp, ws.pool, model, cut)
+        saf = Vertigo.Cutting._build_cut_saf(ws.decomp, ws.pool, model, cut)
 
         @test length(saf.terms) == 1
         @test saf.terms[1].variable == col_var
@@ -66,7 +66,7 @@ function test_build_cut_saf_two_columns()
         cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 2) => 5.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
-        saf = Vertigo.BranchCutPrice._build_cut_saf(ws.decomp, ws.pool, model, cut)
+        saf = Vertigo.Cutting._build_cut_saf(ws.decomp, ws.pool, model, cut)
 
         @test length(saf.terms) == 1
         @test saf.terms[1].variable == col_b
@@ -91,7 +91,7 @@ function test_build_cut_saf_mixed_sp_vars()
         cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0, (1, 2) => 5.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
-        saf = Vertigo.BranchCutPrice._build_cut_saf(ws.decomp, ws.pool, model, cut)
+        saf = Vertigo.Cutting._build_cut_saf(ws.decomp, ws.pool, model, cut)
 
         @test length(saf.terms) == 1
         @test saf.terms[1].variable == col_var
@@ -114,7 +114,7 @@ function test_build_cut_saf_skips_invalid_column()
         cut_coeffs = Dict{Tuple{Int,Int},Float64}((1, 1) => 3.0)
         cut = SeparatedCut(cut_coeffs, MOI.LessThan(1.0))
 
-        saf = Vertigo.BranchCutPrice._build_cut_saf(ws.decomp, ws.pool, model, cut)
+        saf = Vertigo.Cutting._build_cut_saf(ws.decomp, ws.pool, model, cut)
 
         @test isempty(saf.terms)
     end

@@ -27,19 +27,23 @@ using .Branching:
     bp_robust_cuts,
     most_fractional_original_variable
 
+include("Cutting/Cutting.jl")
+using .Cutting
+using .Cutting: _separate_and_add_cuts!, _master_lp_obj
+
 include("bp_output.jl")
 include("branching.jl")
-include("cut_col_gen.jl")
 include("config.jl")
 include("space.jl")
-include("cut_separation.jl")
 include("evaluator.jl")
 include("rmp_heuristic.jl")
-include("dot_logger.jl")
+include("logger.jl")
 
 export BPEvaluator, BPOutput
-export BranchCutPriceConfig, BranchCutPriceWorkspace
+export BranchCutPriceConfig, BranchCutPriceWorkspace, CutSeparationConfig
+export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 export run_branch_and_price
+export parent_lp_obj, branching_var, branching_direction, branching_frac
 export BPDotLoggerContext
 
 end # module BranchCutPrice

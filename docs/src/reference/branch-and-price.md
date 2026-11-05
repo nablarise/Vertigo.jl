@@ -16,13 +16,6 @@ Modules = [Vertigo.BranchCutPrice]
 Pages = ["BranchCutPrice/branching.jl"]
 ```
 
-## cut_col_gen.jl
-
-```@autodocs
-Modules = [Vertigo.BranchCutPrice]
-Pages = ["BranchCutPrice/cut_col_gen.jl"]
-```
-
 ## config.jl
 
 ```@autodocs
@@ -35,13 +28,6 @@ Pages = ["BranchCutPrice/config.jl"]
 ```@autodocs
 Modules = [Vertigo.BranchCutPrice]
 Pages = ["BranchCutPrice/space.jl"]
-```
-
-## cut_separation.jl
-
-```@autodocs
-Modules = [Vertigo.BranchCutPrice]
-Pages = ["BranchCutPrice/cut_separation.jl"]
 ```
 
 ## evaluator.jl
@@ -58,9 +44,9 @@ Modules = [Vertigo.BranchCutPrice]
 Pages = ["BranchCutPrice/rmp_heuristic.jl"]
 ```
 
-## dot_logger.jl
+## logger.jl
 
 ```@autodocs
 Modules = [Vertigo.BranchCutPrice]
-Pages = ["BranchCutPrice/dot_logger.jl"]
+Pages = ["BranchCutPrice/logger.jl"]
 ```

@@ -49,6 +49,36 @@ mutable struct SearchNode{D,U}
 end
 
 """
+    NodeView
+
+Read-only view of a [`SearchNode`](@ref), handed to user code such as a priority
+function. It holds a reference to the node, so building it copies nothing.
+
+The properties are `id`, `depth`, `dual_bound` and `user_data`. There is no setter.
+`user_data` is whatever the search space attached to the node; a search space
+that wants to give a stable surface to user code defines accessor functions on
+`NodeView` (see `BranchCutPrice`) and the user should prefer them.
+"""
+struct NodeView{N<:SearchNode}
+    node::N
+end
+
+const _NODE_VIEW_PROPERTIES = (:id, :depth, :dual_bound, :user_data)
+
+function Base.getproperty(v::NodeView, name::Symbol)
+    if name in _NODE_VIEW_PROPERTIES
+        return getfield(getfield(v, :node), name)
+    end
+    return throw(
+        ArgumentError(
+            "NodeView has no property `$name`; use one of $(_NODE_VIEW_PROPERTIES)"
+        ),
+    )
+end
+
+Base.propertynames(::NodeView) = _NODE_VIEW_PROPERTIES
+
+"""
     root_node(id_counter, forward_diff, backward_diff, user_data; dual_bound=-Inf)
 
 Create the root node of a search tree.
