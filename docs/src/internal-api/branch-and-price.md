@@ -1,4 +1,4 @@
-# Module: Branch-and-price
+# Module: BranchCutPrice
 
 !!! warning
 
