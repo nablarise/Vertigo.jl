@@ -13,7 +13,8 @@ Base.@kwdef struct MasterProblemOptions
 end
 
 """
-    SubproblemOptions(; silent = true, user_overridden = false)
+    SubproblemOptions(; silent = true, user_overridden = false,
+                      lower_multiplicity = 1, upper_multiplicity = 1)
 
 Options of one subproblem.
 
@@ -23,10 +24,19 @@ Options of one subproblem.
   them. Its variables still get a `MOI.VariableIndex`, available through
   `mapped_subproblem_var`, and `sp_models(decomp)[sp_id]` is `nothing` until you install
   your pricer there.
+- `lower_multiplicity`, `upper_multiplicity`: the number of solutions of the subproblem that a
+  solution of the problem uses, counted with repetitions, is between the two. The default
+  `(1, 1)` is one solution per subproblem, as for the machine of a generalised assignment
+  problem. With identical vehicles in one subproblem, a column is a route and the number of
+  routes is a decision: `(0, fleet)`. The master gets the convexity constraints
+  `lower_multiplicity <= sum of the column weights <= upper_multiplicity`. It must hold that
+  `0 <= lower_multiplicity <= upper_multiplicity`, and `upper_multiplicity >= 1`.
 """
 Base.@kwdef struct SubproblemOptions
     silent::Bool = true
     user_overridden::Bool = false
+    lower_multiplicity::Int = 1
+    upper_multiplicity::Int = 1
 end
 
 """

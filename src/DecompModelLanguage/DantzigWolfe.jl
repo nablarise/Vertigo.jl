@@ -85,7 +85,9 @@ function dantzig_wolfe_decomposition(
         throw(ArgumentError("At least one subproblem is needed to decompose the model"))
     end
 
+    _check_linear(model)
     _check_subproblem_ids(subproblems)
+    _check_multiplicities(subproblems)
     _check_ownerships(model, master, subproblems)
 
     jump_models = _create_reformulated_jump_models(model, master, subproblems, optimizer)
@@ -172,8 +174,15 @@ function _fill_builder(model, master, subproblems, jump_models)
     minimize = (JuMP.objective_sense(model) == MOI.MIN_SENSE)
     builder = DWDecompositionBuilder{JuMP.VariableRef}(; minimize=minimize)
 
+    options = Dict(sp.id => sp.options for sp in subproblems)
     for id in sorted_ids
-        add_subproblem!(builder, sp_id_map[id], 0.0, 1.0, 1.0)
+        add_subproblem!(
+            builder,
+            sp_id_map[id],
+            0.0,
+            Float64(options[id].lower_multiplicity),
+            Float64(options[id].upper_multiplicity),
+        )
     end
 
     # Collect original objective coefficients

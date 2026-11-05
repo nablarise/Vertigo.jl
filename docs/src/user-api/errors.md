@@ -16,6 +16,7 @@ names the offending object.
 | A reference belongs to another model | `ArgumentError`: *`x[1]` of the master does not belong to the model that is decomposed* | use the objects of the model you decompose |
 | A constraint is given as a variable, or the reverse | `ArgumentError`: *expected a variable or a container of them, got…* | give `variables` variable references and `constraints` constraint references |
 | A subproblem constraint uses a variable of another model | `ArgumentError`: *constraint `mixed` belongs to subproblem 1 but uses variable `x[2,1]` of subproblem 2…* | move the constraint to the master, or the variable to the same subproblem |
+| The multiplicities of a subproblem are inconsistent | `ArgumentError`: *the multiplicities of the subproblem 1 are (2, 1)…* | give `0 <= lower_multiplicity <= upper_multiplicity` and `upper_multiplicity >= 1` |
 | A `user_overridden` subproblem has no pricer | error from `ColGenWorkspace(decomp, config)`: *has no pricer* | install a pricer in `sp_models(decomp)` |
 
 ## Notes

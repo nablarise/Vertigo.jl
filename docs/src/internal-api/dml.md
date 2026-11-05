@@ -80,7 +80,7 @@ A reference of the wrong kind is rejected there, by `_collect_varconstrs_refs!`.
 | Structure | Fields |
 |-----------|--------|
 | `MasterProblemOptions` | `silent = true` |
-| `SubproblemOptions` | `silent = true`, `user_overridden = false` |
+| `SubproblemOptions` | `silent = true`, `user_overridden = false`, `lower_multiplicity = 1`, `upper_multiplicity = 1` |
 
 **Mappings** (`Mappings.jl`) `VariableMapping` and `ConstraintMapping` link each
 object of the original JuMP model to its copy in the master or a subproblem
