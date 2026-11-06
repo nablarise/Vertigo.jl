@@ -17,6 +17,31 @@ function _rebuild_branching_constraints!(space::BranchCutPriceWorkspace)
         ov = space.branching_cut_info[cut_id]
         push!(bcs, ColGen.ActiveBranchingConstraint(ci, ov))
     end
+    _update_column_branching_coefficients!(space)
+    return nothing
+end
+
+# A branching constraint is re-created, when its node is entered, with the columns that
+# existed when it was created. The columns generated since, in other nodes, get their
+# coefficient here: the pricing assumes it, and without it a column that breaks the
+# constraint is allowed, so the pricing finds it again and it is refused as a duplicate.
+function _update_column_branching_coefficients!(space::BranchCutPriceWorkspace)
+    ws = space.ws
+    decomp = bp_decomp(ws)
+    model = bp_master_model(ws)
+    for bc in bp_branching_constraints(ws)
+        for (col_var, rec) in columns(bp_pool(ws))
+            coeff = compute_branching_column_coefficient(
+                decomp, bc.orig_var, column_sp_id(rec), rec.solution
+            )
+            if iszero(coeff)
+                continue
+            end
+            with_typed_ci(bc.constraint_index) do ci
+                return MOI.modify(model, ci, MOI.ScalarCoefficientChange(col_var, coeff))
+            end
+        end
+    end
     return nothing
 end
 

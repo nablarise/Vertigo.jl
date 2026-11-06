@@ -4,6 +4,19 @@
 
 # ── Global dual bound e2e tests on GAP class A ───────────────────────────
 
+# Branches on the original variable of the first subproblem variable, whatever the solution.
+struct BranchOnFirstVariable <: Vertigo.Branching.AbstractBranchingStrategy end
+
+function Vertigo.Branching.select_branching_variable(
+    ::BranchOnFirstVariable, space, node, primal_values
+)
+    decomp = space.ws.decomp
+    sp_id = first(Vertigo.Decomposition.subproblem_ids(decomp))
+    sp_var = first(Vertigo.Decomposition.subproblem_variables(decomp, sp_id))
+    orig_var = Vertigo.Decomposition.mapped_original_var(decomp, sp_id, sp_var)
+    return Vertigo.Branching.BranchingResult(orig_var, 0.5)
+end
+
 function test_dual_bound_e2e()
     @testset "[dual bound] the root bound is known as soon as the root is evaluated" begin
         inst = parse_gap_file(get_gap_instance_path('A', 10, 100))
@@ -37,18 +50,19 @@ function test_dual_bound_e2e()
     end
 
     @testset "[dual bound] the children inherit the dual bound of the node" begin
-        inst = parse_gap_file(get_gap_instance_path('A', 20, 100))
+        # A random GAP root is rarely fractional, so the branching is forced on a variable.
         space = BranchCutPriceWorkspace(
-            build_gap_decomp(inst),
-            BranchCutPriceConfig(cg_config=ColGenConfig(smoothing_alpha=0.5)),
+            build_gap_decomp(random_gap_instance(2, 5; seed=1)),
+            BranchCutPriceConfig(branching_strategy=BranchOnFirstVariable()),
         )
         root = Vertigo.TreeSearch.new_root(space)
         Vertigo.TreeSearch.evaluate!(BPEvaluator(), space, root)
+        MOI.optimize!(space.backend)   # the LP solution `branch!` reads is up to date
         # A bound tighter than the one found by column generation, as the bound a node
         # inherits can be: the children must start from it, not from the weaker one.
         root.dual_bound += 1.0
         children = Vertigo.TreeSearch.branch!(space, root)
-        @test !isempty(children)
+        @test length(children) == 2
         @test all(child -> child.dual_bound == root.dual_bound, children)
     end
 
