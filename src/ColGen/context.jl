@@ -312,10 +312,31 @@ function _remove_artificial_vars!(ws::ColGenWorkspace)
     return nothing
 end
 
+# Give the columns and the pure master variables their original costs. Phase 1 sets them
+# to 0 and a run can end there, so every run starts by restoring them.
+function _set_original_costs!(ws::ColGenWorkspace)
+    model = master_model(ws.decomp)
+    obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+    for (col_var, rec) in columns(ws.pool)
+        MOI.modify(
+            model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec))
+        )
+    end
+    for pmv in pure_master_variables(ws.decomp)
+        MOI.modify(
+            model,
+            obj_type,
+            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)),
+        )
+    end
+    return nothing
+end
+
 function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
     model = master_model(ws.decomp)
     # Artificial variables left by a previous run are replaced, not stacked.
     _remove_artificial_vars!(ws)
+    _set_original_costs!(ws)
     sense = is_minimization(ws.decomp) ? 1 : -1
     cost = sense * phase.artificial_var_cost
     convexity_cost = sense * phase.convexity_artificial_var_cost
@@ -439,23 +460,8 @@ function setup_reformulation!(ws::ColGenWorkspace, ::Phase1)
 end
 
 function setup_reformulation!(ws::ColGenWorkspace, ::Phase2)
-    model = master_model(ws.decomp)
-    obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
-
     _remove_artificial_vars!(ws)
-
-    for (col_var, rec) in columns(ws.pool)
-        MOI.modify(
-            model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec))
-        )
-    end
-    for pmv in pure_master_variables(ws.decomp)
-        MOI.modify(
-            model,
-            obj_type,
-            MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)),
-        )
-    end
+    _set_original_costs!(ws)
     return nothing
 end
 
