@@ -252,12 +252,9 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     orig_var = result.orig_var
     x_val = result.value
 
-    cg_output = node.user_data.cg_output
-    db = if isnothing(cg_output) || isnothing(cg_output.incumbent_dual_bound)
-        node.dual_bound
-    else
-        cg_output.incumbent_dual_bound
-    end
+    # The children inherit the bound of the node, which `evaluate!` made at least as
+    # tight as the one it inherited itself, not the raw bound of its column generation.
+    db = node.dual_bound
 
     parent_lp = if !isnothing(node.user_data) && !isnothing(node.user_data.cg_output)
         node.user_data.cg_output.master_lp_obj

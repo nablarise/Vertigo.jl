@@ -36,6 +36,22 @@ function test_dual_bound_e2e()
         @test Vertigo.TreeSearch.ts_best_dual_bound(space) >= root_bound - 1e-6
     end
 
+    @testset "[dual bound] the children inherit the dual bound of the node" begin
+        inst = parse_gap_file(get_gap_instance_path('A', 20, 100))
+        space = BranchCutPriceWorkspace(
+            build_gap_decomp(inst),
+            BranchCutPriceConfig(cg_config=ColGenConfig(smoothing_alpha=0.5)),
+        )
+        root = Vertigo.TreeSearch.new_root(space)
+        Vertigo.TreeSearch.evaluate!(BPEvaluator(), space, root)
+        # A bound tighter than the one found by column generation, as the bound a node
+        # inherits can be: the children must start from it, not from the weaker one.
+        root.dual_bound += 1.0
+        children = Vertigo.TreeSearch.branch!(space, root)
+        @test !isempty(children)
+        @test all(child -> child.dual_bound == root.dual_bound, children)
+    end
+
     @testset "[dual bound] a closed tree has the incumbent as dual bound" begin
         inst = parse_gap_file(get_gap_instance_path('A', 20, 100))
         output = run_branch_and_price(
