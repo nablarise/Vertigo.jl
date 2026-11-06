@@ -139,7 +139,9 @@ The charts above, in words.
    passed) or when no open node is left.
 4. **Evaluating a node** (`evaluator.jl`, `Cutting/`,
    `rmp_heuristic.jl`). `evaluate!` gives the master the incumbent value as primal bound, rebuilds
-   the branching constraints of the node, and runs column generation. If a separator is set, the
+   the branching constraints of the node (a constraint re-created on entering a node holds the columns
+   that existed when it was created, so the columns generated since get their coefficient), and runs
+   column generation. If a separator is set, the
    cut-and-column-generation loop adds the separated robust cuts and runs column generation again
    until `stop_cutcolgen` is true: `max_cut_rounds` rounds, no new cut, a column generation that is
    not optimal, or a relative improvement of the master LP below `min_gap_improvement`. Then the
