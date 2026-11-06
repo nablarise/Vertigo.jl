@@ -23,15 +23,16 @@ the decomposition; the rest solve it.
    wanted, `run_branch_and_price` (`space.jl`) searches a tree; each node is
    evaluated by `BPEvaluator` (`evaluator.jl`), which runs column generation. Its
    `Branching` submodule (`src/BranchCutPrice/Branching/`) chooses the original
-   variable to branch on (most fractional, or strong branching with LP and
-   column generation probes) from the master solution; `create_branching_children`
+   variable to branch on (most fractional, strong branching with LP and
+   column generation probes, or a user priority) from the master solution; `create_branching_children`
    (`branching.jl`) turns the choice into the two children.
    The module relies on three others, besides the decomposition it solves:
    - **Column generation** (`src/ColGen/`) solves the linear relaxation of
      every node. Its workspace also holds the active branching constraints and
      the incumbent.
    - **TreeSearch** (`src/TreeSearch/`) is the generic search: nodes, the
-     search loop and the strategies (depth first, best first, and others). It
+     search loop and the node selection strategies (depth first, best first,
+     plunging, and others, including a user priority). It
      knows nothing of optimisation; `BranchCutPriceWorkspace` is its search
      space and `BPEvaluator` its node evaluator.
    - **MathOptState** (`src/MathOptState/`) records the differences between

@@ -12,6 +12,7 @@ using Printf
 using ...Decomposition
 using ...ColGen
 using ...MathOptState
+using ...TreeSearch: NodeView
 
 include("interface.jl")
 include("branching_utils.jl")
@@ -30,6 +31,7 @@ include("logger.jl")
 # ── Public API ────────────────────────────────────────────────────────────
 export AbstractBranchingPhase, LPProbePhase, CGProbePhase
 export AbstractBranchingStrategy, MostFractionalBranching
+export AbstractPriorityBranchingStrategy, get_branching_priority
 export MultiPhaseStrongBranching, with_branching_ctx
 export AbstractBranchingRule, MostFractionalRule, LeastFractionalRule
 export BranchingStatus, BranchingResult

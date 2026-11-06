@@ -50,6 +50,14 @@ enters the reduced cost of every subproblem variable mapped to the original vari
 A strategy is a subtype of `AbstractBranchingStrategy` with a method of
 `select_branching_variable`. `BranchCutPriceConfig.branching_strategy` holds it.
 
+The user hook mirrors the node selection one: a subtype of `AbstractPriorityBranchingStrategy`
+with a method of `get_branching_priority(strategy, candidate::BranchingCandidate, node::NodeView)`.
+`select_branching_variable` ranks the fractional candidates with it and takes the lowest priority
+(ties go to the most fractional candidate). The candidate is an immutable struct and the node a
+read-only `NodeView`, so the hook cannot change the search. Strategies that probe the candidates
+implement `select_branching_variable` themselves, as the node selection ones can implement the
+container interface.
+
 - `MostFractionalBranching` takes the original variable whose value is the closest to a half
   (`most_fractional_original_variable`, from `find_fractional_variables`).
 - `MultiPhaseStrongBranching` probes candidates, as follows.
@@ -112,7 +120,7 @@ A `BranchingContext` receives a call before and after each step of the selection
 | `branching_utils.jl` | `most_fractional_original_variable` |
 | `branching_candidates.jl` | `BranchingCandidate`, `find_fractional_variables` |
 | `branching_rules.jl` | `MostFractionalRule`, `LeastFractionalRule`, `select_candidates` |
-| `branching_strategy.jl` | `BranchingResult`, `AbstractBranchingStrategy`, `MostFractionalBranching` |
+| `branching_strategy.jl` | `BranchingResult`, `AbstractBranchingStrategy`, `MostFractionalBranching`, `AbstractPriorityBranchingStrategy` and its hook `get_branching_priority` |
 | `phases.jl` | `LPProbePhase`, `CGProbePhase` |
 | `strong_branching.jl` | branching constraint of a probe, `run_sb_probe`, `sb_score` |
 | `lp_probe.jl`, `cg_probe.jl` | `probe_candidate` of each phase |

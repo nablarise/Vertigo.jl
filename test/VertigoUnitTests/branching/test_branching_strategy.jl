@@ -7,7 +7,11 @@ using Vertigo.Branching:
     BranchingCandidate,
     MostFractionalRule,
     LeastFractionalRule,
-    select_candidates
+    select_candidates,
+    AbstractPriorityBranchingStrategy,
+    select_branching_variable,
+    all_integral,
+    branching_ok
 
 # ────────────────────────────────────────────────────────────────
 # Minimal context for find_fractional_variables
@@ -163,6 +167,66 @@ function test_select_candidates_truncation()
 end
 
 # ────────────────────────────────────────────────────────────────
+# Tests — AbstractPriorityBranchingStrategy
+# ────────────────────────────────────────────────────────────────
+
+# Must be at module level — Julia does not allow struct definitions inside functions.
+struct LargestValueBranching <: AbstractPriorityBranchingStrategy end
+function Vertigo.Branching.get_branching_priority(
+    ::LargestValueBranching, c::BranchingCandidate, ::NodeView
+)
+    return -c.value
+end
+
+struct ConstantPriorityBranching <: AbstractPriorityBranchingStrategy end
+function Vertigo.Branching.get_branching_priority(
+    ::ConstantPriorityBranching, ::BranchingCandidate, ::NodeView
+)
+    return 0.0
+end
+
+struct RecordingBranching <: AbstractPriorityBranchingStrategy
+    seen::Vector{Any}
+end
+function Vertigo.Branching.get_branching_priority(
+    s::RecordingBranching, ::BranchingCandidate, node::NodeView
+)
+    push!(s.seen, node)
+    return 0.0
+end
+
+function test_priority_branching_strategy()
+    @testset "[branching] priority strategy picks the lowest priority" begin
+        ws, col_var_a, col_var_b = _build_branching_test_context()
+        # x(1,1) = 0.3, x(1,2) = 0.9, x(1,3) = 0.6; most fractional first: (1,3), (1,1), (1,2).
+        primal = Dict{MOI.VariableIndex,Float64}(col_var_a => 0.3, col_var_b => 0.6)
+        space = (ws=ws, tolerance=1e-6)
+        node = root_node(NodeIdCounter(), nothing, nothing, nothing)
+
+        result = select_branching_variable(LargestValueBranching(), space, node, primal)
+        @test result.status == branching_ok
+        @test result.orig_var == (1, 2)
+        @test result.value ≈ 0.9 atol=1e-10
+
+        # Ties go to the most fractional candidate.
+        tie = select_branching_variable(ConstantPriorityBranching(), space, node, primal)
+        @test tie.orig_var == (1, 3)
+
+        # The hook sees a read-only view of the node, once per candidate.
+        recording = RecordingBranching(Any[])
+        select_branching_variable(recording, space, node, primal)
+        @test length(recording.seen) == 3
+        @test all(v -> v isa NodeView, recording.seen)
+
+        # No fractional variable: nothing to branch on.
+        none = select_branching_variable(
+            LargestValueBranching(), space, node, Dict{MOI.VariableIndex,Float64}()
+        )
+        @test none.status == all_integral
+    end
+end
+
+# ────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────
 
@@ -172,5 +236,6 @@ function test_branching_strategy()
     test_find_fractional_integral_projection()
     test_select_candidates_most_fractional()
     test_select_candidates_least_fractional()
-    return test_select_candidates_truncation()
+    test_select_candidates_truncation()
+    return test_priority_branching_strategy()
 end

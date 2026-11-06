@@ -51,7 +51,7 @@ wraps an existing workspace.
 | Keyword | Default | Meaning |
 |---------|---------|---------|
 | `cg_config` | `ColGenConfig()` | configuration of the column generation at each node |
-| `node_select_strategy` | `DepthFirstStrategy()` | tree search strategy |
+| `node_select_strategy` | `DepthFirstNodeSelecStrategy()` | tree search strategy |
 | `node_limit` | `10_000` | maximum nodes to explore |
 | `tolerance` | `1e-6` | numerical tolerance |
 | `rmp_use_heuristic` | `true` | run the restricted master IP heuristic at each node |
@@ -61,12 +61,17 @@ wraps an existing workspace.
 | `log_level` | `0` | tree logger: `0` off, `1` table, `2` verbose |
 | `dot_file` | `nothing` | path of a Graphviz `.dot` file of the tree |
 
-Other tree strategies are `BreadthFirstStrategy`, `DualBoundBestFirstStrategy` and
-`PlungingStrategy`, which dives into the first child of each branching and backtracks to the open
+Other tree strategies are `BreadthFirstNodeSelecStrategy`, `DualBoundBestFirstNodeSelecStrategy` and
+`PlungingNodeSelecStrategy`, which dives into the first child of each branching and backtracks to the open
 node with the best dual bound. A custom best-first rule is a subtype of
-`TreeSearch.AbstractBestFirstStrategy` with a `TreeSearch.get_priority(strategy, node::NodeView)`
+`TreeSearch.AbstractBestFirstNodeSelecStrategy` with a `TreeSearch.get_selection_priority(strategy, node::NodeView)`
 method; the node with the lowest priority is selected first. `MultiPhaseStrongBranching` is the alternative
 branching strategy.
+
+A custom branching rule is a subtype of `Branching.AbstractPriorityBranchingStrategy` with a
+`Branching.get_branching_priority(strategy, candidate::BranchingCandidate, node::NodeView)` method:
+the fractional original variable with the lowest priority is branched on, as the node with the lowest
+priority is selected first.
 
 ### `BPOutput`
 

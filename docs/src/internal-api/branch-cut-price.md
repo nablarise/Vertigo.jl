@@ -130,7 +130,8 @@ The charts above, in words.
    open node.
 3. **Searching** (`space.jl`, `src/TreeSearch/search_loop.jl`). `run_branch_and_price` sets the
    deadline of the search and of column generation, then calls `TreeSearch.search` with the
-   strategy of the configuration (depth first by default); the dot logger or the tree logger wrap
+   strategy of the configuration (depth first by default; breadth first, best first, plunging or a
+   user priority are the others); the dot logger or the tree logger wrap
    the workspace when they are enabled. The strategy decides which open node `select_node!`
    returns. `transition!` moves the master from the previous node to the next one: `MathOptState`
    keeps the changes between nodes as forward and backward differences, so that no node rebuilds
