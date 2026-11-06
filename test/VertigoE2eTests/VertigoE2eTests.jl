@@ -60,6 +60,7 @@ function run()
         for test in (
             test_column_generation_e2e,
             test_bp_gap_a_instances,
+            test_bp_ip_incumbent_before_convergence,
             test_dml_e2e,
             test_cut_col_gen_e2e,
             test_time_limit_e2e,

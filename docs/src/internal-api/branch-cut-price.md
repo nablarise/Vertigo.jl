@@ -95,7 +95,7 @@ Evaluating a node, the box `evaluate!` of the chart above:
 |       |                                                                                    |
 |       v                                                                                    |
 |    +- evaluator.jl: column generation found a better integer solution? ------------------+ |
-|    | yes: store it as the incumbent, return FEASIBLE                                     | |
+|    | yes: store it as the incumbent; return FEASIBLE if the node bound reaches it        | |
 |    +-------------------------------------------------------------------------------------+ |
 |       |                                                                                    |
 |       v                                                                                    |
@@ -146,9 +146,11 @@ The charts above, in words.
    node is closed (`CUTOFF`) if the master or a subproblem is infeasible, if column generation
    proved the node cannot improve the incumbent (`ip_pruned`), if its dual bound is no better than
    the incumbent, or if the time ran out in column generation. If column generation found a better
-   integer solution, it becomes the incumbent and the status is `FEASIBLE`. Otherwise the
-   restricted master heuristic may improve the incumbent, and the status is `BRANCH`: the
-   heuristic does not close the node.
+   integer solution, it becomes the incumbent. If the dual bound of the node reaches it, the node
+   is solved and the status is `FEASIBLE`; if not (column generation can meet an integer solution
+   before it converges), the node is branched like any other. Otherwise the restricted master
+   heuristic may improve the incumbent, and the status is `BRANCH`: the heuristic does not close
+   the node.
 5. **Branching** (`space.jl`, `branching.jl`). For a `BRANCH` node, `branch!` reads the primal
    solution of the master and asks the branching strategy for an original variable
    (`select_branching_variable`). If all the original variables are integral, or the node is

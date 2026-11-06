@@ -132,9 +132,14 @@ function TreeSearch.evaluate!(::BPEvaluator, space::BranchCutPriceWorkspace, nod
         space.last_ip_incumbent = ip_sol
         if _is_improving_incumbent(space, ip_sol)
             space.incumbent = ip_sol
-            delete!(space.open_node_bounds, node.id)
-            _recompute_global_dual_bound!(space)
-            return TreeSearch.FEASIBLE
+            # Column generation can meet an integer master solution before it
+            # converges, so the node is solved only if its bound reaches the
+            # new incumbent. Otherwise the node is branched like any other.
+            if _should_prune(space, db)
+                delete!(space.open_node_bounds, node.id)
+                _recompute_global_dual_bound!(space)
+                return TreeSearch.FEASIBLE
+            end
         end
     end
 

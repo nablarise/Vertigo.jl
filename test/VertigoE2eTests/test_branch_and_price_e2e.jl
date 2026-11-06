@@ -59,3 +59,21 @@ function test_bp_gap_a_instances()
         end
     end
 end
+
+# Column generation can meet an integer master solution before it converges. The node must
+# then be branched, not closed: here the root LP is 63 while the first integer solution
+# found by column generation costs 65 (issue 76).
+function test_bp_ip_incumbent_before_convergence()
+    @testset "[bp] an integer solution found during column generation does not close the node" begin
+        inst = random_gap_instance(4, 12; seed=1)
+        optimal = 63.0   # flat MIP optimum
+        bcp_ws = BranchCutPriceWorkspace(
+            build_gap_decomp(inst), BranchCutPriceConfig(node_limit=2_000)
+        )
+        output = run_branch_and_price(bcp_ws)
+        @test output.status == :optimal
+        @test output.root_lp_value ≈ optimal atol = 1e-4
+        @test output.incumbent.obj_value ≈ optimal atol = 1e-4
+        @test output.best_dual_bound <= optimal + 1e-4
+    end
+end
