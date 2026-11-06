@@ -273,10 +273,30 @@ end
 # Entry point
 # ──────────────────────────────────────────────────────────────────
 
+function test_setup_reformulation_phase0_restores_costs_after_phase1()
+    @testset "[setup_reformulation] phase 0 restores the original costs left at 0 by phase 1" begin
+        # A run that ends in phase 1 (infeasibility confirmed) leaves the costs at 0:
+        # the next run starts in phase 0 and must see the original costs again.
+        ws, vars = build_phase_test_context()
+        model = master_model(ws.decomp)
+
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
+        @test _obj_coeff(model, vars.λ1) ≈ 0.0
+
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
+        @test _obj_coeff(model, vars.λ1) ≈ 5.0
+        @test _obj_coeff(model, vars.λ2) ≈ 8.0
+        @test _obj_coeff(model, vars.y_cont) ≈ 3.5
+        @test _obj_coeff(model, vars.y_int) ≈ 7.0
+    end
+end
+
 function test_setup_reformulation()
     test_setup_reformulation_phase0_relaxes_integrality()
     test_setup_reformulation_phase1_zeroes_costs()
     test_setup_reformulation_phase2_restores_costs()
+    test_setup_reformulation_phase0_restores_costs_after_phase1()
     test_setup_reformulation_phase2_removes_art_vars()
     return test_setup_reformulation_full_sequence()
 end
