@@ -285,7 +285,7 @@ end
 Run tree search with VERTIGO-styled per-node logging.
 Prints a header, delegates to the 3-arg `search`, then prints a footer.
 """
-function search(strategy::AbstractSearchStrategy, ctx::TreeSearchLoggerContext)
+function search(strategy::AbstractNodeSelecStrategy, ctx::TreeSearchLoggerContext)
     start_time = time()
     if ctx.log_level <= 1
         println(_TS_HDR)

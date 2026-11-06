@@ -176,7 +176,7 @@ function test_treesearch_loop_dfs_order()
         #    / \ / \
         #   4  5 6  7
         space = MockSearchSpace(max_depth=2)
-        result = search(DepthFirstStrategy(), space, MockEvaluator())
+        result = search(DepthFirstNodeSelecStrategy(), space, MockEvaluator())
 
         # DFS pre-order left-first: 1, 2, 4, 5, 3, 6, 7
         @test result.visited_values == [1, 2, 4, 5, 3, 6, 7]
@@ -186,7 +186,7 @@ end
 function test_treesearch_loop_bfs_order()
     @testset "[treesearch] BFS traversal order" begin
         space = MockSearchSpace(max_depth=2)
-        result = search(BreadthFirstStrategy(), space, MockEvaluator())
+        result = search(BreadthFirstNodeSelecStrategy(), space, MockEvaluator())
 
         # BFS level-order: 1, 2, 3, 4, 5, 6, 7
         @test result.visited_values == [1, 2, 3, 4, 5, 6, 7]
@@ -198,7 +198,7 @@ function test_treesearch_loop_cutoff_pruning()
         space = MockSearchSpace(max_depth=2)
         eval = SelectiveCutoffEvaluator(Set([2]))
 
-        result = search(DepthFirstStrategy(), space, eval)
+        result = search(DepthFirstNodeSelecStrategy(), space, eval)
 
         # DFS: visit 1, 2 (CUTOFF), then 3, 6, 7
         @test result.visited_values == [1, 2, 3, 6, 7]
@@ -210,7 +210,7 @@ end
 function test_treesearch_loop_feasible_detection()
     @testset "[treesearch] FEASIBLE detection" begin
         space = MockSearchSpace(max_depth=2, feasible_values=Set([2, 6]))
-        result = search(DepthFirstStrategy(), space, MockEvaluator())
+        result = search(DepthFirstNodeSelecStrategy(), space, MockEvaluator())
 
         # Node 2 is feasible (no children), node 6 is feasible.
         # DFS: 1 (branch), 2 (feasible → no children), 3 (branch), 6 (feasible), 7 (cutoff)
@@ -226,7 +226,7 @@ function test_treesearch_loop_stop_criterion()
         inner = MockSearchSpace(max_depth=3)
         bounded = BoundedSearchSpace(inner, 3, 0)
 
-        result = search(DepthFirstStrategy(), bounded, BoundedEvaluator())
+        result = search(DepthFirstNodeSelecStrategy(), bounded, BoundedEvaluator())
 
         @test length(result.visited_values) == 3
     end
@@ -235,7 +235,7 @@ end
 function test_treesearch_loop_dfs_transitions()
     @testset "[treesearch] DFS transitions" begin
         space = MockSearchSpace(max_depth=1)
-        result = search(DepthFirstStrategy(), space, MockEvaluator())
+        result = search(DepthFirstNodeSelecStrategy(), space, MockEvaluator())
 
         @test result.visited_values == [1, 2, 3]
         @test length(result.transitions) == 2

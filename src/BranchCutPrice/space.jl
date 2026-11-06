@@ -96,7 +96,7 @@ mutable struct BranchCutPriceWorkspace{Ws,B} <: TreeSearch.AbstractSearchSpace
     total_cuts_separated::Int
     branching_strategy::AbstractBranchingStrategy
     log_level::Int
-    node_select_strategy::TreeSearch.AbstractSearchStrategy
+    node_select_strategy::TreeSearch.AbstractNodeSelecStrategy
     dot_file::Union{Nothing,String}
 end
 

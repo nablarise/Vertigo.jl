@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: MIT
 
 # A best-first strategy ordering the nodes by the BCP data of a `NodeView`.
-struct DeepestFirstByView <: Vertigo.TreeSearch.AbstractBestFirstStrategy end
+struct DeepestFirstByView <: Vertigo.TreeSearch.AbstractBestFirstNodeSelecStrategy end
 const VIEWED_NODES = Tuple{Int,Any,Any}[]
-function Vertigo.TreeSearch.get_priority(::DeepestFirstByView, node::Vertigo.TreeSearch.NodeView)
+function Vertigo.TreeSearch.get_selection_priority(
+    ::DeepestFirstByView, node::Vertigo.TreeSearch.NodeView
+)
     push!(
         VIEWED_NODES,
         (node.depth, Vertigo.branching_direction(node), Vertigo.parent_lp_obj(node)),
@@ -28,8 +30,10 @@ function test_branch_and_price()
     end
 
     @testset "[branch_and_price] the node selection strategy must be a search strategy" begin
-        config = BranchCutPriceConfig(node_select_strategy=Vertigo.TreeSearch.BreadthFirstStrategy())
-        @test config.node_select_strategy isa Vertigo.TreeSearch.AbstractSearchStrategy
+        config = BranchCutPriceConfig(
+            node_select_strategy=Vertigo.TreeSearch.BreadthFirstNodeSelecStrategy()
+        )
+        @test config.node_select_strategy isa Vertigo.TreeSearch.AbstractNodeSelecStrategy
         @test_throws TypeError BranchCutPriceConfig(node_select_strategy=:depth_first)
     end
 

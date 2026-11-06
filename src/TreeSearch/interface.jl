@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: MIT
 
 """
-    AbstractSearchStrategy
+    AbstractNodeSelecStrategy
 
 Abstract type for search strategies (DFS, BFS, Best-First, etc.).
 Subtypes control the order in which nodes are explored.
 """
-abstract type AbstractSearchStrategy end
+abstract type AbstractNodeSelecStrategy end
 
 """
     AbstractSearchSpace
@@ -142,7 +142,7 @@ function evaluate! end
 # ============================================================
 
 """
-    init_container(strategy::AbstractSearchStrategy, root::SearchNode)
+    init_container(strategy::AbstractNodeSelecStrategy, root::SearchNode)
 
 Create and return the initial open-node container for the given strategy,
 with `root` already inserted.
@@ -150,14 +150,14 @@ with `root` already inserted.
 function init_container end
 
 """
-    select_node!(strategy::AbstractSearchStrategy, container)
+    select_node!(strategy::AbstractNodeSelecStrategy, container)
 
 Select and remove the next node to process from `container`.
 """
 function select_node! end
 
 """
-    insert_node!(strategy::AbstractSearchStrategy, container, node::SearchNode)
+    insert_node!(strategy::AbstractNodeSelecStrategy, container, node::SearchNode)
 
 Insert `node` into `container`.
 """
@@ -177,7 +177,7 @@ Insert multiple child nodes into the container. The default implementation
 calls `insert_node!` for each child. Strategies like DFS override this
 to insert in reverse order (so the first child is explored first).
 """
-function insert_children!(strategy::AbstractSearchStrategy, container, children)
+function insert_children!(strategy::AbstractNodeSelecStrategy, container, children)
     for child in children
         insert_node!(strategy, container, child)
     end

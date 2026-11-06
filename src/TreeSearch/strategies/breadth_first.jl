@@ -3,22 +3,22 @@
 # SPDX-License-Identifier: MIT
 
 """
-    BreadthFirstStrategy <: AbstractSearchStrategy
+    BreadthFirstNodeSelecStrategy <: AbstractNodeSelecStrategy
 
 Breadth-first search. Uses a deque (FIFO) as the open-node container.
 Nodes are explored level by level.
 """
-struct BreadthFirstStrategy <: AbstractSearchStrategy end
+struct BreadthFirstNodeSelecStrategy <: AbstractNodeSelecStrategy end
 
-function init_container(::BreadthFirstStrategy, root::SearchNode)
+function init_container(::BreadthFirstNodeSelecStrategy, root::SearchNode)
     queue = Deque{typeof(root)}()
     push!(queue, root)
     return queue
 end
 
-select_node!(::BreadthFirstStrategy, queue::Deque) = popfirst!(queue)
+select_node!(::BreadthFirstNodeSelecStrategy, queue::Deque) = popfirst!(queue)
 
-function insert_node!(::BreadthFirstStrategy, queue::Deque, node::SearchNode)
+function insert_node!(::BreadthFirstNodeSelecStrategy, queue::Deque, node::SearchNode)
     push!(queue, node)
     return nothing
 end

@@ -24,7 +24,7 @@ Cheap to construct, copy, and compare.
   IP heuristic at each node (default: 60.0).
 - `rmp_use_heuristic::Bool`: Run the restricted master IP heuristic at each
   node to find feasible solutions (default: true).
-- `node_select_strategy::TreeSearch.AbstractSearchStrategy`: Node selection strategy (default: `DepthFirstStrategy()`).
+- `node_select_strategy::TreeSearch.AbstractNodeSelecStrategy`: Node selection strategy (default: `DepthFirstNodeSelecStrategy()`).
 - `branching_strategy`: Branching strategy
   (default: `MostFractionalBranching()`).
 - `cut_config::CutSeparationConfig`: Cut separator and the rounds of the
@@ -45,7 +45,7 @@ struct BranchCutPriceConfig
     rmp_heuristic_time_limit::Float64
     rmp_use_heuristic::Bool
 
-    node_select_strategy::TreeSearch.AbstractSearchStrategy
+    node_select_strategy::TreeSearch.AbstractNodeSelecStrategy
     branching_strategy::AbstractBranchingStrategy
     cut_config::CutSeparationConfig
 
@@ -60,7 +60,7 @@ struct BranchCutPriceConfig
         node_limit::Int=10_000,
         rmp_heuristic_time_limit::Float64=60.0,
         rmp_use_heuristic::Bool=true,
-        node_select_strategy::TreeSearch.AbstractSearchStrategy=TreeSearch.DepthFirstStrategy(),
+        node_select_strategy::TreeSearch.AbstractNodeSelecStrategy=TreeSearch.DepthFirstNodeSelecStrategy(),
         branching_strategy::AbstractBranchingStrategy=MostFractionalBranching(),
         cut_config::CutSeparationConfig=CutSeparationConfig(),
         tolerance::Float64=1e-6,

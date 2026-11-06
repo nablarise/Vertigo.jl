@@ -80,8 +80,8 @@ function TreeSearch.evaluate!(
 end
 
 # Must be at module level — Julia does not allow struct definitions inside functions.
-struct ValuePriorityStrategy <: AbstractBestFirstStrategy end
-function TreeSearch.get_priority(::ValuePriorityStrategy, node::NodeView)
+struct ValuePriorityStrategy <: AbstractBestFirstNodeSelecStrategy end
+function TreeSearch.get_selection_priority(::ValuePriorityStrategy, node::NodeView)
     return Float64(node.user_data.value)
 end
 
@@ -116,7 +116,7 @@ function test_treesearch_strategies_best_first()
         #
         # Best-first: 1(db=0), 2(db=2), 3(db=3), 4(db=4), 5(db=5), 6(db=6), 7(db=7)
         space = StrategyTestSpace(max_depth=2)
-        visited = search(DualBoundBestFirstStrategy(), space, StrategyEvaluator())
+        visited = search(DualBoundBestFirstNodeSelecStrategy(), space, StrategyEvaluator())
 
         @test visited[1] == 1
         @test visited[2] == 2
@@ -132,7 +132,7 @@ end
 function test_treesearch_strategies_beam_search()
     @testset "[treesearch] beam search width limit" begin
         space = StrategyTestSpace(max_depth=2)
-        strategy = BeamSearchStrategy(ValuePriorityStrategy(), 2)
+        strategy = BeamSearchNodeSelecStrategy(ValuePriorityStrategy(), 2)
         visited = search(strategy, space, StrategyEvaluator())
 
         # Depth 0: evaluate root (value=1) → generates 2, 3
@@ -152,7 +152,7 @@ end
 function test_treesearch_strategies_bfs_consistency()
     @testset "[treesearch] BFS model state consistency" begin
         space = StrategyTestSpace(max_depth=2)
-        visited = search(BreadthFirstStrategy(), space, StrategyEvaluator())
+        visited = search(BreadthFirstNodeSelecStrategy(), space, StrategyEvaluator())
 
         @test visited == [1, 2, 3, 4, 5, 6, 7]
     end
@@ -161,7 +161,7 @@ end
 function test_treesearch_strategies_dfs_child_order()
     @testset "[treesearch] DFS first child first" begin
         space = StrategyTestSpace(max_depth=2)
-        visited = search(DepthFirstStrategy(), space, StrategyEvaluator())
+        visited = search(DepthFirstNodeSelecStrategy(), space, StrategyEvaluator())
 
         @test visited == [1, 2, 4, 5, 3, 6, 7]
     end
@@ -173,18 +173,18 @@ function test_treesearch_strategies_plunging()
         # closed, so it backtracks to the open node with the lowest dual bound (3),
         # dives 3 -> 6, then backtracks to 5 and 7.
         space = StrategyTestSpace(max_depth=2)
-        visited = search(PlungingStrategy(), space, StrategyEvaluator())
+        visited = search(PlungingNodeSelecStrategy(), space, StrategyEvaluator())
         @test visited == [1, 2, 4, 3, 6, 5, 7]
 
         # It differs from depth first (1, 2, 4, 5, 3, 6, 7), which does not backtrack
         # to the best open node.
         space = StrategyTestSpace(max_depth=2)
-        @test search(DepthFirstStrategy(), space, StrategyEvaluator()) != visited
+        @test search(DepthFirstNodeSelecStrategy(), space, StrategyEvaluator()) != visited
     end
     @testset "[treesearch] plunging container" begin
         counter = NodeIdCounter()
         root = root_node(counter, SEMPTY, SEMPTY, SData(1); dual_bound=0.0)
-        strategy = PlungingStrategy()
+        strategy = PlungingNodeSelecStrategy()
         container = init_container(strategy, root)
         @test !is_empty_container(container)
         @test select_node!(strategy, container) === root

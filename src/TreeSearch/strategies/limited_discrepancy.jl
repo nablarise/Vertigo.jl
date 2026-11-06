@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """
-    LimitedDiscrepancyStrategy{S<:AbstractSearchStrategy} <: AbstractSearchStrategy
+    LimitedDiscrepancyNodeSelecStrategy{S<:AbstractNodeSelecStrategy} <: AbstractNodeSelecStrategy
 
 Limited Discrepancy Search (LDS): wraps an inner search strategy and limits
 the number of "non-preferred" branching decisions (discrepancies).
@@ -16,21 +16,22 @@ When `branch!` returns children, the FIRST child is the "preferred" direction
 (discrepancy cost = 0) and subsequent children cost 1 discrepancy each.
 Children that would exceed the remaining budget are filtered out.
 """
-struct LimitedDiscrepancyStrategy{S<:AbstractSearchStrategy} <: AbstractSearchStrategy
+struct LimitedDiscrepancyNodeSelecStrategy{S<:AbstractNodeSelecStrategy} <:
+       AbstractNodeSelecStrategy
     inner_strategy::S
     max_discrepancy::Int
 end
 
 # Delegate container operations to inner strategy
-function init_container(s::LimitedDiscrepancyStrategy, root::SearchNode)
+function init_container(s::LimitedDiscrepancyNodeSelecStrategy, root::SearchNode)
     return init_container(s.inner_strategy, root)
 end
 
-function select_node!(s::LimitedDiscrepancyStrategy, container)
+function select_node!(s::LimitedDiscrepancyNodeSelecStrategy, container)
     return select_node!(s.inner_strategy, container)
 end
 
-function insert_node!(s::LimitedDiscrepancyStrategy, container, node::SearchNode)
+function insert_node!(s::LimitedDiscrepancyNodeSelecStrategy, container, node::SearchNode)
     return insert_node!(s.inner_strategy, container, node)
 end
 
@@ -38,7 +39,7 @@ end
     DiscrepancyData{U}
 
 Wrapper for user data that adds a discrepancy budget.
-Used with `LimitedDiscrepancyStrategy` to track remaining discrepancies.
+Used with `LimitedDiscrepancyNodeSelecStrategy` to track remaining discrepancies.
 """
 struct DiscrepancyData{U}
     remaining_discrepancy::Int

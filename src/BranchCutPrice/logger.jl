@@ -120,7 +120,7 @@ Run tree search and write an incremental Graphviz `.dot` file with
 color-coded nodes and branching-decision edge labels.
 """
 function TreeSearch.search(
-    strategy::TreeSearch.AbstractSearchStrategy, ctx::BPDotLoggerContext
+    strategy::TreeSearch.AbstractNodeSelecStrategy, ctx::BPDotLoggerContext
 )
     space = ctx.space
     evaluator = ctx.evaluator

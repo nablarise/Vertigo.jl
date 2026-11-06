@@ -26,7 +26,7 @@ function test_ts_logger_search_with_logger_context()
         ctx = TreeSearchLoggerContext(space, evaluator)
 
         result = redirect_stdout(devnull) do
-            search(DepthFirstStrategy(), ctx)
+            search(DepthFirstNodeSelecStrategy(), ctx)
         end
 
         # Same DFS traversal as without logger
@@ -41,7 +41,7 @@ function test_ts_logger_feasible_with_logger()
         ctx = TreeSearchLoggerContext(space, evaluator)
 
         result = redirect_stdout(devnull) do
-            search(DepthFirstStrategy(), ctx)
+            search(DepthFirstNodeSelecStrategy(), ctx)
         end
 
         @test result.visited_values == [1, 2, 3, 6, 7]
@@ -74,7 +74,7 @@ function test_ts_logger_level2_traversal_order()
         ctx = TreeSearchLoggerContext(space, evaluator, 2)
 
         result = redirect_stdout(devnull) do
-            search(DepthFirstStrategy(), ctx)
+            search(DepthFirstNodeSelecStrategy(), ctx)
         end
 
         @test result.visited_values == [1, 2, 4, 5, 3, 6, 7]
@@ -89,7 +89,7 @@ function test_ts_logger_level2_output_contains_banner()
 
         pipe = Pipe()
         redirect_stdout(pipe) do
-            search(DepthFirstStrategy(), ctx)
+            search(DepthFirstNodeSelecStrategy(), ctx)
         end
         close(pipe.in)
         output = read(pipe, String)

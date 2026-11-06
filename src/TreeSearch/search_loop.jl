@@ -22,7 +22,7 @@ Execute a tree search with the given strategy, search space, and node evaluator.
 4. Return `output(space)`.
 
 # Arguments
-- `strategy::AbstractSearchStrategy`: Controls node selection order.
+- `strategy::AbstractNodeSelecStrategy`: Controls node selection order.
 - `space::AbstractSearchSpace`: Problem-specific search space.
 - `evaluator::AbstractNodeEvaluator`: Controls how nodes are evaluated.
 
@@ -30,7 +30,7 @@ Execute a tree search with the given strategy, search space, and node evaluator.
 Whatever `output(space)` returns.
 """
 function search(
-    strategy::AbstractSearchStrategy,
+    strategy::AbstractNodeSelecStrategy,
     space::AbstractSearchSpace,
     evaluator::AbstractNodeEvaluator,
 )

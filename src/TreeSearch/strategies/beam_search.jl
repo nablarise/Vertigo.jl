@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """
-    BeamSearchStrategy{S<:AbstractBestFirstStrategy} <: AbstractSearchStrategy
+    BeamSearchNodeSelecStrategy{S<:AbstractBestFirstNodeSelecStrategy} <: AbstractNodeSelecStrategy
 
 Beam search: explores the tree level by level, keeping only the `max_width`
 best nodes at each depth level. Requires an inner best-first strategy to
@@ -12,7 +12,8 @@ determine node priorities.
 Unlike the previous implementation, this does NOT wrap nodes. The beam width
 control is handled entirely through the container management.
 """
-struct BeamSearchStrategy{S<:AbstractBestFirstStrategy} <: AbstractSearchStrategy
+struct BeamSearchNodeSelecStrategy{S<:AbstractBestFirstNodeSelecStrategy} <:
+       AbstractNodeSelecStrategy
     inner_strategy::S
     max_width::Int
 end
@@ -31,15 +32,15 @@ mutable struct BeamSearchContainer{N}
     max_width::Int
 end
 
-function init_container(strategy::BeamSearchStrategy, root::SearchNode)
+function init_container(strategy::BeamSearchNodeSelecStrategy, root::SearchNode)
     N = typeof(root)
     current = PriorityQueue{N,Float64}()
     next = PriorityQueue{N,Float64}()
-    enqueue!(current, root, get_priority(strategy.inner_strategy, NodeView(root)))
+    enqueue!(current, root, get_selection_priority(strategy.inner_strategy, NodeView(root)))
     return BeamSearchContainer{N}(current, next, 0, strategy.max_width)
 end
 
-function select_node!(strategy::BeamSearchStrategy, container::BeamSearchContainer)
+function select_node!(strategy::BeamSearchNodeSelecStrategy, container::BeamSearchContainer)
     # If current queue is exhausted or beam width reached, swap queues
     if isempty(container.current_queue) ||
         container.nodes_at_current_depth >= container.max_width
@@ -53,10 +54,12 @@ function select_node!(strategy::BeamSearchStrategy, container::BeamSearchContain
 end
 
 function insert_node!(
-    strategy::BeamSearchStrategy, container::BeamSearchContainer, node::SearchNode
+    strategy::BeamSearchNodeSelecStrategy, container::BeamSearchContainer, node::SearchNode
 )
     enqueue!(
-        container.next_queue, node, get_priority(strategy.inner_strategy, NodeView(node))
+        container.next_queue,
+        node,
+        get_selection_priority(strategy.inner_strategy, NodeView(node)),
     )
     return nothing
 end

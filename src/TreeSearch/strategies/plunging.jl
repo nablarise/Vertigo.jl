@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 """
-    PlungingStrategy{S<:AbstractBestFirstStrategy} <: AbstractSearchStrategy
+    PlungingNodeSelecStrategy{S<:AbstractBestFirstNodeSelecStrategy} <: AbstractNodeSelecStrategy
 
 Plunging (diving) search: after a node is branched, the search goes on with its
 first child, as depth first search does, until a node is closed or has no child.
@@ -15,18 +15,21 @@ the global dual bound moving, which is the usual choice in branch-and-price.
 
 # Fields
 - `inner_strategy`: the best-first strategy that ranks the open nodes on
-  backtracking (for example `DualBoundBestFirstStrategy()`).
+  backtracking (for example `DualBoundBestFirstNodeSelecStrategy()`).
 
 # Convention
 The first child returned by `branch!` is the one the search plunges into, as for
-[`LimitedDiscrepancyStrategy`](@ref); the other children wait among the open
+[`LimitedDiscrepancyNodeSelecStrategy`](@ref); the other children wait among the open
 nodes.
 """
-struct PlungingStrategy{S<:AbstractBestFirstStrategy} <: AbstractSearchStrategy
+struct PlungingNodeSelecStrategy{S<:AbstractBestFirstNodeSelecStrategy} <:
+       AbstractNodeSelecStrategy
     inner_strategy::S
 end
 
-PlungingStrategy() = PlungingStrategy(DualBoundBestFirstStrategy())
+function PlungingNodeSelecStrategy()
+    return PlungingNodeSelecStrategy(DualBoundBestFirstNodeSelecStrategy())
+end
 
 """
     PlungingContainer{N}
@@ -39,13 +42,13 @@ mutable struct PlungingContainer{N}
     open::PriorityQueue{N,Float64}
 end
 
-function init_container(strategy::PlungingStrategy, root::SearchNode)
+function init_container(strategy::PlungingNodeSelecStrategy, root::SearchNode)
     open = PriorityQueue{typeof(root),Float64}()
-    enqueue!(open, root, get_priority(strategy.inner_strategy, NodeView(root)))
+    enqueue!(open, root, get_selection_priority(strategy.inner_strategy, NodeView(root)))
     return PlungingContainer{typeof(root)}(nothing, open)
 end
 
-function select_node!(::PlungingStrategy, container::PlungingContainer)
+function select_node!(::PlungingNodeSelecStrategy, container::PlungingContainer)
     if container.dive !== nothing
         node = container.dive
         container.dive = nothing
@@ -55,19 +58,23 @@ function select_node!(::PlungingStrategy, container::PlungingContainer)
 end
 
 function insert_node!(
-    strategy::PlungingStrategy, container::PlungingContainer, node::SearchNode
+    strategy::PlungingNodeSelecStrategy, container::PlungingContainer, node::SearchNode
 )
-    enqueue!(container.open, node, get_priority(strategy.inner_strategy, NodeView(node)))
+    enqueue!(
+        container.open,
+        node,
+        get_selection_priority(strategy.inner_strategy, NodeView(node)),
+    )
     return nothing
 end
 
 """
-    insert_children!(::PlungingStrategy, container, children)
+    insert_children!(::PlungingNodeSelecStrategy, container, children)
 
 The first child becomes the dive node; the others go to the open nodes.
 """
 function insert_children!(
-    strategy::PlungingStrategy, container::PlungingContainer, children
+    strategy::PlungingNodeSelecStrategy, container::PlungingContainer, children
 )
     for child in children
         if container.dive === nothing

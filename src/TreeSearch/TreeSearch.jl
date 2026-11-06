@@ -31,19 +31,20 @@ include("strategies/plunging.jl")
 include("strategies/limited_discrepancy.jl")
 
 # Public API
-export AbstractSearchStrategy, AbstractSearchSpace, AbstractNodeEvaluator
+export AbstractNodeSelecStrategy, AbstractSearchSpace, AbstractNodeEvaluator
 export NodeStatus, CUTOFF, FEASIBLE, BRANCH
 export SearchNode, NodeView, NodeIdCounter, root_node, child_node, is_root
 export find_common_ancestor, transition_to!, collect_path_from_ancestor
 export search, new_root, stop, output, transition!, branch!, evaluate!
 export on_feasible_solution!, prune!
 export init_container, select_node!, insert_node!, insert_children!, is_empty_container
-export DepthFirstStrategy
-export BreadthFirstStrategy
-export AbstractBestFirstStrategy, DualBoundBestFirstStrategy, get_priority
-export BeamSearchStrategy
-export PlungingStrategy
-export LimitedDiscrepancyStrategy, DiscrepancyData, filter_by_discrepancy
+export DepthFirstNodeSelecStrategy
+export BreadthFirstNodeSelecStrategy
+export AbstractBestFirstNodeSelecStrategy,
+    DualBoundBestFirstNodeSelecStrategy, get_selection_priority
+export BeamSearchNodeSelecStrategy
+export PlungingNodeSelecStrategy
+export LimitedDiscrepancyNodeSelecStrategy, DiscrepancyData, filter_by_discrepancy
 export TreeSearchLoggerContext
 export ts_incumbent_value, ts_best_dual_bound, ts_is_minimization
 export ts_nodes_explored, ts_search_status_message
