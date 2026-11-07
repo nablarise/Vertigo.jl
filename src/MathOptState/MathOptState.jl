@@ -206,7 +206,6 @@ include("var_bounds_state.jl")
 include("fixed_var_state.jl")
 include("integrality_state.jl")
 include("local_cut_state.jl")
-include("lp_basis_state.jl")
 include("cut_pool_state.jl")
 include("column_state.jl")
 
@@ -229,8 +228,6 @@ export relax_zero_one, restrict_zero_one, relax_integrality!
 export LocalCut, AddLocalCutChange, RemoveLocalCutChange
 export LocalCutChangeDiff, LocalCutTracker, LocalCutTrackerHelper, next_id!
 export LinearConstraintSet
-export LPBasisState, LPBasisDiff, LPBasisTracker
-export capture_basis, update_basis
 export ColumnData, AddColumnChange, RemoveColumnChange
 export ColumnChangeDiff, ColumnTracker, ColumnTrackerHelper
 export make_transition_callbacks
