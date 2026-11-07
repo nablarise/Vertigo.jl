@@ -3,6 +3,17 @@
 # SPDX-License-Identifier: MIT
 
 """
+    LinearConstraintSet
+
+Union of the scalar set types a global cut can use.
+"""
+const LinearConstraintSet = Union{
+    MOI.GreaterThan{Float64},
+    MOI.LessThan{Float64},
+    MOI.EqualTo{Float64},
+}
+
+"""
     GlobalCut
 
 A globally-valid cut that can be activated or deactivated at each B&B node.
