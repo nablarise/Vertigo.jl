@@ -4,11 +4,11 @@
 
 struct SubproblemAssignment
     id_expr::Any
-    silent_expr::Any
+    options::Vector{Expr}   # `key=value` keywords, forwarded as written
 end
 
 struct MasterAssignment
-    silent_expr::Any
+    options::Vector{Expr}
 end
 
 struct PatternRule
@@ -34,8 +34,13 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
 - `subproblem(id)` — assign to subproblem with given ID
 - `master()` — assign to master problem
 - Both accept `silent=true|false` to silence (or not) the solver of the
-  model they assign to. Unset, a model is silent. Rules assigning to the
-  same model must not contradict each other.
+  model they assign to. Unset, a model is silent.
+- `subproblem` also accepts `user_overriden=true` for a subproblem solved by
+  your own algorithm: no MOI model is built for it. Its constraints are not modeled
+  (the algorithm enforces them), its variables get a `MOI.VariableIndex`
+  (see `mapped_subproblem_var`), and `sp_models(decomp)[sp_id]` is `nothing`
+  until you install your pricer there.
+- Rules assigning to the same model must not contradict each other.
 
 # Example
 ```julia
@@ -45,6 +50,22 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
     coverage[_] => master()
 end
 ```
+
+# Containers
+Instead of assigning each pattern, you can list what each model contains.
+Options are then written once, on the container. A section takes one pattern
+or a vector of them, and `variables`/`constraints` are only there for the
+reader:
+```julia
+@dantzig_wolfe model begin
+    master() => (constraints = coverage[_])
+    subproblem(m, user_overriden=true) => (
+        variables = [x[m, _]],
+        constraints = knapsack[m]
+    )
+end
+```
+Both forms can be mixed; they are equivalent.
 
 Returns `(decomp::DWReformulation, sp_id_map::Dict)`.
 """
@@ -69,16 +90,47 @@ function parse_block(block::Expr)
         line isa LineNumberNode && continue
         if line isa Expr && line.head == :call &&
            length(line.args) == 3 && line.args[1] == :(=>)
-            pattern, assignment = line.args[2], line.args[3]
-            push!(patterns, parse_pattern_rule(pattern, assignment))
+            lhs, rhs = line.args[2], line.args[3]
+            if lhs isa Expr && lhs.head == :call
+                append!(patterns, parse_container(lhs, rhs))
+            else
+                push!(patterns, parse_pattern_rule(lhs, rhs))
+            end
         else
-            error("Expected pattern => assignment, got: $line")
+            error(
+                "Expected `pattern => assignment` or " *
+                "`master()/subproblem(id) => (variables = ..., constraints = ...)`, " *
+                "got: $line"
+            )
         end
     end
 
     isempty(patterns) && error(
         "No patterns specified in @dantzig_wolfe block"
     )
+    return patterns
+end
+
+# `master(opts) => (variables = ..., constraints = ...)`: every listed pattern
+# gets the container's assignment. Each section holds one pattern or a vector
+# of them; the sections only separate variables from constraints for the
+# reader, both are optional and handled alike.
+function parse_container(call::Expr, contents)
+    assign = parse_assignment(call)
+    sections = contents isa Expr && contents.head == :tuple ? contents.args : [contents]
+    patterns = PatternRule[]
+    for section in sections
+        section isa Expr && section.head in (:kw, :(=)) &&
+            section.args[1] in (:variables, :constraints) || error(
+            "Expected `variables = ...` or `constraints = ...` in container, " *
+            "got: $section"
+        )
+        listed = section.args[2]
+        for pattern in (listed isa Expr && listed.head == :vect ? listed.args : [listed])
+            name, indices = parse_pattern(pattern)
+            push!(patterns, PatternRule(name, indices, assign))
+        end
+    end
     return patterns
 end
 
@@ -114,44 +166,38 @@ function parse_assignment(assignment::Expr)
         "Expected function call for assignment, got: $assignment"
     )
     func_name = assignment.args[1]
-    positional, silent_expr = split_call_args(assignment.args[2:end])
+    positional, options = split_call_args(assignment.args[2:end])
     if func_name == :subproblem
         length(positional) == 1 || error(
             "subproblem() requires exactly one positional argument"
         )
-        return SubproblemAssignment(positional[1], silent_expr)
+        return SubproblemAssignment(positional[1], options)
     elseif func_name == :master
         isempty(positional) || error(
             "master() takes no positional arguments"
         )
-        return MasterAssignment(silent_expr)
+        return MasterAssignment(options)
     else
         error("Unknown assignment function: $func_name")
     end
 end
 
-# Splits call arguments into positional ones and the `silent` value.
-# Handles both `f(a, silent=x)` and `f(a; silent=x)`.
+# Splits call arguments into positional ones and `key=value` options, which
+# are forwarded as keywords (`dantzig_wolfe_subproblem` rejects unknown ones).
+# Handles both `f(a, key=x)` and `f(a; key=x)`.
 function split_call_args(args)
     positional = Any[]
-    silent_expr = :nothing
+    options = Expr[]
     for arg in args
-        kws = if arg isa Expr && arg.head == :parameters
-            arg.args
-        else
-            [arg]
-        end
-        for kw in kws
-            if kw isa Expr && kw.head in (:kw, :(=)) && kw.args[1] == :silent
-                silent_expr = kw.args[2]
-            elseif kw isa Expr && kw.head in (:kw, :(=))
-                error("Unknown keyword: $(kw.args[1])")
+        for a in (arg isa Expr && arg.head == :parameters ? arg.args : [arg])
+            if a isa Expr && a.head in (:kw, :(=))
+                push!(options, Expr(:kw, a.args[1], a.args[2]))
             else
-                push!(positional, kw)
+                push!(positional, a)
             end
         end
     end
-    return positional, silent_expr
+    return positional, options
 end
 
 function generate_method_definitions(
@@ -179,11 +225,14 @@ function generate_method_definition(
 end
 
 function generate_assignment_expr(a::SubproblemAssignment)
-    return :(dantzig_wolfe_subproblem(
-        $(a.id_expr); silent=$(a.silent_expr)
-    ))
+    return Expr(
+        :call, :dantzig_wolfe_subproblem,
+        Expr(:parameters, a.options...), a.id_expr
+    )
 end
 
 function generate_assignment_expr(a::MasterAssignment)
-    return :(dantzig_wolfe_master(; silent=$(a.silent_expr)))
+    return Expr(
+        :call, :dantzig_wolfe_master, Expr(:parameters, a.options...)
+    )
 end

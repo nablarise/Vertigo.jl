@@ -57,10 +57,12 @@ function _replace_vars_in_func(
     var_mapping::VariableMapping;
     preserve_constant::Bool=true
 )
+    # Variables of a user-overridden subproblem have no model, hence no mapping.
     terms = [
         var_mapping[var] => coeff
         for (var, coeff) in func.terms
-        if JuMP.owner_model(var_mapping[var]) == target_model
+        if haskey(var_mapping, var) &&
+           JuMP.owner_model(var_mapping[var]) == target_model
     ]
     constant = preserve_constant ? func.constant : 0.0
     return JuMP.AffExpr(constant, terms...)
@@ -71,9 +73,9 @@ function _replace_vars_in_func(
     var_mapping::VariableMapping;
     preserve_constant::Bool=true
 )
-    mapped = var_mapping[single_var]
-    if JuMP.owner_model(mapped) == target_model
-        return mapped
+    if haskey(var_mapping, single_var)
+        mapped = var_mapping[single_var]
+        JuMP.owner_model(mapped) == target_model && return mapped
     end
     return 0.0
 end
