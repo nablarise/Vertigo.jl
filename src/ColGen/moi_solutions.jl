@@ -16,6 +16,12 @@ struct PrimalMoiSolution
     variable_values::Dict{MOI.VariableIndex,Float64}
 end
 
+struct MasterPrimalSolution
+    sol::PrimalMoiSolution
+end
+
+get_variable_values(sol::MasterPrimalSolution) = sol.sol.variable_values
+
 """
     DualMoiSolution
 

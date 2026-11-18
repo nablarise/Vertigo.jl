@@ -441,7 +441,7 @@ struct ColGenIterationOutput
     master_lp_dual_sol::Any
     master_ip_primal_sol::Union{Nothing,MasterIpPrimalSol}
     subproblem_infeasible::Bool
-    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
 end
 
 colgen_iteration_output_type(::ColGenWorkspace) = ColGenIterationOutput
@@ -507,10 +507,9 @@ function new_iteration_output(
     master_ip_primal_sol,
     master_lp_dual_sol,
 )
-    primal = isnothing(master_lp_primal_sol) ? nothing : master_lp_primal_sol.sol
     return ColGenIterationOutput(
         mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol,
-        infeasible_subproblem, primal
+        infeasible_subproblem, master_lp_primal_sol
     )
 end
 
@@ -529,7 +528,7 @@ struct ColGenPhaseOutput
     colgen_converged::Bool      # condition D: CG has converged
     subproblem_infeasible::Bool
     ip_pruned::Bool
-    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
 end
 
 colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
@@ -611,7 +610,7 @@ struct ColGenOutput
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
-    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
 end
 
 """
@@ -624,7 +623,7 @@ function master_lp_primal_values(output::ColGenOutput)
     if isnothing(output.master_lp_primal_sol)
         error("No master LP solution: column generation ended with status $(output.status).")
     end
-    return output.master_lp_primal_sol.variable_values
+    return get_variable_values(output.master_lp_primal_sol)
 end
 
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
