@@ -8,7 +8,7 @@
 Solve the restricted master problem as a MIP to find IP-feasible
 solutions from fractional LP relaxations. Adds integrality
 constraints to column variables and integer pure master variables,
-solves, then restores the LP relaxation for branching.
+solves, then removes them.
 
 Returns a `ColGen.MasterIpPrimalSol` if a feasible IP solution
 is found, `nothing` otherwise.
@@ -92,9 +92,7 @@ function solve_restricted_master_ip!(
         MOI.delete(backend, ci)
     end
 
-    # Clear time limit and re-solve LP for branching.
     MOI.set(backend, MOI.TimeLimitSec(), nothing)
-    MOI.optimize!(backend)
 
     return result
 end
