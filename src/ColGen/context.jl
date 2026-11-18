@@ -441,6 +441,7 @@ struct ColGenIterationOutput
     master_lp_dual_sol::Any
     master_ip_primal_sol::Union{Nothing,MasterIpPrimalSol}
     subproblem_infeasible::Bool
+    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
 end
 
 colgen_iteration_output_type(::ColGenWorkspace) = ColGenIterationOutput
@@ -506,7 +507,11 @@ function new_iteration_output(
     master_ip_primal_sol,
     master_lp_dual_sol,
 )
-    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol, infeasible_subproblem)
+    primal = isnothing(master_lp_primal_sol) ? nothing : master_lp_primal_sol.sol
+    return ColGenIterationOutput(
+        mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol,
+        infeasible_subproblem, primal
+    )
 end
 
 get_dual_bound(output::ColGenIterationOutput) = output.dual_bound
@@ -524,6 +529,7 @@ struct ColGenPhaseOutput
     colgen_converged::Bool      # condition D: CG has converged
     subproblem_infeasible::Bool
     ip_pruned::Bool
+    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
 end
 
 colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
@@ -564,7 +570,10 @@ function new_phase_output(
     ip_pruned_flag = _dual_bound_dominated(
         ws, inc_dual_bound, ws.ip_primal_bound
     )
-    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag)
+    return ColGenPhaseOutput(
+        mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf,
+        ip_pruned_flag, colgen_iter_output.master_lp_primal_sol
+    )
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
@@ -602,7 +611,11 @@ struct ColGenOutput
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
+    master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
 end
+
+ColGenOutput(status, lp_obj, dual_bound, ip) =
+    ColGenOutput(status, lp_obj, dual_bound, ip, nothing)
 
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
@@ -621,22 +634,22 @@ function new_output(
     elseif p.ip_pruned
         return ColGenOutput(
             ip_pruned, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     elseif p.colgen_converged
         return ColGenOutput(
             optimal, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     elseif time_limit_reached(ws)
         return ColGenOutput(
             time_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     else
         return ColGenOutput(
             iteration_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     end
 end
