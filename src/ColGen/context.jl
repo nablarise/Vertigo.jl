@@ -614,6 +614,19 @@ struct ColGenOutput
     master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
 end
 
+"""
+    master_lp_primal_values(output::ColGenOutput) -> Dict{MOI.VariableIndex,Float64}
+
+Return the master variable values at the last master LP solve of the run.
+Columns that pricing added after that solve are absent: their value is 0.
+"""
+function master_lp_primal_values(output::ColGenOutput)
+    if isnothing(output.master_lp_primal_sol)
+        error("No master LP solution: column generation ended with status $(output.status).")
+    end
+    return output.master_lp_primal_sol.variable_values
+end
+
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
 function new_output(

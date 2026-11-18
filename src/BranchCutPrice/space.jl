@@ -213,8 +213,8 @@ function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
 end
 
 function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
-    # Pricing may have added columns since this node's last master LP solve.
-    primal_values = node.user_data.cg_output.master_lp_primal_sol.variable_values
+    # Not the backend: pricing may have added columns since its last solve.
+    primal_values = ColGen.master_lp_primal_values(node.user_data.cg_output)
 
     # The node leaves the open set: its children (if any) replace it.
     delete!(space.open_node_bounds, node.id)
