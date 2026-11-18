@@ -44,4 +44,14 @@ function test_dual_bound_e2e()
         @test output.status == :optimal
         @test output.best_dual_bound ≈ output.incumbent.obj_value
     end
+
+    @testset "[dual bound] an infeasible problem has +Inf as dual bound" begin
+        output = run_branch_and_price(
+            BranchCutPriceWorkspace(
+                build_gap_decomp(gap_infeasible_master()), BranchCutPriceConfig()
+            )
+        )
+        @test output.status == :infeasible
+        @test output.best_dual_bound == Inf
+    end
 end
