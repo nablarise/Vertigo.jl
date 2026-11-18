@@ -60,6 +60,7 @@ export WentgesSmoothing, NoStabilization
 # Decomposition interface query functions
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost, convexity_bounds
 export coupling_constraints, is_minimization, original_cost, coupling_coefficients
+export mapped_subproblem_var, mapped_original_var
 export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id
 export has_column, record_column!, columns, columns_for_subproblem

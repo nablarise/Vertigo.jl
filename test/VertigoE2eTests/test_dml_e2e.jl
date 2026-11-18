@@ -300,7 +300,102 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
     end
 end
 
+# Brute-force knapsack pricing oracle for one GAP machine: it stands in for the
+# MOI model of a `user_overriden=true` subproblem, receiving the reduced costs through
+# `MOI.modify` like a model would.
+mutable struct KnapsackPricer
+    vars::Vector{MOI.VariableIndex}   # vars[t]: subproblem variable of task t
+    weight::Vector{Float64}
+    capacity::Float64
+    red_cost::Vector{Float64}
+end
+
+function MOI.modify(
+    p::KnapsackPricer,
+    ::MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}},
+    change::MOI.ScalarCoefficientChange{Float64}
+)
+    p.red_cost[findfirst(==(change.variable), p.vars)] = change.new_coefficient
+    return nothing
+end
+
+function Vertigo.ColGen.get_pricing_subprob_optimizer(
+    ::Vertigo.ColGen.ExactStage,
+    sp::Vertigo.ColGen.PricingSubproblem{<:KnapsackPricer}
+)
+    return Vertigo.ColGen.moi_pricing_sp(sp)
+end
+
+function Vertigo.ColGen.optimize_pricing_problem!(
+    ws::Vertigo.ColGen.ColGenWorkspace, sp_id,
+    ::Vertigo.ColGen.PricingSubproblem, p::KnapsackPricer,
+    mast_dual_sol, _stab_changes_mast_dual_sol
+)
+    CG = Vertigo.ColGen
+    n = length(p.vars)
+    best_obj, best_set = Inf, Int[]
+    for mask in 0:(2^n - 1)
+        items = [t for t in 1:n if (mask >> (t - 1)) & 1 == 1]
+        sum(p.weight[items]) <= p.capacity || continue
+        obj = sum(p.red_cost[items])
+        obj < best_obj && ((best_obj, best_set) = (obj, items))
+    end
+
+    decomp = ws.decomp
+    ν = CG._get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id) +
+        CG._get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
+    reduced_cost = best_obj + subproblem_fixed_cost(decomp, sp_id) - ν
+    sol = Vertigo.Reformulation._SpSolution(
+        sp_id, reduced_cost, [(p.vars[t], 1.0) for t in best_set]
+    )
+    improving = reduced_cost < -CG.RC_IMPROVING_TOL
+    return CG.PricingSolution(
+        false, false, reduced_cost, best_obj,
+        [CG.PricingPrimalSolution(sp_id, sol, improving)]
+    )
+end
+
+function test_dml_user_overriden_subproblem()
+    @testset "[dml] GAP with user-overridden knapsack pricers dual ≈ 63.0" begin
+        cost = [5.0 8.0 14.0 20.0 5.0 4.0 13.0;
+                18.0 14.0 15.0 16.0 3.0 8.0 19.0]
+        weight = [1.0 1.0 1.0 5.0 2.0 1.0 4.0;
+                  5.0 3.0 4.0 1.0 4.0 1.0 1.0]
+        capacity = [11.0, 14.0]
+        K = 1:2; T = 1:7
+
+        model = Model(HiGHS.Optimizer)
+        @variable(model, x[k in K, t in T], Bin)
+        @constraint(model, assign[t in T], sum(x[k, t] for k in K) == 1)
+        @constraint(model, knapsack[k in K],
+            sum(weight[k, t] * x[k, t] for t in T) <= capacity[k])
+        @objective(model, Min, sum(cost[k, t] * x[k, t] for k in K, t in T))
+
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k, user_overriden=true)
+            knapsack[k] => subproblem(k)
+            assign[_] => master()
+        end
+
+        # No model was built; the user installs a pricer per subproblem.
+        for k in K
+            sp_id = sp_map[k]
+            @test sp_model(decomp, sp_id) === nothing
+            vars = [last(mapped_subproblem_var(decomp, x[k, t])) for t in T]
+            sp_models(decomp)[sp_id] = KnapsackPricer(
+                vars, weight[k, :], capacity[k], zeros(length(T))
+            )
+        end
+
+        ws = _build_colgen_context_from_dml(decomp, sp_map)
+        output = run_column_generation(ws)
+        @test output.status == optimal
+        @test abs(output.incumbent_dual_bound - 63.0) <= 1e-4
+    end
+end
+
 function test_dml_e2e()
+    test_dml_user_overriden_subproblem()
     for smoothing_alpha in (0.0, 0.5)
         test_dml_gap_converges(; smoothing_alpha)
         test_dml_gap_converges2(; smoothing_alpha)

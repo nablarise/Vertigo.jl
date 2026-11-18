@@ -181,7 +181,59 @@ function test_dml_silent()
     end
 end
 
+function test_dml_user_overriden_subproblem()
+    @testset "[dml] user-overridden subproblem has no model" begin
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k, user_overriden=(k == 1))
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+
+        @test sp_model(decomp, sp_map[1]) === nothing
+        @test sp_model(decomp, sp_map[2]) !== nothing
+
+        # The user-overridden subproblem is still part of the decomposition: its
+        # variables are numbered 1..7 and appear in the coupling rows.
+        sp_vars = subproblem_variables(decomp, sp_map[1])
+        @test sort(getfield.(sp_vars, :value)) == collect(1:7)
+        @test length(subproblem_variables(decomp, sp_map[2])) == 7
+        @test length(coupling_constraints(decomp)) == 7
+        x = model[:x]
+        for t in 1:7
+            sp_id, vi = mapped_subproblem_var(decomp, x[1, t])
+            @test sp_id == sp_map[1]
+            @test vi in sp_vars
+            @test mapped_original_var(decomp, sp_id, vi) == x[1, t]
+            @test !isempty(coupling_coefficients(decomp, sp_id, vi))
+        end
+
+        # Container syntax: options are written once per container.
+        decomp, sp_map = @dantzig_wolfe model begin
+            master() => (constraints = assign[_])
+            subproblem(k, user_overriden=true) => (
+                variables = [x[k, _]],
+                constraints = knapsack[k]
+            )
+        end
+        @test all(isnothing, values(sp_models(decomp)))
+        @test length(coupling_constraints(decomp)) == 7
+
+        # Column generation refuses to start until every pricer is installed.
+        @test_throws "has no pricer" ColGenWorkspace(decomp, ColGenConfig())
+
+        # Rules assigning to the same subproblem must agree.
+        @test_throws ErrorException @dantzig_wolfe model begin
+            x[k, _] => subproblem(k, user_overriden=true)
+            assign[_] => master()
+            knapsack[k] => subproblem(k, user_overriden=false)
+        end
+    end
+end
+
 function test_dml()
+    test_dml_user_overriden_subproblem()
     test_dml_macro_basic_gap()
     test_dml_silent()
     test_dml_annotation_function()
