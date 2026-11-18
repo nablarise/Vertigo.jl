@@ -14,6 +14,7 @@ function setup_stabilization! end
 
 function stop_colgen end
 function setup_reformulation! end
+function teardown_reformulation! end
 
 function next_phase end
 function next_stage end
@@ -45,6 +46,7 @@ function run!(context, ip_primal_sol; iter = 1)
         setup_reformulation!(context, phase)
         last_iter = isnothing(phase_output) ? iter : phase_output.nb_iterations
         phase_output = run_colgen_phase!(context, phase, stage, ip_primal_sol, stab; iter = last_iter)
+        teardown_reformulation!(context, phase)
         phase = next_phase(phase_it, phase, phase_output)
         stage = next_stage(stage_it, stage, phase_output)
     end

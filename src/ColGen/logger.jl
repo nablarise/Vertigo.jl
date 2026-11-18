@@ -100,6 +100,9 @@ function setup_reformulation!(lws::ColGenLoggerWorkspace, phase)
     setup_reformulation!(lws.inner, phase)
 end
 
+teardown_reformulation!(lws::ColGenLoggerWorkspace, phase) =
+    teardown_reformulation!(lws.inner, phase)
+
 function after_colgen_iteration(
     lws::ColGenLoggerWorkspace, phase, _stage,
     colgen_iterations, stab, out,
