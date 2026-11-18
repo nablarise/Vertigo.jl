@@ -450,6 +450,7 @@ struct ColGenIterationOutput
     master_lp_dual_sol::Any
     master_ip_primal_sol::Union{Nothing,MasterIpPrimalSol}
     subproblem_infeasible::Bool
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
 end
 
 colgen_iteration_output_type(::ColGenWorkspace) = ColGenIterationOutput
@@ -515,7 +516,10 @@ function new_iteration_output(
     master_ip_primal_sol,
     master_lp_dual_sol,
 )
-    return ColGenIterationOutput(mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol, infeasible_subproblem)
+    return ColGenIterationOutput(
+        mlp, db, nb_new_cols, master_lp_dual_sol, master_ip_primal_sol,
+        infeasible_subproblem, master_lp_primal_sol
+    )
 end
 
 get_dual_bound(output::ColGenIterationOutput) = output.dual_bound
@@ -533,6 +537,7 @@ struct ColGenPhaseOutput
     colgen_converged::Bool      # condition D: CG has converged
     subproblem_infeasible::Bool
     ip_pruned::Bool
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
 end
 
 colgen_phase_output_type(::ColGenWorkspace) = ColGenPhaseOutput
@@ -573,7 +578,10 @@ function new_phase_output(
     ip_pruned_flag = _dual_bound_dominated(
         ws, inc_dual_bound, ws.ip_primal_bound
     )
-    return ColGenPhaseOutput(mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf, ip_pruned_flag)
+    return ColGenPhaseOutput(
+        mlp, inc_dual_bound, iteration, has_art, converged, subprob_inf,
+        ip_pruned_flag, colgen_iter_output.master_lp_primal_sol
+    )
 end
 
 function next_phase(::ColGenPhaseIterator, ::Phase0, o::ColGenPhaseOutput)
@@ -611,6 +619,20 @@ struct ColGenOutput
     master_lp_obj::Union{Nothing,Float64}
     incumbent_dual_bound::Union{Nothing,Float64}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
+    master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
+end
+
+"""
+    master_lp_primal_values(output::ColGenOutput) -> Dict{MOI.VariableIndex,Float64}
+
+Return the master variable values at the last master LP solve of the run.
+Columns that pricing added after that solve are absent: their value is 0.
+"""
+function master_lp_primal_values(output::ColGenOutput)
+    if isnothing(output.master_lp_primal_sol)
+        error("No master LP solution: column generation ended with status $(output.status).")
+    end
+    return get_variable_values(output.master_lp_primal_sol)
 end
 
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
@@ -621,31 +643,31 @@ function new_output(
     ip = ws.ip_incumbent
     if p.subproblem_infeasible
         return ColGenOutput(
-            subproblem_infeasible, nothing, nothing, ip
+            subproblem_infeasible, nothing, nothing, ip, nothing
         )
     elseif p.has_artificial_vars && p.colgen_converged
         return ColGenOutput(
-            master_infeasible, nothing, nothing, ip
+            master_infeasible, nothing, nothing, ip, nothing
         )
     elseif p.ip_pruned
         return ColGenOutput(
             ip_pruned, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     elseif p.colgen_converged
         return ColGenOutput(
             optimal, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     elseif time_limit_reached(ws)
         return ColGenOutput(
             time_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     else
         return ColGenOutput(
             iteration_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     end
 end

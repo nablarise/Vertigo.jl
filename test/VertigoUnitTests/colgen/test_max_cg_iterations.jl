@@ -18,7 +18,8 @@ function test_max_cg_iterations()
             1,       # nb_columns_added (not zero)
             nothing, # master_lp_dual_sol
             nothing, # master_ip_primal_sol
-            false    # subproblem_infeasible
+            false,   # subproblem_infeasible
+            nothing  # master_lp_primal_sol
         )
 
         # Phase0: iteration 4 (≤ 5) → don't stop
@@ -36,7 +37,7 @@ function test_max_cg_iterations()
 
         # Phase1 iter output: columns still being added
         iter_output = ColGenIterationOutput(
-            100.0, nothing, 1, nothing, nothing, false
+            100.0, nothing, 1, nothing, nothing, false, nothing
         )
 
         # Phase1 does not stop even beyond limit

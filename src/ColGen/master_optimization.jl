@@ -2,10 +2,6 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
-struct MasterPrimalSolution
-    sol::PrimalMoiSolution
-end
-
 struct MasterDualSolution
     sol::DualMoiSolution
     # Coupling constraint IDs used to filter the full dual solution and

@@ -3,6 +3,23 @@
 # SPDX-License-Identifier: MIT
 
 function test_branch_and_price()
+    @testset "[branch_and_price] branch after pricing adds a column on the last iteration (#73)" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        # The root LP is fractional. Stop CG immediately after pricing so
+        # the master contains columns absent from the last LP solution.
+        config = BranchCutPriceConfig(
+            colgen = ColGenConfig(max_cg_iterations = 1),
+            rmp_heuristic = false,
+            node_limit = 1
+        )
+        space = BranchCutPriceWorkspace(build_gap_decomp(inst), config)
+        output = run_branch_and_price(space)
+        @test output.status == :node_limit
+        @test length(space.open_node_bounds) == 2
+        @test isfinite(output.best_dual_bound)
+        @test output.best_dual_bound <= output.root_lp_value + 1e-6
+    end
+
     @testset "[branch_and_price] small GAP finds integer solution" begin
         inst = random_gap_instance(2, 4; seed=42)
         decomp = build_gap_decomp(inst)
