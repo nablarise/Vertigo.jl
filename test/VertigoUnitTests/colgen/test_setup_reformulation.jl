@@ -198,7 +198,7 @@ function test_setup_reformulation_phase1_zeroes_costs()
 end
 
 function test_teardown_reformulation_phase1_restores_costs()
-    @testset "[teardown_reformulation] phase 1 restores the costs it changed" begin
+    @testset "[teardown_reformulation] phase 1 restores the original costs" begin
         ws, vars = build_phase_test_context()
         model = master_model(ws.decomp)
 
@@ -212,17 +212,6 @@ function test_teardown_reformulation_phase1_restores_costs()
         # Pure master variable costs from the decomposition.
         @test _obj_coeff(model, vars.y_cont) ≈ 3.5 atol=1e-10
         @test _obj_coeff(model, vars.y_int) ≈ 7.0 atol=1e-10
-        # Artificial variables back to the Phase 0 default cost (10000).
-        for (s_pos, s_neg) in values(ws.eq_art_vars)
-            @test _obj_coeff(model, s_pos) ≈ 10000.0 atol=1e-10
-            @test _obj_coeff(model, s_neg) ≈ 10000.0 atol=1e-10
-        end
-        for s in values(ws.leq_art_vars)
-            @test _obj_coeff(model, s) ≈ 10000.0 atol=1e-10
-        end
-        for s in values(ws.geq_art_vars)
-            @test _obj_coeff(model, s) ≈ 10000.0 atol=1e-10
-        end
     end
 end
 

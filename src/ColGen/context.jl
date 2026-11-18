@@ -116,8 +116,6 @@ mutable struct ColGenWorkspace{D<:AbstractDecomposition}
     eq_art_vars::Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}
     leq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
     geq_art_vars::Dict{TaggedCI,MOI.VariableIndex}
-    # Costs of the artificial variables before Phase 1 replaced them.
-    art_var_costs_before_phase1::Dict{MOI.VariableIndex,Float64}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
     ip_primal_bound::Union{Nothing,Float64}
     branching_constraints::Vector{ActiveBranchingConstraint}
@@ -161,7 +159,6 @@ function ColGenWorkspace(
     return ColGenWorkspace(
         decomp, pool,
         eq_art_vars, leq_art_vars, geq_art_vars,
-        Dict{MOI.VariableIndex,Float64}(),
         nothing, nothing,
         ActiveBranchingConstraint[], ActiveRobustCut[],
         config.smoothing_alpha, config.max_cg_iterations,
@@ -391,28 +388,10 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
     return nothing
 end
 
-# The artificial variables of the workspace, whatever the constraint sense.
-function _artificial_vars(ws::ColGenWorkspace)
-    art_vars = MOI.VariableIndex[]
-    for (s_pos, s_neg) in values(ws.eq_art_vars)
-        push!(art_vars, s_pos, s_neg)
-    end
-    append!(art_vars, values(ws.leq_art_vars))
-    append!(art_vars, values(ws.geq_art_vars))
-    return art_vars
-end
-
 function setup_reformulation!(ws::ColGenWorkspace, ::Phase1)
     model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
     sense = is_minimization(ws.decomp) ? 1.0 : -1.0
-
-    obj = MOI.Utilities.canonical(MOI.get(model, obj_type))
-    obj_coeffs = Dict(t.variable => t.coefficient for t in obj.terms)
-    empty!(ws.art_var_costs_before_phase1)
-    for s in _artificial_vars(ws)
-        ws.art_var_costs_before_phase1[s] = get(obj_coeffs, s, 0.0)
-    end
 
     for (col_var, _) in columns(ws.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, 0.0))
@@ -420,7 +399,14 @@ function setup_reformulation!(ws::ColGenWorkspace, ::Phase1)
     for pmv in pure_master_variables(ws.decomp)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(pmv.id, 0.0))
     end
-    for s in _artificial_vars(ws)
+    for (_, (s_pos, s_neg)) in ws.eq_art_vars
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_pos, sense))
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s_neg, sense))
+    end
+    for (_, s) in ws.leq_art_vars
+        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
+    end
+    for (_, s) in ws.geq_art_vars
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, sense))
     end
     return nothing
@@ -433,8 +419,9 @@ end
 
 teardown_reformulation!(::ColGenWorkspace, ::Union{Phase0,Phase2}) = nothing
 
-# Phase 1 replaced the objective: give the master back its own, whatever
-# comes next — Phase 2, the end of the run, or the next run.
+# Phase 1 zeroed the original costs: restore them, whatever comes next —
+# Phase 2, the end of the run, or the next run. The artificial variables keep
+# their Phase 1 cost: the next Phase 0 or Phase 2 deletes them.
 function teardown_reformulation!(ws::ColGenWorkspace, ::Phase1)
     model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
@@ -447,10 +434,6 @@ function teardown_reformulation!(ws::ColGenWorkspace, ::Phase1)
         MOI.modify(model, obj_type,
             MOI.ScalarCoefficientChange(pmv.id, pure_master_cost(ws.decomp, pmv)))
     end
-    for (s, cost) in ws.art_var_costs_before_phase1
-        MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(s, cost))
-    end
-    empty!(ws.art_var_costs_before_phase1)
     return nothing
 end
 
