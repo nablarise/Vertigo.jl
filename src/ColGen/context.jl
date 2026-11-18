@@ -614,9 +614,6 @@ struct ColGenOutput
     master_lp_primal_sol::Union{Nothing,PrimalMoiSolution}
 end
 
-ColGenOutput(status, lp_obj, dual_bound, ip) =
-    ColGenOutput(status, lp_obj, dual_bound, ip, nothing)
-
 colgen_output_type(::ColGenWorkspace) = ColGenOutput
 
 function new_output(
@@ -625,11 +622,11 @@ function new_output(
     ip = ws.ip_incumbent
     if p.subproblem_infeasible
         return ColGenOutput(
-            subproblem_infeasible, nothing, nothing, ip
+            subproblem_infeasible, nothing, nothing, ip, nothing
         )
     elseif p.has_artificial_vars && p.colgen_converged
         return ColGenOutput(
-            master_infeasible, nothing, nothing, ip
+            master_infeasible, nothing, nothing, ip, nothing
         )
     elseif p.ip_pruned
         return ColGenOutput(
