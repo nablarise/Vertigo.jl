@@ -197,25 +197,45 @@ function test_setup_reformulation_phase1_zeroes_costs()
     end
 end
 
-function test_setup_reformulation_phase2_restores_costs()
-    @testset "[setup_reformulation] phase 2 restores original costs" begin
+function test_teardown_reformulation_phase1_restores_costs()
+    @testset "[teardown_reformulation] phase 1 restores the original costs" begin
         ws, vars = build_phase_test_context()
         model = master_model(ws.decomp)
 
         Vertigo.ColGen.setup_reformulation!(ws, Phase0())
         Vertigo.ColGen.setup_reformulation!(ws, Phase1())
+        Vertigo.ColGen.teardown_reformulation!(ws, Phase1())
 
-        @test _obj_coeff(model, vars.y_cont) ≈ 0.0
-        @test _obj_coeff(model, vars.y_int) ≈ 0.0
+        # Column costs from the pool (build_phase_test_context).
+        @test _obj_coeff(model, vars.λ1) ≈ 5.0 atol=1e-10
+        @test _obj_coeff(model, vars.λ2) ≈ 8.0 atol=1e-10
+        # Pure master variable costs from the decomposition.
+        @test _obj_coeff(model, vars.y_cont) ≈ 3.5 atol=1e-10
+        @test _obj_coeff(model, vars.y_int) ≈ 7.0 atol=1e-10
+    end
+end
 
-        Vertigo.ColGen.setup_reformulation!(ws, Phase2())
+function test_teardown_reformulation_phase1_restores_new_column_cost()
+    @testset "[teardown_reformulation] phase 1 restores a column it inserted" begin
+        ws, _ = build_phase_test_context()
+        model = master_model(ws.decomp)
 
-        # Column costs restored from pool.
-        @test _obj_coeff(model, vars.λ1) ≈ 5.0
-        @test _obj_coeff(model, vars.λ2) ≈ 8.0
-        # Pure master variable costs restored from decomposition.
-        @test _obj_coeff(model, vars.y_cont) ≈ 3.5
-        @test _obj_coeff(model, vars.y_int) ≈ 7.0
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
+        Vertigo.ColGen.setup_reformulation!(ws, Phase1())
+
+        # A column inserted during Phase 1 enters the master at cost 0.
+        λ3 = MOI.add_variable(model)
+        MOI.add_constraint(model, λ3, MOI.GreaterThan(0.0))
+        sp1 = PricingSubproblemId(1)
+        sol3 = Vertigo.Reformulation._SpSolution(
+            sp1, 6.0, [(MOI.VariableIndex(9999), 1.0)]
+        )
+        record_column!(ws.pool, λ3, sp1, sol3, 6.0)
+        @test _obj_coeff(model, λ3) ≈ 0.0 atol=1e-10
+
+        Vertigo.ColGen.teardown_reformulation!(ws, Phase1())
+
+        @test _obj_coeff(model, λ3) ≈ 6.0 atol=1e-10
     end
 end
 
@@ -231,6 +251,7 @@ function test_setup_reformulation_phase2_removes_art_vars()
         @test n_art > 0
 
         Vertigo.ColGen.setup_reformulation!(ws, Phase1())
+        Vertigo.ColGen.teardown_reformulation!(ws, Phase1())
         Vertigo.ColGen.setup_reformulation!(ws, Phase2())
 
         @test isempty(ws.eq_art_vars)
@@ -263,6 +284,7 @@ function test_setup_reformulation_full_sequence()
         @test _obj_coeff(model, vars.y_cont) ≈ 0.0
         @test _obj_coeff(model, vars.y_int) ≈ 0.0
 
+        Vertigo.ColGen.teardown_reformulation!(ws, Phase1())
         Vertigo.ColGen.setup_reformulation!(ws, Phase2())
 
         # Model should still solve.
@@ -285,7 +307,8 @@ end
 function test_setup_reformulation()
     test_setup_reformulation_phase0_relaxes_integrality()
     test_setup_reformulation_phase1_zeroes_costs()
-    test_setup_reformulation_phase2_restores_costs()
+    test_teardown_reformulation_phase1_restores_costs()
+    test_teardown_reformulation_phase1_restores_new_column_cost()
     test_setup_reformulation_phase2_removes_art_vars()
     test_setup_reformulation_full_sequence()
 end

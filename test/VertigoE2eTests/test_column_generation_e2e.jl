@@ -160,6 +160,33 @@ function test_gap_infeasible_master(; smoothing_alpha=0.0)
     end
 end
 
+# Phase 1 zeroes the column costs; a run that stops in Phase 1 must hand the
+# master back with its original costs, or the next run optimizes a wrong
+# objective.
+function test_gap_infeasible_master_restores_column_costs(; smoothing_alpha=0.0)
+    @testset "[gap] infeasible master leaves original column costs" begin
+        inst = gap_infeasible_master()
+        ws = build_gap_context(inst; smoothing_alpha)
+        output = run_column_generation(ws)
+        @test output.status == master_infeasible
+        pool = ws.inner.pool
+        @test !isempty(columns(pool))
+
+        obj = MOI.get(
+            Vertigo.Reformulation.master_model(ws.inner.decomp),
+            MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+        )
+        obj = MOI.Utilities.canonical(obj)
+        obj_coeffs = Dict(t.variable => t.coefficient for t in obj.terms)
+        for (col_var, rec) in columns(pool)
+            # Every task costs 1.0 on every machine: a column costs its
+            # number of tasks, at least one.
+            @test get(obj_coeffs, col_var, 0.0) ≈ column_original_cost(rec) atol=1e-10
+            @test column_original_cost(rec) >= 1.0
+        end
+    end
+end
+
 function test_gap_infeasible_subproblem(; smoothing_alpha=0.0)
     @testset "[gap] infeasible subproblem (machine 1 capacity = -1)" begin
         inst = gap_infeasible_subproblem()
@@ -300,6 +327,7 @@ function test_column_generation_e2e()
         test_gap_column_generation_converges2(; smoothing_alpha)
         #test_gap_benchmark_instances(; smoothing_alpha)
         test_gap_infeasible_master(; smoothing_alpha)
+        test_gap_infeasible_master_restores_column_costs(; smoothing_alpha)
         test_gap_infeasible_subproblem(; smoothing_alpha)
         test_gap_maximization(; smoothing_alpha)
         test_gap_two_identical_machines(; smoothing_alpha)

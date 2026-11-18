@@ -413,11 +413,20 @@ function setup_reformulation!(ws::ColGenWorkspace, ::Phase1)
 end
 
 function setup_reformulation!(ws::ColGenWorkspace, ::Phase2)
+    _remove_artificial_vars!(ws)
+    return nothing
+end
+
+teardown_reformulation!(::ColGenWorkspace, ::Union{Phase0,Phase2}) = nothing
+
+# Phase 1 zeroed the original costs: restore them, whatever comes next —
+# Phase 2, the end of the run, or the next run. The artificial variables keep
+# their Phase 1 cost: the next Phase 0 or Phase 2 deletes them.
+function teardown_reformulation!(ws::ColGenWorkspace, ::Phase1)
     model = master_model(ws.decomp)
     obj_type = MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
 
-    _remove_artificial_vars!(ws)
-
+    # The pool also holds the columns inserted during Phase 1, at cost 0.
     for (col_var, rec) in columns(ws.pool)
         MOI.modify(model, obj_type, MOI.ScalarCoefficientChange(col_var, column_original_cost(rec)))
     end
