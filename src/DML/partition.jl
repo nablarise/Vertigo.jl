@@ -101,3 +101,37 @@ function _partition_subproblem_constraints(model, dw_annotation)
     end
     return sp_constrs
 end
+
+const _AnnotatedRef = Union{JuMP.AbstractVariableRef,JuMP.ConstraintRef}
+
+"""
+    _subproblem_multiplicities(model, dw_annotation) -> Dict
+
+Map each subproblem id to the multiplicity its annotations give it; a
+subproblem that none gives is absent. Throws an `ArgumentError` when two
+annotations of the same subproblem give different ones.
+"""
+function _subproblem_multiplicities(model, dw_annotation)
+    multiplicities = Dict{Any,Tuple{Float64,Float64}}()
+    for (name, obj) in JuMP.object_dictionary(model)
+        annotations = if obj isa AbstractArray && length(obj) > 0 && first(obj) isa _AnnotatedRef
+            (dw_annotation(Val(name), Tuple(idx)...) for idx in _eachindex(obj))
+        elseif obj isa _AnnotatedRef
+            (dw_annotation(Val(name)),)
+        else
+            ()
+        end
+        for annotation in annotations
+            if annotation isa SubproblemAnnotation && !isnothing(annotation.multiplicity)
+                given = get!(multiplicities, annotation.id, annotation.multiplicity)
+                if given != annotation.multiplicity
+                    throw(ArgumentError(
+                        "the subproblem $(annotation.id) is given the " *
+                        "multiplicities $given and $(annotation.multiplicity)"
+                    ))
+                end
+            end
+        end
+    end
+    return multiplicities
+end

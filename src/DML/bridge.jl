@@ -169,8 +169,10 @@ function dantzig_wolfe_decomposition(
         minimize=minimize
     )
 
+    multiplicities = _subproblem_multiplicities(model, dw_annotation)
     for id in sorted_ids
-        add_subproblem!(builder, sp_id_map[id], 0.0, 1.0, 1.0)
+        conv_lb, conv_ub = get(multiplicities, id, (1.0, 1.0))
+        add_subproblem!(builder, sp_id_map[id], 0.0, conv_lb, conv_ub)
     end
 
     # Collect original objective coefficients
@@ -215,8 +217,9 @@ function dantzig_wolfe_decomposition(
 
     for id in sorted_ids
         sp_id = sp_id_map[id]
-        conv_lb_ref = @JuMP.constraint(master_model, 0 >= 1)
-        conv_ub_ref = @JuMP.constraint(master_model, 0 <= 1)
+        conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
+        conv_lb_ref = @JuMP.constraint(master_model, 0 >= conv_lb)
+        conv_ub_ref = @JuMP.constraint(master_model, 0 <= conv_ub)
         conv_lb_map[sp_id] = TaggedCI(JuMP.index(conv_lb_ref))
         conv_ub_map[sp_id] = TaggedCI(JuMP.index(conv_ub_ref))
     end

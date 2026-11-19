@@ -2,8 +2,10 @@
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
+# The arguments of `subproblem(...)`, passed as written to
+# `dantzig_wolfe_subproblem`.
 struct SubproblemAssignment
-    id_expr::Any
+    args::Vector{Any}
 end
 
 struct MasterAssignment
@@ -30,7 +32,12 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
 
 # Assignment Syntax
 - `subproblem(id)` — assign to subproblem with given ID
+- `subproblem(id; multiplicity = (lb, ub))` — and bound the number of its
+  solutions used; see [`dantzig_wolfe_subproblem`](@ref)
 - `master()` — assign to master problem
+
+The arguments of `subproblem` may use the captured indices and the variables
+of the calling scope.
 
 # Example
 ```julia
@@ -49,10 +56,12 @@ macro dantzig_wolfe(model, block)
     fn_name = gensym("generated_annotation")
     method_defs = generate_method_definitions(fn_name, patterns)
 
-    return quote
+    # Escaped, so that the arguments of `subproblem` see the caller's
+    # variables; the functions of this module are interpolated as values.
+    return esc(quote
         $(method_defs...)
-        dantzig_wolfe_decomposition($(esc(model)), $fn_name)
-    end
+        $(dantzig_wolfe_decomposition)($model, $fn_name)
+    end)
 end
 
 function parse_block(block::Expr)
@@ -109,10 +118,14 @@ function parse_assignment(assignment::Expr)
     if assignment.head == :call
         func_name = assignment.args[1]
         if func_name == :subproblem
-            length(assignment.args) == 2 || error(
-                "subproblem() requires exactly one argument"
+            args = assignment.args[2:end]
+            positional = filter(
+                arg -> !Meta.isexpr(arg, (:parameters, :kw)), args
             )
-            return SubproblemAssignment(assignment.args[2])
+            length(positional) == 1 || error(
+                "subproblem() requires exactly one positional argument"
+            )
+            return SubproblemAssignment(args)
         elseif func_name == :master
             length(assignment.args) == 1 || error(
                 "master() takes no arguments"
@@ -140,7 +153,7 @@ end
 function generate_method_definition(
     fn_name::Symbol, pattern::PatternRule
 )
-    val_param = :(::Val{$(QuoteNode(pattern.name))})
+    val_param = :(::$(Val){$(QuoteNode(pattern.name))})
     params = if isempty(pattern.indices)
         [val_param]
     else
@@ -153,9 +166,9 @@ function generate_method_definition(
 end
 
 function generate_assignment_expr(a::SubproblemAssignment)
-    return :(dantzig_wolfe_subproblem($(a.id_expr)))
+    return :($(dantzig_wolfe_subproblem)($(a.args...)))
 end
 
 function generate_assignment_expr(::MasterAssignment)
-    return :(dantzig_wolfe_master())
+    return :($(dantzig_wolfe_master)())
 end

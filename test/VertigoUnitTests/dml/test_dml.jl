@@ -186,10 +186,90 @@ function test_dml_solver_parameters()
     end
 end
 
+# The convexity bounds of a subproblem, as the decomposition records them and
+# as the master constraints hold them; the two must agree.
+function _recorded_and_master_convexity_bounds(decomp, sp_id)
+    master = master_model(decomp)
+    rhs(tagged) = with_typed_ci(tagged) do ci
+        set = MOI.get(master, MOI.ConstraintSet(), ci)
+        return set isa MOI.GreaterThan ? set.lower : set.upper
+    end
+    master_bounds = (
+        rhs(convexity_lb_ci(decomp, sp_id)), rhs(convexity_ub_ci(decomp, sp_id))
+    )
+    return convexity_bounds(decomp, sp_id), master_bounds
+end
+
+function test_dml_subproblem_multiplicity()
+    @testset "[dml] multiplicity from the caller's scope and the indices" begin
+        model = _build_gap_jump_model()
+        fleet = [2, 3]
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k; multiplicity = (0, fleet[k]))
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+        for (k, expected_ub) in ((1, 2.0), (2, 3.0))
+            recorded, in_master = _recorded_and_master_convexity_bounds(decomp, sp_map[k])
+            @test recorded[1] ≈ 0.0 atol=1e-10
+            @test recorded[2] ≈ expected_ub atol=1e-10
+            @test in_master[1] ≈ 0.0 atol=1e-10
+            @test in_master[2] ≈ expected_ub atol=1e-10
+        end
+    end
+
+    @testset "[dml] multiplicity defaults to (1, 1)" begin
+        model = _build_gap_jump_model()
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+        recorded, in_master = _recorded_and_master_convexity_bounds(decomp, sp_map[1])
+        @test recorded[1] ≈ 1.0 atol=1e-10
+        @test recorded[2] ≈ 1.0 atol=1e-10
+        @test in_master[1] ≈ 1.0 atol=1e-10
+        @test in_master[2] ≈ 1.0 atol=1e-10
+    end
+
+    @testset "[dml] multiplicity through the annotation function" begin
+        model = _build_gap_jump_model()
+        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k)
+        ann(::Val{:assign}, _) = dantzig_wolfe_master()
+        ann(::Val{:knapsack}, k) = dantzig_wolfe_subproblem(k; multiplicity = (1, 4))
+        decomp, sp_map = dantzig_wolfe_decomposition(model, ann)
+        recorded, in_master = _recorded_and_master_convexity_bounds(decomp, sp_map[2])
+        @test recorded[1] ≈ 1.0 atol=1e-10
+        @test recorded[2] ≈ 4.0 atol=1e-10
+        @test in_master[1] ≈ 1.0 atol=1e-10
+        @test in_master[2] ≈ 4.0 atol=1e-10
+    end
+
+    @testset "[dml] annotations of one subproblem give different multiplicities" begin
+        model = _build_gap_jump_model()
+        @test_throws ArgumentError @dantzig_wolfe model begin
+            x[k, _] => subproblem(k; multiplicity = (0, 2))
+            assign[_] => master()
+            knapsack[k] => subproblem(k; multiplicity = (0, 3))
+        end
+    end
+
+    for (name, multiplicity) in [
+        ("negative lower bound", (-1, 2)),
+        ("upper bound below the lower one", (3, 2)),
+        ("infinite upper bound", (0, Inf)),
+    ]
+        @testset "[dml] multiplicity rejected: $name" begin
+            @test_throws ArgumentError dantzig_wolfe_subproblem(1; multiplicity)
+        end
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
     test_dml_pure_master_missing_bounds()
+    test_dml_subproblem_multiplicity()
     test_dml_solver_parameters()
 end
