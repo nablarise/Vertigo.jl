@@ -177,4 +177,52 @@ function test_branch_and_price()
         )
         @test occursin("DB = 410.50", String(take!(io)))
     end
+
+    # Issue #88: a branching constraint is re-created, when its node is
+    # entered, from the columns that existed when it was created.
+    @testset "[branch_and_price] a column generated elsewhere gets the coefficient of a re-created branching constraint" begin
+        inst = GAPInstance(
+            2, 2, [1.0 2.0; 3.0 4.0], [1.0 1.0; 1.0 1.0], [2.0, 2.0]
+        )
+        space = BranchCutPriceWorkspace(
+            build_gap_decomp(inst), BranchCutPriceConfig()
+        )
+        ws = space.ws
+        decomp = ws.decomp
+        root = Vertigo.TreeSearch.new_root(space)
+
+        # Branch while the pool is empty: the constraints hold no column.
+        sp_id = PricingSubproblemId(1)
+        sp_var = first(Vertigo.Reformulation.subproblem_variables(decomp, sp_id))
+        orig_var = Vertigo.Reformulation.mapped_original_var(decomp, sp_id, sp_var)
+        (_, up), cut_info = Vertigo.BranchCutPrice.create_branching_children(
+            space.id_counter, root, orig_var, 0.5, ws, root.dual_bound,
+            space.cut_tracker
+        )
+        for (cut_id, ov) in cut_info
+            space.branching_cut_info[cut_id] = ov
+        end
+
+        # A column using the branched variable once, generated while the
+        # constraint is not active: its coefficient there is 1.0.
+        sol = Vertigo.Reformulation._SpSolution(sp_id, -1.0, [(sp_var, 1.0)])
+        col_var = Vertigo.ColGen._insert_column!(
+            ws, Vertigo.ColGen.Phase2(),
+            Vertigo.ColGen.PricingPrimalSolution(sp_id, sol, true)
+        )
+
+        Vertigo.TreeSearch.transition!(space, root, up)
+        Vertigo.BranchCutPrice._rebuild_branching_constraints!(space)
+
+        (bc,) = Vertigo.Branching.bp_branching_constraints(ws)
+        f = Vertigo.Reformulation.with_typed_ci(bc.constraint_index) do ci
+            MOI.get(
+                Vertigo.Branching.bp_master_model(ws),
+                MOI.ConstraintFunction(), ci
+            )
+        end
+        coeffs = Dict(t.variable => t.coefficient for t in f.terms)
+        @test !isnothing(col_var)
+        @test get(coeffs, col_var, 0.0) ≈ 1.0 atol = 1e-10
+    end
 end
