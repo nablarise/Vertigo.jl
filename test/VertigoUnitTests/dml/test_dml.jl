@@ -186,9 +186,42 @@ function test_dml_solver_parameters()
     end
 end
 
+function test_dml_containers_real_indices()
+    @testset "[dml] every JuMP container is decomposed by its real indices" begin
+        # x[k, t]: two subproblems "a" and "b" over tasks 3:5, linked by cover[t].
+        # The decomposition must be the same whatever container JuMP stores them in.
+        for container in (
+            JuMP.Containers.DenseAxisArray, JuMP.Containers.SparseAxisArray, Dict
+        )
+            model = Model()
+            K, T = ["a", "b"], 3:5
+            x = @variable(model, [k in K, t in T], base_name = "x", container = container)
+            model[:x] = x
+            model[:cover] = @constraint(
+                model, [t in T], sum(x[k, t] for k in K) == 1, container = container
+            )
+            @constraint(
+                model, cap[k in K], sum(x[k, t] for t in T) <= 2, container = Dict
+            )
+            @objective(model, Min, sum(x[k, t] for k in K, t in T))
+            decomp, sp_map = @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                cover[_] => master()
+                cap[k] => subproblem(k)
+            end
+            @test sort(collect(keys(sp_map))) == ["a", "b"]
+            for id in subproblem_ids(decomp)
+                @test length(subproblem_variables(decomp, id)) == 3
+            end
+            @test length(coupling_constraints(decomp)) == 3
+        end
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
+    test_dml_containers_real_indices()
     test_dml_pure_master_variables()
     test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
