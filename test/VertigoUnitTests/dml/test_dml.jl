@@ -147,8 +147,29 @@ function test_dml_pure_master_variables()
     end
 end
 
+function test_dml_solver_parameters()
+    @testset "[dml] models are silent and take parameters after decomposition" begin
+        silent(m) = MOI.get(m, MOI.Silent())
+        model = _build_gap_jump_model()
+        set_optimizer(model, HiGHS.Optimizer)
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+        @test silent(master_model(decomp))
+        @test all(silent, values(sp_models(decomp)))
+
+        MOI.set(sp_model(decomp, sp_map[1]), MOI.Silent(), false)
+        @test !silent(sp_model(decomp, sp_map[1]))
+        @test silent(sp_model(decomp, sp_map[2]))
+        @test silent(master_model(decomp))
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
+    test_dml_solver_parameters()
 end
