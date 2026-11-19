@@ -147,6 +147,25 @@ function test_dml_pure_master_variables()
     end
 end
 
+# The decomposition records the bounds the master keeps: a missing lower bound
+# is -Inf, not 0.
+function test_dml_pure_master_missing_bounds()
+    # (name, bounds of `y`, expected lower and upper bounds)
+    cases = [
+        ("free", _ -> nothing, -Inf, Inf),
+        ("upper bound only", y -> set_upper_bound(y, 4), -Inf, 4.0),
+        ("lower bound only", y -> set_lower_bound(y, 2), 2.0, Inf),
+    ]
+    for (name, set_bounds!, expected_lb, expected_ub) in cases
+        @testset "[dml] pure master variable bounds, $name" begin
+            decomp = build_pure_master_y_decomp(set_bounds!)
+            lb, ub = pure_master_bounds(decomp, only(pure_master_variables(decomp)))
+            @test lb ≈ expected_lb atol=1e-10
+            @test ub ≈ expected_ub atol=1e-10
+        end
+    end
+end
+
 function test_dml_solver_parameters()
     @testset "[dml] models are silent and take parameters after decomposition" begin
         silent(m) = MOI.get(m, MOI.Silent())
@@ -171,5 +190,6 @@ function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
+    test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
 end
