@@ -1,1 +1,3 @@
 docs/superpowers/
+test/*.dot
+test/*.png
