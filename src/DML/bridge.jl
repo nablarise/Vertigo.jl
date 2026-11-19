@@ -13,13 +13,23 @@ maps user-provided subproblem identifiers to `PricingSubproblemId`.
 
 The master and every subproblem get their own instance of `optimizer`, or
 of the optimizer attached to `model` when `optimizer` is `nothing`, and are
-made silent. To set any other solver parameter, call `MOI.set` on
-`master_model(decomp)` and on the models in `sp_models(decomp)`:
+made silent. Parameters set on `model` itself (time limit, threads, raw
+solver parameters) are not carried over.
+
+To give every model the same parameters, pass them with the optimizer:
+
+```julia
+opt = optimizer_with_attributes(HiGHS.Optimizer, "threads" => 1)
+decomp, sp_map = dantzig_wolfe_decomposition(model, ann; optimizer=opt)
+```
+
+To set a parameter on one model, call `MOI.set` on `master_model(decomp)`
+or on a model in `sp_models(decomp)`:
 
 ```julia
 MOI.set(master_model(decomp), MOI.Silent(), false)
 for (_, sp) in sp_models(decomp)
-    MOI.set(sp, MOI.RawOptimizerAttribute("threads"), 1)
+    MOI.set(sp, MOI.TimeLimitSec(), 10.0)
 end
 ```
 
