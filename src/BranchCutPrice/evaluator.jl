@@ -39,6 +39,25 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
+# Record a new integer solution found by column generation as the incumbent,
+# and return whether it closes the node. Column generation can meet it before
+# converging, so the node is closed only if its bound reaches the incumbent.
+function _close_on_ip_incumbent!(space::BranchCutPriceWorkspace, node, ip_sol)
+    closed = false
+    if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
+        space.last_ip_incumbent = ip_sol
+        if _is_improving_incumbent(space, ip_sol)
+            space.incumbent = ip_sol
+            if _should_prune(space, node.dual_bound)
+                delete!(space.open_node_bounds, node.id)
+                _recompute_global_dual_bound!(space)
+                closed = true
+            end
+        end
+    end
+    return closed
+end
+
 # The bound a node inherits from its parent stays valid: a column generation
 # stopped early (time limit) can end with a weaker one.
 function _tighter_bound(space::BranchCutPriceWorkspace, inherited, found)
@@ -130,16 +149,8 @@ function TreeSearch.evaluate!(
         return TreeSearch.CUTOFF
     end
 
-    # Detect new IP-feasible solution from CG
-    ip_sol = cg_output.ip_incumbent
-    if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
-        space.last_ip_incumbent = ip_sol
-        if _is_improving_incumbent(space, ip_sol)
-            space.incumbent = ip_sol
-            delete!(space.open_node_bounds, node.id)
-            _recompute_global_dual_bound!(space)
-            return TreeSearch.FEASIBLE
-        end
+    if _close_on_ip_incumbent!(space, node, cg_output.ip_incumbent)
+        return TreeSearch.FEASIBLE
     end
 
     # The node stays open until it is branched, so the global dual bound
