@@ -41,7 +41,8 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
 end
 ```
 
-Returns `(decomp::DWReformulation, sp_id_map::Dict)`.
+Returns `(decomp::DWReformulation, sp_id_map::Dict)`. Solver parameters are
+set on the resulting models; see [`dantzig_wolfe_decomposition`](@ref).
 """
 macro dantzig_wolfe(model, block)
     patterns = parse_block(block)

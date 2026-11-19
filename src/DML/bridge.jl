@@ -11,6 +11,18 @@ the annotation function `dw_annotation`.
 Returns `(decomp::DWReformulation, sp_id_map::Dict)` where `sp_id_map`
 maps user-provided subproblem identifiers to `PricingSubproblemId`.
 
+The master and every subproblem get their own instance of `optimizer`, or
+of the optimizer attached to `model` when `optimizer` is `nothing`, and are
+made silent. To set any other solver parameter, call `MOI.set` on
+`master_model(decomp)` and on the models in `sp_models(decomp)`:
+
+```julia
+MOI.set(master_model(decomp), MOI.Silent(), false)
+for (_, sp) in sp_models(decomp)
+    MOI.set(sp, MOI.RawOptimizerAttribute("threads"), 1)
+end
+```
+
 # Example
 ```jldoctest
 using JuMP, HiGHS, Vertigo
