@@ -138,6 +138,34 @@ function build_gap_context(inst::GAPInstance; max_cg_iterations::Int=1000)
     )
 end
 
+"""
+    build_pure_master_y_decomp(set_bounds!) -> DWReformulation
+
+Decompose a GAP with two machines and three tasks whose only pure master
+variable `y` has cost 3 and coefficient 1 in each of the three `assign`
+constraints: with every `assign` dual at `π`, its reduced cost is `3 - 3π`.
+`set_bounds!(y)` sets the bounds of `y`, which is free otherwise.
+"""
+function build_pure_master_y_decomp(set_bounds!)
+    model = Model()
+    @variable(model, x[k in 1:2, t in 1:3], Bin)
+    @variable(model, y)
+    set_bounds!(y)
+    @constraint(model, assign[t in 1:3], sum(x[k, t] for k in 1:2) + y >= 1)
+    @constraint(model, knapsack[k in 1:2], sum(x[k, t] for t in 1:3) <= 2)
+    @objective(model, Min, sum(x) + 3y)
+    decomp, _ = @dantzig_wolfe model begin
+        x[k, _] => subproblem(k)
+        y => master()
+        assign[_] => master()
+        knapsack[k] => subproblem(k)
+    end
+    return decomp
+end
+
+# Reformulation
+include("reformulation/test_interface.jl")
+
 # ColGen
 include("colgen/test_gap.jl")
 include("colgen/ip_management_tests.jl")
@@ -180,6 +208,7 @@ include("dml/test_dml.jl")
 # ────────────────────────────────────────────────────────────────────────────────────────
 
 function run()
+    test_reformulation_pure_master_contribution()
     test_gap_decomposition_builder()
     test_gap_column_pool_populated()
     test_gap_lp_dual_bound_matches_primal()

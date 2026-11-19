@@ -137,6 +137,9 @@ end
 
 Lagrangian contribution from pure master variables:
     Σₛ min{ (gₛ - Σᵢ φᵢₛ πᵢ) · Yₛ,  (gₛ - Σᵢ φᵢₛ πᵢ) · Ȳₛ }
+
+A reduced cost within 1e-6 of zero contributes nothing when the bound
+it points to is infinite.
 """
 function compute_dual_bound_pure_master_contribution(decomp::AbstractDecomposition, dual_values)
     contrib = 0.0
@@ -146,7 +149,14 @@ function compute_dual_bound_pure_master_contribution(decomp::AbstractDecompositi
             rc_y -= entry.coefficient * dual_values(entry.constraint_id)
         end
         lb, ub = pure_master_bounds(decomp, y_var)
-        contrib += min(rc_y * lb, rc_y * ub)
+        # The minimum is reached at the bound the reduced cost points to.
+        bound = rc_y > 0 ? lb : ub
+        # Below 1e-6, a reduced cost is solver noise on a basic variable;
+        # times an infinite bound, it would make the dual bound ±Inf, or NaN
+        # as 0 * Inf.
+        if isfinite(bound) || abs(rc_y) > 1e-6
+            contrib += rc_y * bound
+        end
     end
     return contrib
 end
