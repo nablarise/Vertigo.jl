@@ -181,9 +181,34 @@ function test_dml_silent()
     end
 end
 
+# `_replace_vars_in_func` once splatted every term into `AffExpr(constant, terms...)`; Julia
+# compiles a new method per argument count and the cost grows far faster than the size, so a
+# subproblem with a few thousand variables took tens of seconds to decompose.
+function test_dml_large_subproblem_objective()
+    @testset "[dml] a subproblem with thousands of variables decomposes quickly" begin
+        function build(n)
+            model = Model()
+            @variable(model, y[1:n], Bin)
+            @constraint(model, cover, sum(y) >= 1)
+            @objective(model, Min, sum(i * y[i] for i in 1:n))
+            return model
+        end
+        ann(::Val{:y}, i) = dantzig_wolfe_subproblem(1)
+        ann(::Val{:cover}) = dantzig_wolfe_master()
+
+        dantzig_wolfe_decomposition(build(10), ann)   # compile everything but the size effect
+        n = 2000
+        elapsed = @elapsed decomp, _ = dantzig_wolfe_decomposition(build(n), ann)
+        sp_id = only(subproblem_ids(decomp))
+        @test length(subproblem_variables(decomp, sp_id)) == n
+        @test elapsed < 10   # tens of seconds with the splat; about a second without
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_silent()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
+    test_dml_large_subproblem_objective()
 end
