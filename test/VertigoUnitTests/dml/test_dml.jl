@@ -147,11 +147,9 @@ function test_dml_pure_master_variables()
     end
 end
 
-function test_dml_silent()
-    @testset "[dml] silent is chosen per master and subproblem" begin
+function test_dml_solver_parameters()
+    @testset "[dml] models are silent and take parameters after decomposition" begin
         silent(m) = MOI.get(m, MOI.Silent())
-
-        # Default: everything is silent.
         model = _build_gap_jump_model()
         set_optimizer(model, HiGHS.Optimizer)
         decomp, sp_map = @dantzig_wolfe model begin
@@ -159,31 +157,19 @@ function test_dml_silent()
             assign[_] => master()
             knapsack[k] => subproblem(k)
         end
-        @test silent(decomp.master_model)
+        @test silent(master_model(decomp))
         @test all(silent, values(sp_models(decomp)))
 
-        # Explicit choice per model; one rule is enough to decide.
-        decomp, sp_map = @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, silent=(k == 2))
-            assign[_] => master(silent=false)
-            knapsack[k] => subproblem(k)
-        end
-        @test !silent(decomp.master_model)
-        @test silent(sp_models(decomp)[sp_map[2]])
-        @test !silent(sp_models(decomp)[sp_map[1]])
-
-        # Rules assigning to the same model must agree.
-        @test_throws ErrorException @dantzig_wolfe model begin
-            x[k, _] => subproblem(k, silent=true)
-            assign[_] => master()
-            knapsack[k] => subproblem(k, silent=false)
-        end
+        MOI.set(sp_model(decomp, sp_map[1]), MOI.Silent(), false)
+        @test !silent(sp_model(decomp, sp_map[1]))
+        @test silent(sp_model(decomp, sp_map[2]))
+        @test silent(master_model(decomp))
     end
 end
 
 function test_dml()
     test_dml_macro_basic_gap()
-    test_dml_silent()
     test_dml_annotation_function()
     test_dml_pure_master_variables()
+    test_dml_solver_parameters()
 end

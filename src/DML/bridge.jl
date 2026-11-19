@@ -11,6 +11,28 @@ the annotation function `dw_annotation`.
 Returns `(decomp::DWReformulation, sp_id_map::Dict)` where `sp_id_map`
 maps user-provided subproblem identifiers to `PricingSubproblemId`.
 
+The master and every subproblem get their own instance of `optimizer`, or
+of the optimizer attached to `model` when `optimizer` is `nothing`, and are
+made silent. Parameters set on `model` itself (time limit, threads, raw
+solver parameters) are not carried over.
+
+To give every model the same parameters, pass them with the optimizer:
+
+```julia
+opt = optimizer_with_attributes(HiGHS.Optimizer, "threads" => 1)
+decomp, sp_map = dantzig_wolfe_decomposition(model, ann; optimizer=opt)
+```
+
+To set a parameter on one model, call `MOI.set` on `master_model(decomp)`
+or on a model in `sp_models(decomp)`:
+
+```julia
+MOI.set(master_model(decomp), MOI.Silent(), false)
+for (_, sp) in sp_models(decomp)
+    MOI.set(sp, MOI.TimeLimitSec(), 10.0)
+end
+```
+
 # Example
 ```jldoctest
 using JuMP, HiGHS, Vertigo
@@ -126,19 +148,10 @@ function dantzig_wolfe_decomposition(
 
     if opt !== nothing
         JuMP.set_optimizer(master_model, opt)
-        _requested_silent(
-            Iterators.flatten((master_vars, master_constrs)),
-            dw_annotation, "the master"
-        ) && JuMP.set_silent(master_model)
-        for (sp_id, sp_model) in sp_jump_models
+        JuMP.set_silent(master_model)
+        for sp_model in values(sp_jump_models)
             JuMP.set_optimizer(sp_model, opt)
-            _requested_silent(
-                Iterators.flatten((
-                    get(sp_vars_partition, sp_id, ()),
-                    get(sp_constrs_partition, sp_id, ())
-                )),
-                dw_annotation, "subproblem $sp_id"
-            ) && JuMP.set_silent(sp_model)
+            JuMP.set_silent(sp_model)
         end
     end
 
@@ -202,8 +215,8 @@ function dantzig_wolfe_decomposition(
 
     for id in sorted_ids
         sp_id = sp_id_map[id]
-        conv_lb_ref = JuMP.@constraint(master_model, 0 >= 1)
-        conv_ub_ref = JuMP.@constraint(master_model, 0 <= 1)
+        conv_lb_ref = @JuMP.constraint(master_model, 0 >= 1)
+        conv_ub_ref = @JuMP.constraint(master_model, 0 <= 1)
         conv_lb_map[sp_id] = TaggedCI(JuMP.index(conv_lb_ref))
         conv_ub_map[sp_id] = TaggedCI(JuMP.index(conv_ub_ref))
     end
@@ -219,21 +232,6 @@ function dantzig_wolfe_decomposition(
     )
 
     return (decomp, sp_id_map)
-end
-
-# Whether the model gathering `objects` (name => indexes pairs) must be
-# silent. Rules that don't say are ignored; the default is silent.
-function _requested_silent(objects, dw_annotation, target)
-    flags = Set{Bool}()
-    for (name, indexes) in objects, idx in indexes
-        silent = dw_annotation(Val(name), idx...).silent
-        silent === nothing || push!(flags, silent)
-    end
-    length(flags) > 1 && error(
-        "Conflicting `silent` settings for $target: " *
-        "all rules assigning to it must agree."
-    )
-    return isempty(flags) ? true : only(flags)
 end
 
 function _get_optimizer(model::JuMP.Model)
