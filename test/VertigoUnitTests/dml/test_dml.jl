@@ -207,7 +207,7 @@ function test_dml_subproblem_multiplicity()
         decomp, sp_map = @dantzig_wolfe model begin
             x[k, _] => subproblem(k; multiplicity = (0, fleet[k]))
             assign[_] => master()
-            knapsack[k] => subproblem(k)
+            knapsack[k] => subproblem(k; multiplicity = (0, fleet[k]))
         end
         for (k, expected_ub) in ((1, 2.0), (2, 3.0))
             recorded, in_master = _recorded_and_master_convexity_bounds(decomp, sp_map[k])
@@ -234,7 +234,7 @@ function test_dml_subproblem_multiplicity()
 
     @testset "[dml] multiplicity through the annotation function" begin
         model = _build_gap_jump_model()
-        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k)
+        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k; multiplicity = (1, 4))
         ann(::Val{:assign}, _) = dantzig_wolfe_master()
         ann(::Val{:knapsack}, k) = dantzig_wolfe_subproblem(k; multiplicity = (1, 4))
         decomp, sp_map = dantzig_wolfe_decomposition(model, ann)
@@ -251,6 +251,15 @@ function test_dml_subproblem_multiplicity()
             x[k, _] => subproblem(k; multiplicity = (0, 2))
             assign[_] => master()
             knapsack[k] => subproblem(k; multiplicity = (0, 3))
+        end
+    end
+
+    @testset "[dml] a multiplicity left out is (1, 1), not unspecified" begin
+        model = _build_gap_jump_model()
+        @test_throws ArgumentError @dantzig_wolfe model begin
+            x[k, _] => subproblem(k; multiplicity = (0, 2))
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
         end
     end
 

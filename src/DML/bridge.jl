@@ -171,7 +171,7 @@ function dantzig_wolfe_decomposition(
 
     multiplicities = _subproblem_multiplicities(model, dw_annotation)
     for id in sorted_ids
-        conv_lb, conv_ub = get(multiplicities, id, (1.0, 1.0))
+        conv_lb, conv_ub = multiplicities[id]
         add_subproblem!(builder, sp_id_map[id], 0.0, conv_lb, conv_ub)
     end
 

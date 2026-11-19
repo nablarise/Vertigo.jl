@@ -107,9 +107,9 @@ const _AnnotatedRef = Union{JuMP.AbstractVariableRef,JuMP.ConstraintRef}
 """
     _subproblem_multiplicities(model, dw_annotation) -> Dict
 
-Map each subproblem id to the multiplicity its annotations give it; a
-subproblem that none gives is absent. Throws an `ArgumentError` when two
-annotations of the same subproblem give different ones.
+Map each subproblem id to the multiplicity its annotations give it. Throws an
+`ArgumentError` when two annotations of the same subproblem give different
+ones.
 """
 function _subproblem_multiplicities(model, dw_annotation)
     multiplicities = Dict{Any,Tuple{Float64,Float64}}()
@@ -122,7 +122,7 @@ function _subproblem_multiplicities(model, dw_annotation)
             ()
         end
         for annotation in annotations
-            if annotation isa SubproblemAnnotation && !isnothing(annotation.multiplicity)
+            if annotation isa SubproblemAnnotation
                 given = get!(multiplicities, annotation.id, annotation.multiplicity)
                 if given != annotation.multiplicity
                     throw(ArgumentError(
