@@ -85,10 +85,9 @@ function _dot_status_text(s::DotNodeStatus)
 end
 
 function _write_dot_node(io::IO, node, dot_status::DotNodeStatus,
-                         dual_bound, incumbent_value)
+                         incumbent_value)
     shape, color = _dot_shape_and_color(dot_status)
-    db_str = isnothing(dual_bound) ? "N/A" :
-        @sprintf("%.2f", dual_bound)
+    db_str = @sprintf("%.2f", node.dual_bound)
     ip_str = isnothing(incumbent_value) ? "\u2014" :
         @sprintf("%.2f", incumbent_value)
     status_str = _dot_status_text(dot_status)
@@ -149,16 +148,13 @@ function TreeSearch.search(
 
             status = TreeSearch.evaluate!(evaluator, space, next_node)
 
-            # Derive dot status and dual bound
             cg_out = next_node.user_data.cg_output
             dot_status = _derive_dot_status(status, cg_out)
-            dual_bound = isnothing(cg_out) ? nothing :
-                cg_out.incumbent_dual_bound
 
             inc_val = isnothing(space.incumbent) ? nothing :
                 space.incumbent.obj_value
             _write_dot_node(
-                io, next_node, dot_status, dual_bound, inc_val
+                io, next_node, dot_status, inc_val
             )
 
             # Edge from parent
