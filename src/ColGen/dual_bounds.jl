@@ -65,19 +65,26 @@ function compute_dual_bound(
     end
 
     # 3. Subtract pure master variable bound duals
-    #    (avoid double-counting with pure_master_contrib below)
+    #    (avoid double-counting with pure_master_contrib below).
+    #    An infinite bound has no constraint, hence no dual: skipping it
+    #    avoids 0 * Inf = NaN.
     pure_master_bound_contrib = 0.0
     for y_var in pure_master_variables(decomp)
         lb, ub = pure_master_bounds(decomp, y_var)
-        lb_ci = TaggedCI(y_var.id.value, VI_GEQ)
-        ub_ci = TaggedCI(y_var.id.value, VI_LEQ)
-        lb_dual = get(
-            mast_dual_sol.sol.constraint_duals, lb_ci, 0.0
-        )
-        ub_dual = get(
-            mast_dual_sol.sol.constraint_duals, ub_ci, 0.0
-        )
-        pure_master_bound_contrib += lb_dual * lb + ub_dual * ub
+        if isfinite(lb)
+            lb_ci = TaggedCI(y_var.id.value, VI_GEQ)
+            lb_dual = get(
+                mast_dual_sol.sol.constraint_duals, lb_ci, 0.0
+            )
+            pure_master_bound_contrib += lb_dual * lb
+        end
+        if isfinite(ub)
+            ub_ci = TaggedCI(y_var.id.value, VI_LEQ)
+            ub_dual = get(
+                mast_dual_sol.sol.constraint_duals, ub_ci, 0.0
+            )
+            pure_master_bound_contrib += ub_dual * ub
+        end
     end
 
     # 4. Pure master variable contribution
