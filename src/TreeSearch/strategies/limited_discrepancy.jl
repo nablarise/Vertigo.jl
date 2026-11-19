@@ -22,8 +22,8 @@ struct LimitedDiscrepancyStrategy{S<:AbstractSearchStrategy} <: AbstractSearchSt
 end
 
 # Delegate container operations to inner strategy
-init_container(s::LimitedDiscrepancyStrategy, root::SearchNode) =
-    init_container(s.inner_strategy, root)
+init_container(s::LimitedDiscrepancyStrategy, root::SearchNode, minimize) =
+    init_container(s.inner_strategy, root, minimize)
 
 select_node!(s::LimitedDiscrepancyStrategy, container) =
     select_node!(s.inner_strategy, container)

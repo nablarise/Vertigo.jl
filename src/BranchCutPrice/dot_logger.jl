@@ -132,7 +132,9 @@ function TreeSearch.search(
         println(io, "  edge [fontsize=9];")
 
         root = TreeSearch.new_root(space)
-        container = TreeSearch.init_container(strategy, root)
+        container = TreeSearch.init_container(
+            strategy, root, TreeSearch.ts_is_minimization(space)
+        )
         current_node = root
         is_first = true
 

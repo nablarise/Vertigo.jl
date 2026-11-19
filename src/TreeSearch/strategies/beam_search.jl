@@ -24,26 +24,28 @@ Two-queue container for beam search: one for the current depth level and one
 for the next depth level. Nodes are transferred between queues when the
 current level is exhausted or the beam width is reached.
 """
-mutable struct BeamSearchContainer{N}
-    current_queue::PriorityQueue{N, Float64}
-    next_queue::PriorityQueue{N, Float64}
+mutable struct BeamSearchContainer{N,O<:Base.Order.Ordering}
+    current_queue::PriorityQueue{N, Float64, O}
+    next_queue::PriorityQueue{N, Float64, O}
     nodes_at_current_depth::Int
     max_width::Int
 end
 
-function init_container(strategy::BeamSearchStrategy, root::SearchNode)
+function init_container(strategy::BeamSearchStrategy, root::SearchNode, minimize)
     N = typeof(root)
-    current = PriorityQueue{N, Float64}()
-    next = PriorityQueue{N, Float64}()
+    order = _priority_order(minimize)
+    current = PriorityQueue{N, Float64}(order)
+    next = PriorityQueue{N, Float64}(order)
     enqueue!(current, root, get_priority(strategy.inner_strategy, root))
-    return BeamSearchContainer{N}(current, next, 0, strategy.max_width)
+    return BeamSearchContainer(current, next, 0, strategy.max_width)
 end
 
 function select_node!(strategy::BeamSearchStrategy, container::BeamSearchContainer)
     # If current queue is exhausted or beam width reached, swap queues
     if isempty(container.current_queue) || container.nodes_at_current_depth >= container.max_width
+        dropped = container.current_queue
         container.current_queue = container.next_queue
-        container.next_queue = PriorityQueue{keytype(container.current_queue), Float64}()
+        container.next_queue = empty!(dropped)
         container.nodes_at_current_depth = 0
     end
 

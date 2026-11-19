@@ -16,11 +16,14 @@ mutable struct StrategyTestSpace <: TreeSearch.AbstractSearchSpace
     counter::NodeIdCounter
     visited_values::Vector{Int}
     model_val::Ref{Int}
+    minimize::Bool
 end
 
-function StrategyTestSpace(; max_depth=2)
-    StrategyTestSpace(max_depth, NodeIdCounter(), Int[], Ref(1))
+function StrategyTestSpace(; max_depth=2, minimize=true)
+    StrategyTestSpace(max_depth, NodeIdCounter(), Int[], Ref(1), minimize)
 end
+
+TreeSearch.ts_is_minimization(space::StrategyTestSpace) = space.minimize
 
 function TreeSearch.new_root(space::StrategyTestSpace)
     return root_node(space.counter, SEMPTY, SEMPTY, SData(1), dual_bound=0.0)
@@ -93,6 +96,18 @@ function test_treesearch_strategies_best_first()
     end
 end
 
+function test_treesearch_strategies_best_first_maximization()
+    @testset "[treesearch] best-first priority order in a maximization" begin
+        # Same tree; in a maximization the largest dual bound is explored first.
+        # Open {1} -> 1, open {2,3} -> 3, open {2,6,7} -> 7, 6, 2,
+        # open {4,5} -> 5, 4.
+        space = StrategyTestSpace(max_depth=2, minimize=false)
+        visited = search(DualBoundBestFirstStrategy(), space, StrategyEvaluator())
+
+        @test visited == [1, 3, 7, 6, 2, 5, 4]
+    end
+end
+
 function test_treesearch_strategies_beam_search()
     @testset "[treesearch] beam search width limit" begin
         space = StrategyTestSpace(max_depth=2)
@@ -110,6 +125,17 @@ function test_treesearch_strategies_beam_search()
         @test 5 ∈ visited
         @test 6 ∉ visited
         @test 7 ∉ visited
+    end
+end
+
+function test_treesearch_strategies_beam_search_maximization()
+    @testset "[treesearch] beam search keeps the largest bounds in a maximization" begin
+        space = StrategyTestSpace(max_depth=2, minimize=false)
+        strategy = BeamSearchStrategy(ValuePriorityStrategy(), 2)
+        visited = search(strategy, space, StrategyEvaluator())
+
+        # Depth 1: 3 then 2. Depth 2: the best 2 of {4,5,6,7} are 7 and 6.
+        @test visited == [1, 3, 2, 7, 6]
     end
 end
 
@@ -133,7 +159,9 @@ end
 
 function test_treesearch_strategies()
     test_treesearch_strategies_best_first()
+    test_treesearch_strategies_best_first_maximization()
     test_treesearch_strategies_beam_search()
+    test_treesearch_strategies_beam_search_maximization()
     test_treesearch_strategies_bfs_consistency()
     test_treesearch_strategies_dfs_child_order()
 end

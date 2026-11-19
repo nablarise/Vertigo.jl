@@ -10,7 +10,7 @@ Children are pushed in reverse order so that the first child is explored first.
 """
 struct DepthFirstStrategy <: AbstractSearchStrategy end
 
-function init_container(::DepthFirstStrategy, root::SearchNode)
+function init_container(::DepthFirstStrategy, root::SearchNode, _)
     stack = Stack{typeof(root)}()
     push!(stack, root)
     return stack
