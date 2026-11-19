@@ -148,13 +148,16 @@ function test_dml_pure_master_variables()
 end
 
 # The decomposition records the bounds the master keeps: a missing lower bound
-# is -Inf, not 0.
+# is -Inf, not 0, and a fixing is both bounds.
 function test_dml_pure_master_missing_bounds()
     # (name, bounds of `y`, expected lower and upper bounds)
     cases = [
         ("free", _ -> nothing, -Inf, Inf),
         ("upper bound only", y -> set_upper_bound(y, 4), -Inf, 4.0),
         ("lower bound only", y -> set_lower_bound(y, 2), 2.0, Inf),
+        ("fixed at -2", y -> fix(y, -2), -2.0, -2.0),
+        ("fixed at 0", y -> fix(y, 0), 0.0, 0.0),
+        ("fixed at 4", y -> fix(y, 4), 4.0, 4.0),
     ]
     for (name, set_bounds!, expected_lb, expected_ub) in cases
         @testset "[dml] pure master variable bounds, $name" begin
