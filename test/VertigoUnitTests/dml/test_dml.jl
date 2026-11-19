@@ -218,6 +218,30 @@ function test_dml_containers_real_indices()
     end
 end
 
+function test_dml_unassigned_constraints()
+    @testset "[dml] an anonymous constraint is not silently left out" begin
+        model = _build_gap_jump_model()
+        x = model[:x]
+        @constraint(model, x[1, 1] + x[2, 1] <= 0)
+        @test_throws ["Constraint ", "assigned to neither the master nor a subproblem"] (
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+            end
+        )
+    end
+    @testset "[dml] a named constraint assigned to no model is not left out" begin
+        model = _build_gap_jump_model()
+        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k)
+        ann(::Val{:assign}, _) = dantzig_wolfe_master()
+        ann(::Val{:knapsack}, k) = nothing
+        @test_throws ["Constraint knapsack[1]", "assigned to neither the master nor a subproblem"] (
+            dantzig_wolfe_decomposition(model, ann)
+        )
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
@@ -225,4 +249,5 @@ function test_dml()
     test_dml_pure_master_variables()
     test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
+    test_dml_unassigned_constraints()
 end

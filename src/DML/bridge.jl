@@ -68,6 +68,9 @@ function dantzig_wolfe_decomposition(
     sp_constrs_partition = _partition_subproblem_constraints(
         model, dw_annotation
     )
+    _check_all_constraints_assigned(
+        model, master_constrs, sp_constrs_partition
+    )
 
     # Create master JuMP model
     master_model = JuMP.Model()
