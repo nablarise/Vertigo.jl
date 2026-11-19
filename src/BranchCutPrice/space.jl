@@ -199,11 +199,12 @@ end
 function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
     bounds = space.open_node_bounds
     if isempty(bounds)
-        # No open node left: the incumbent is proved optimal.
+        # No open node left: the incumbent is proved optimal, or, without
+        # one, the problem is proved infeasible.
         space.best_dual_bound = if !isnothing(space.incumbent)
             space.incumbent.obj_value
         else
-            is_minimization(space.ws) ? -Inf : Inf
+            is_minimization(space.ws) ? Inf : -Inf
         end
         return
     end
