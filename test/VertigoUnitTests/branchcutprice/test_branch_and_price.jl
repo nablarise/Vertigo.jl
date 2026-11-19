@@ -128,4 +128,44 @@ function test_branch_and_price()
         @test out1.status == out2.status
         @test out1.nodes_explored == out2.nodes_explored
     end
+
+    # Issue #76: column generation can meet an integer master solution
+    # before it converges. No solver runs here: the node bound and the
+    # integer solution are set by hand on a 2 machines x 2 tasks GAP.
+    function root_with_bound(bound)
+        inst = GAPInstance(
+            2, 2, [1.0 2.0; 3.0 4.0], [1.0 1.0; 1.0 1.0], [2.0, 2.0]
+        )
+        space = BranchCutPriceWorkspace(
+            build_gap_decomp(inst), BranchCutPriceConfig()
+        )
+        root = Vertigo.TreeSearch.new_root(space)
+        root.dual_bound = bound
+        space.open_node_bounds[root.id] = bound
+        return space, root
+    end
+    ip_sol(value) = Vertigo.ColGen.MasterIpPrimalSol(
+        value, Tuple{MOI.VariableIndex,Int}[]
+    )
+
+    @testset "[branch_and_price] an integer solution above the node bound keeps the node open" begin
+        space, root = root_with_bound(155.0)
+        closed = Vertigo.BranchCutPrice._close_on_ip_incumbent!(
+            space, root, ip_sol(160.0)
+        )
+        @test !closed
+        @test space.incumbent.obj_value ≈ 160.0 atol = 1e-10
+        @test haskey(space.open_node_bounds, root.id)
+    end
+
+    @testset "[branch_and_price] an integer solution at the node bound closes the node" begin
+        space, root = root_with_bound(160.0)
+        closed = Vertigo.BranchCutPrice._close_on_ip_incumbent!(
+            space, root, ip_sol(160.0)
+        )
+        @test closed
+        @test space.incumbent.obj_value ≈ 160.0 atol = 1e-10
+        @test !haskey(space.open_node_bounds, root.id)
+        @test space.best_dual_bound ≈ 160.0 atol = 1e-10
+    end
 end
