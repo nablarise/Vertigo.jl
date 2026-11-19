@@ -10,7 +10,9 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     MasterDualSolution, DualMoiSolution, GeneratedColumns,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
-    Phase0, Phase1, Phase2, TaggedCI
+    Phase0, Phase1, Phase2, TaggedCI,
+    ActiveRobustCut, ActiveBranchingConstraint
+using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -128,6 +130,10 @@ function test_stabilization()
     @testset "[stabilization] iter_update" begin
         test_decrease_alpha()
         test_increase_alpha()
+        test_angle_reads_robust_cut_row()
+        test_angle_reads_branching_row()
+        test_angle_reads_convexity_row()
+        test_angle_subtracts_column_activity_in_cut_row()
     end
 end
 
@@ -392,5 +398,76 @@ function test_increase_alpha()
     update_stabilization_after_iter!(stab, out_dual)
     @test stab.smooth_dual_sol_coeff > old_alpha
     # α = 0.5 + (1.0 - 0.5) * 0.1 = 0.55
+    @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
+end
+
+# The angle test of the α update reads every smoothed row, not only the
+# coupling constraints (#117). In each case below, the coupling rows alone
+# give a negative product (α would go up), and the other row makes it
+# positive (α goes down), or the reverse for the activity case.
+
+const _EqCstr = MOI.ConstraintIndex{
+    MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
+}
+
+# A master row with no column yet, `lhs >= rhs`.
+function _add_empty_geq_row!(ws, rhs)
+    f = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0)
+    return TaggedCI(MOI.add_constraint(master_model(ws.decomp), f, MOI.GreaterThan(rhs)))
+end
+
+# Stabilization whose center and LP duals differ on coupling row 2 by
+# 3.0 → 1.0 (product 1 * (1 - 3) = -2, no column covers it) and on `extra`.
+function _stab_for_angle(ws, extra_duals_center, extra_duals_out, columns)
+    stab = setup_stabilization!(ws, get_master(ws))
+    center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
+    out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
+    stab.stab_center = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
+    stab.last_generated_columns = GeneratedColumns(columns)
+    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    return stab, MasterDualSolution(DualMoiSolution(0.0, out), TaggedCI[])
+end
+
+function test_angle_reads_robust_cut_row()
+    ws = _build_stab_ctx(alpha=0.5)
+    cut = _add_empty_geq_row!(ws, 2.0)
+    push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
+    # cut row: g = 2 (no column), dual 0 → 2: 2 * 2 = 4; total -2 + 4 = 2 > 0
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 2.0], PricingPrimalSolution[])
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+function test_angle_reads_branching_row()
+    ws = _build_stab_ctx(alpha=0.5)
+    row = _add_empty_geq_row!(ws, 1.0)
+    push!(ws.branching_constraints, ActiveBranchingConstraint(row, (1, 1)))
+    # branching row: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
+    stab, out = _stab_for_angle(ws, [row => 0.0], [row => 3.0], PricingPrimalSolution[])
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+function test_angle_reads_convexity_row()
+    ws = _build_stab_ctx(alpha=0.5)
+    conv_ub = convexity_ub_ci(ws.decomp, PricingSubproblemId(1))
+    # convexity row 0 <= 1: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
+    stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], PricingPrimalSolution[])
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+function test_angle_subtracts_column_activity_in_cut_row()
+    ws = _build_stab_ctx(alpha=0.5)
+    cut = _add_empty_geq_row!(ws, 2.0)
+    push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
+    # One improving column of subproblem 1 with task 1, multiplicity 1 (the
+    # convexity upper bound). It covers coupling row 1 (no dual change) and
+    # the cut: g = 2 - 1 = 1, dual 0 → 1.5: 1.5. Total -2 + 1.5 = -0.5 ≤ 0,
+    # so α goes up. Without the activity, g = 2 gives +3 and α would go down.
+    sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+    column = PricingPrimalSolution(sp_id, _SpSolution(sp_id, -5.0, [(sp_var, 1.0)]), true)
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 1.5], [column])
+    update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end

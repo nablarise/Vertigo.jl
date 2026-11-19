@@ -222,7 +222,9 @@ function update_stabilization_after_iter!(
 
     # Compute subgradient direction product:
     # Σ_i g^sep_i * (π^out_i - π^in_i)
-    # where g^sep_i = rhs_i - Σ_k m_k * Σ_t A_{i,t}^k * z_t^k
+    # where g^sep_i = rhs_i - Σ_k m_k * Σ_t A_{i,t}^k * z_t^k,
+    # over every row whose dual is smoothed (see _convex_combination):
+    # coupling constraints here, the other rows below.
     direction_product = 0.0
 
     # Compute column contributions per coupling constraint
@@ -230,12 +232,7 @@ function update_stabilization_after_iter!(
     for pricing_sol in stab.last_generated_columns.collection
         sp_id = pricing_sol.sp_id
         sol = pricing_sol.solution
-
-        # Multiplicity: use convexity bound based on RC sign
-        sense = is_minimization(ws) ? 1 : -1
-        rc = sol.obj_value
-        conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        mult = (sense * rc < 0) ? conv_ub : conv_lb
+        mult = _column_multiplicity(ws, pricing_sol)
 
         for (sp_var, val) in nonzero_entries(sol)
             for entry in coupling_coefficients(decomp, sp_id, sp_var)
@@ -253,6 +250,7 @@ function update_stabilization_after_iter!(
         pi_in = _dual_value(center, cstr_id)
         direction_product += g_sep * (pi_out - pi_in)
     end
+    direction_product += _other_rows_direction_product(stab, out)
 
     # Adjust α based on direction product
     if direction_product > 0
@@ -266,6 +264,65 @@ function update_stabilization_after_iter!(
     end
 
     return nothing
+end
+
+# Multiplicity of a generated column in the subgradient: the convexity bound
+# its reduced cost makes binding.
+function _column_multiplicity(ws::ColGenWorkspace, pricing_sol::PricingPrimalSolution)
+    sense = is_minimization(ws) ? 1 : -1
+    conv_lb, conv_ub = convexity_bounds(ws.decomp, pricing_sol.sp_id)
+    return (sense * pricing_sol.solution.obj_value < 0) ? conv_ub : conv_lb
+end
+
+# Σ g_i (π^out_i - π^in_i) over the smoothed rows that are not coupling
+# constraints: convexity constraints, robust cuts and branching constraints.
+function _other_rows_direction_product(stab::WentgesSmoothing, out::MasterDualSolution)
+    ws = stab.ws
+    decomp = ws.decomp
+    master = master_model(decomp)
+    columns = stab.last_generated_columns.collection
+    rhs(tagged) = with_typed_ci(
+        ci -> _rhs(MOI.get(master, MOI.ConstraintSet(), ci)), tagged
+    )
+    term(tagged, activity) = (rhs(tagged) - activity) *
+        (_dual_value(out, tagged) - _dual_value(stab.stab_center, tagged))
+    # Activity of the generated columns in a row given by original-variable
+    # coefficients.
+    function activity(coefficients)
+        total = 0.0
+        for pricing_sol in columns
+            col = 0.0
+            for (sp_var, val) in nonzero_entries(pricing_sol.solution)
+                ov = mapped_original_var(decomp, pricing_sol.sp_id, sp_var)
+                if ov !== nothing
+                    col += get(coefficients, ov, 0.0) * val
+                end
+            end
+            total += _column_multiplicity(ws, pricing_sol) * col
+        end
+        return total
+    end
+
+    product = 0.0
+    for sp_id in subproblem_ids(decomp)
+        conv_activity = sum(
+            (_column_multiplicity(ws, ps) for ps in columns if ps.sp_id == sp_id);
+            init = 0.0
+        )
+        if has_convexity_lb(decomp, sp_id)
+            product += term(convexity_lb_ci(decomp, sp_id), conv_activity)
+        end
+        if has_convexity_ub(decomp, sp_id)
+            product += term(convexity_ub_ci(decomp, sp_id), conv_activity)
+        end
+    end
+    for cut in ws.robust_cuts
+        product += term(cut.constraint_index, activity(cut.coefficients))
+    end
+    for bc in ws.branching_constraints
+        product += term(bc.constraint_index, activity(Dict(bc.orig_var => 1.0)))
+    end
+    return product
 end
 
 # ── Iteration logging dispatch ───────────────────────────────────────────────
