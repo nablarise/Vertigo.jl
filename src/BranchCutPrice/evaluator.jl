@@ -134,7 +134,7 @@ function TreeSearch.evaluate!(
     end
 
     # Prune by bound
-    if _should_prune(space, db)
+    if _should_prune(space, node.dual_bound)
         delete!(space.open_node_bounds, node.id)
         _recompute_global_dual_bound!(space)
         return TreeSearch.CUTOFF
