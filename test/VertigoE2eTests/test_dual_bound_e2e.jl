@@ -4,6 +4,21 @@
 
 # ── Global dual bound e2e tests on GAP class A ───────────────────────────
 
+# Branches on the original variable of the first subproblem variable,
+# whatever the LP solution: whether the root LP solution is fractional
+# depends on which optimal solution the solver returns.
+struct BranchOnFirstVariable <: Vertigo.Branching.AbstractBranchingStrategy end
+
+function Vertigo.Branching.select_branching_variable(
+    ::BranchOnFirstVariable, space, node, primal_values
+)
+    decomp = space.ws.decomp
+    sp_id = first(Vertigo.Reformulation.subproblem_ids(decomp))
+    sp_var = first(Vertigo.Reformulation.subproblem_variables(decomp, sp_id))
+    orig_var = Vertigo.Reformulation.mapped_original_var(decomp, sp_id, sp_var)
+    return Vertigo.Branching.BranchingResult(orig_var, 0.5)
+end
+
 function test_dual_bound_e2e()
     @testset "[dual bound] the root bound is known as soon as the root is evaluated" begin
         inst = parse_gap_file(get_gap_instance_path('A', 10, 100))
@@ -34,6 +49,23 @@ function test_dual_bound_e2e()
         @test status == Vertigo.TreeSearch.CUTOFF
         @test child.dual_bound >= root_bound - 1e-6
         @test Vertigo.TreeSearch.ts_best_dual_bound(space) >= root_bound - 1e-6
+    end
+
+    @testset "[dual bound] children inherit the node bound, not the column generation one" begin
+        inst = parse_gap_file(get_gap_instance_path('A', 10, 100))
+        space = BranchCutPriceWorkspace(
+            build_gap_decomp(inst),
+            BranchCutPriceConfig(branching_strategy=BranchOnFirstVariable()),
+        )
+        root = Vertigo.TreeSearch.new_root(space)
+        Vertigo.TreeSearch.evaluate!(BPEvaluator(), space, root)
+        # Stands for a bound inherited from an ancestor, tighter than the
+        # one this column generation found (issue #86).
+        root.dual_bound += 0.5
+        children = Vertigo.TreeSearch.branch!(space, root)
+        @test length(children) == 2
+        @test children[1].dual_bound ≈ root.dual_bound atol = 1e-10
+        @test children[2].dual_bound ≈ root.dual_bound atol = 1e-10
     end
 
     @testset "[dual bound] a closed tree has the incumbent as dual bound" begin

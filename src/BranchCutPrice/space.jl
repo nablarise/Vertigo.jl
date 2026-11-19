@@ -230,14 +230,6 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     orig_var = result.orig_var
     x_val = result.value
 
-    cg_output = node.user_data.cg_output
-    db = if isnothing(cg_output) ||
-            isnothing(cg_output.incumbent_dual_bound)
-        node.dual_bound
-    else
-        cg_output.incumbent_dual_bound
-    end
-
     parent_lp = if !isnothing(node.user_data) &&
                    !isnothing(node.user_data.cg_output)
         node.user_data.cg_output.master_lp_obj
@@ -248,7 +240,7 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
 
     children, cut_info = create_branching_children(
         space.id_counter, node, orig_var, x_val,
-        space.ws, db, space.cut_tracker
+        space.ws, node.dual_bound, space.cut_tracker
     )
     for (cut_id, ov) in cut_info
         space.branching_cut_info[cut_id] = ov
