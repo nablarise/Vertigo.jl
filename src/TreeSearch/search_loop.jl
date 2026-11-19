@@ -10,7 +10,8 @@ Execute a tree search with the given strategy, search space, and node evaluator.
 # The search loop
 
 1. Create the root node via `new_root(space)`.
-2. Initialize the open-node container via `init_container(strategy, root)`.
+2. Initialize the open-node container via
+   `init_container(strategy, root, ts_is_minimization(space))`.
 3. Loop until `stop(space, container)` or the container is empty:
    a. Select next node via `select_node!(strategy, container)`.
    b. Transition the model from current to next via `transition!(space, current, next)`.
@@ -35,7 +36,7 @@ function search(
     evaluator::AbstractNodeEvaluator
 )
     root = new_root(space)
-    container = init_container(strategy, root)
+    container = init_container(strategy, root, ts_is_minimization(space))
     current_node = root
     is_first = true
 

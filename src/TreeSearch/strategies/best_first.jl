@@ -7,14 +7,16 @@
 
 Abstract type for best-first search strategies.
 Subtypes must implement `get_priority(strategy, node) -> Float64`.
-Lower priority values are explored first (min-heap).
+Lower priority values are explored first in a minimization, higher ones in a
+maximization.
 """
 abstract type AbstractBestFirstStrategy <: AbstractSearchStrategy end
 
 """
     get_priority(strategy::AbstractBestFirstStrategy, node::SearchNode) -> Float64
 
-Return the priority value for `node`. Lower values are explored first.
+Return the priority value for `node`, in the units of the objective: lower
+values are explored first in a minimization, higher ones in a maximization.
 """
 function get_priority end
 
@@ -22,15 +24,18 @@ function get_priority end
     DualBoundBestFirstStrategy <: AbstractBestFirstStrategy
 
 Best-first search using the dual bound as priority.
-Nodes with smaller dual bounds are explored first (standard best-first).
+The node with the most promising dual bound is explored first: the smallest in
+a minimization, the largest in a maximization.
 """
 struct DualBoundBestFirstStrategy <: AbstractBestFirstStrategy end
 
 get_priority(::DualBoundBestFirstStrategy, node::SearchNode) = node.dual_bound
 
-# Container: PriorityQueue (min-heap by default)
-function init_container(strategy::AbstractBestFirstStrategy, root::SearchNode)
-    pq = PriorityQueue{typeof(root), Float64}()
+_priority_order(minimize) = minimize ? Base.Order.Forward : Base.Order.Reverse
+
+# Container: PriorityQueue, a min-heap in a minimization, a max-heap otherwise.
+function init_container(strategy::AbstractBestFirstStrategy, root::SearchNode, minimize)
+    pq = PriorityQueue{typeof(root), Float64}(_priority_order(minimize))
     enqueue!(pq, root, get_priority(strategy, root))
     return pq
 end

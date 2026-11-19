@@ -10,7 +10,7 @@ Nodes are explored level by level.
 """
 struct BreadthFirstStrategy <: AbstractSearchStrategy end
 
-function init_container(::BreadthFirstStrategy, root::SearchNode)
+function init_container(::BreadthFirstStrategy, root::SearchNode, _)
     queue = Deque{typeof(root)}()
     push!(queue, root)
     return queue

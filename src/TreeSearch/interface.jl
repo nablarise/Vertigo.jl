@@ -142,10 +142,11 @@ function evaluate! end
 # ============================================================
 
 """
-    init_container(strategy::AbstractSearchStrategy, root::SearchNode)
+    init_container(strategy::AbstractSearchStrategy, root::SearchNode, minimize::Bool)
 
 Create and return the initial open-node container for the given strategy,
-with `root` already inserted.
+with `root` already inserted. `minimize` is the optimization sense; strategies
+that order nodes by bound use it.
 """
 function init_container end
 
