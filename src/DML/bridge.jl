@@ -352,7 +352,7 @@ function _register_pure_master_data!(
             moi_idx = JuMP.index(reform_var)
 
             cost = get(orig_costs, orig_var, 0.0)
-            lb = JuMP.has_lower_bound(reform_var) ? JuMP.lower_bound(reform_var) : 0.0
+            lb = JuMP.has_lower_bound(reform_var) ? JuMP.lower_bound(reform_var) : -Inf
             ub = JuMP.has_upper_bound(reform_var) ? JuMP.upper_bound(reform_var) : Inf
             is_int = JuMP.is_integer(reform_var) || JuMP.is_binary(reform_var)
 
