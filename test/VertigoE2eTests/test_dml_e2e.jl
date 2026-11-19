@@ -257,6 +257,41 @@ function test_dml_fixed_master_cost(; smoothing_alpha=0.0)
         @test output.status == optimal
         @test abs(output.master_lp_obj - output.incumbent_dual_bound) <= 1e-4
         @test abs(output.incumbent_dual_bound - 163.0) <= 1e-4
+        @test !isnothing(output.ip_incumbent)
+        # The GAP optimum 63 (test_dml_gap_basic) plus the constant 100.
+        @test abs(output.ip_incumbent.obj_value - 163.0) <= 1e-4
+    end
+end
+
+# One binary forced to 1, objective 3x + constant: the only solution is worth
+# 3 + constant, in either sense.
+function test_dml_objective_constant_incumbent()
+    for sense in (MOI.MIN_SENSE, MOI.MAX_SENSE), constant in (0.0, 100.0, -100.0)
+        @testset "[dml] incumbent counts the objective constant, $sense, $constant" begin
+            model = Model(HiGHS.Optimizer)
+            set_silent(model)
+            @variable(model, x, Bin)
+            @constraint(model, must_choose, 1.0 * x >= 1)
+            @objective(model, sense, 3x + constant)
+            # Each run adds columns to the decomposition: one per run.
+            build_decomp() = first(@dantzig_wolfe model begin
+                x => subproblem(1)
+                must_choose => subproblem(1)
+            end)
+            expected = 3.0 + constant
+
+            cg = run_col_gen(build_decomp(), ColGenConfig(silent=true))
+            @test cg.status == optimal
+            @test !isnothing(cg.ip_incumbent)
+            @test cg.ip_incumbent.obj_value ≈ expected atol=1e-6
+
+            bp = run_branch_and_price(BranchCutPriceWorkspace(
+                build_decomp(), BranchCutPriceConfig(rmp_heuristic=false)
+            ))
+            @test bp.status == :optimal
+            @test bp.incumbent.obj_value ≈ expected atol=1e-6
+            @test bp.best_dual_bound ≈ expected atol=1e-6
+        end
     end
 end
 
@@ -310,4 +345,5 @@ function test_dml_e2e()
         test_dml_fixed_master_cost(; smoothing_alpha)
         test_dml_dual_bound_pure_master(; smoothing_alpha)
     end
+    test_dml_objective_constant_incumbent()
 end
