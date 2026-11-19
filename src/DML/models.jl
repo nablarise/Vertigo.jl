@@ -132,7 +132,8 @@ function _register_variable_object!(
                 reform_model, var, jump_var_name
             )
         end,
-        indexes
+        indexes,
+        JuMP.Containers.SparseAxisArray,
     )
     reform_model[var_name] = vars
 end
@@ -213,7 +214,8 @@ function _register_constraint_object!(
                 reform_model, constr, jump_constr_name
             )
         end,
-        indexes
+        indexes,
+        JuMP.Containers.SparseAxisArray,
     )
     reform_model[constr_name] = constrs
 end
