@@ -168,4 +168,13 @@ function test_branch_and_price()
         @test !haskey(space.open_node_bounds, root.id)
         @test space.best_dual_bound ≈ 160.0 atol = 1e-10
     end
+
+    @testset "[branch_and_price] the dot node label shows the node bound" begin
+        io = IOBuffer()
+        Vertigo.BranchCutPrice._write_dot_node(
+            io, (id = 3, dual_bound = 410.5),
+            Vertigo.BranchCutPrice.DotBranched, nothing
+        )
+        @test occursin("DB = 410.50", String(take!(io)))
+    end
 end
