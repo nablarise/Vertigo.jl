@@ -132,11 +132,17 @@ function compute_column_reduced_cost(
     return rc
 end
 
+# Below this magnitude, a reduced cost is taken as solver noise.
+const _ZERO_RC_TOL = 1e-6
+
 """
     compute_dual_bound_pure_master_contribution(decomp, dual_values) -> Float64
 
 Lagrangian contribution from pure master variables:
     Σₛ min{ (gₛ - Σᵢ φᵢₛ πᵢ) · Yₛ,  (gₛ - Σᵢ φᵢₛ πᵢ) · Ȳₛ }
+
+A reduced cost within `_ZERO_RC_TOL` of zero contributes nothing when the bound
+it points to is infinite.
 """
 function compute_dual_bound_pure_master_contribution(decomp::AbstractDecomposition, dual_values)
     contrib = 0.0
@@ -146,7 +152,13 @@ function compute_dual_bound_pure_master_contribution(decomp::AbstractDecompositi
             rc_y -= entry.coefficient * dual_values(entry.constraint_id)
         end
         lb, ub = pure_master_bounds(decomp, y_var)
-        contrib += min(rc_y * lb, rc_y * ub)
+        # The minimum is reached at the bound the reduced cost points to.
+        bound = rc_y > 0 ? lb : ub
+        # Solver noise on the reduced cost of a basic variable, times an
+        # infinite bound, would make the dual bound ±Inf, or NaN as 0 * Inf.
+        if isfinite(bound) || abs(rc_y) > _ZERO_RC_TOL
+            contrib += rc_y * bound
+        end
     end
     return contrib
 end
