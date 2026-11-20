@@ -300,6 +300,67 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
     end
 end
 
+# GAP of test_dml_dual_bound_pure_master where task 1 is covered by `y`, fixed
+# at 1 and of cost 50. `fixed = false` substitutes 1 for `y` instead.
+function _build_dml_gap_fixed_pure_master(fixed)
+    cost = [8.0 5.0 11.0 21.0 6.0 5.0 19.0;
+            1.0 12.0 11.0 12.0 14.0 8.0 5.0]
+    weight = [2.0 3.0 3.0 1.0 2.0 1.0 1.0;
+              5.0 1.0 1.0 3.0 1.0 5.0 4.0]
+    capacity = [5.0, 8.0]
+    K = 1:2; T = 1:7
+
+    model = Model(HiGHS.Optimizer)
+    set_silent(model)
+    @variable(model, x[k in K, t in T], Bin)
+    @constraint(model, knapsack[k in K],
+        sum(weight[k, t] * x[k, t] for t in T) <= capacity[k])
+    if fixed
+        @variable(model, y)
+        fix(y, 1.0)
+        @constraint(model, assign[t in T],
+            sum(x[k, t] for k in K) + (t == 1 ? y : 0.0) == 1)
+        @objective(model, Min,
+            sum(cost[k, t] * x[k, t] for k in K, t in T) + 50.0 * y)
+        decomp, _ = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            y => master()
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+    else
+        @constraint(model, assign[t in T],
+            sum(x[k, t] for k in K) + (t == 1 ? 1.0 : 0.0) == 1)
+        @objective(model, Min,
+            sum(cost[k, t] * x[k, t] for k in K, t in T) + 50.0)
+        decomp, _ = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+    end
+    return decomp
+end
+
+function test_dml_dual_bound_fixed_pure_master()
+    @testset "[dml] dual bound with a fixed pure master variable" begin
+        fixed = run_col_gen(
+            _build_dml_gap_fixed_pure_master(true), ColGenConfig(silent=true)
+        )
+        substituted = run_col_gen(
+            _build_dml_gap_fixed_pure_master(false), ColGenConfig(silent=true)
+        )
+        @test fixed.status == optimal
+        @test substituted.status == optimal
+        # HiGHS gives `y == 1` the dual 50 at the optimum: nonzero, so
+        # counting it twice would move the bound.
+        @test fixed.incumbent_dual_bound ≈ fixed.master_lp_obj atol=1e-4
+        @test fixed.incumbent_dual_bound ≈ substituted.incumbent_dual_bound atol=1e-4
+        # Compact model solved by HiGHS: LP relaxation 97.75, optimum 110.
+        @test 97.75 - 1e-4 <= fixed.incumbent_dual_bound <= 110.0 + 1e-4
+    end
+end
+
 # 1 <= x[1] + x[2] <= 2 written as two master constraints: the minimum of
 # x[1] + x[2] over binaries is 1.
 function test_dml_ranged_constraint_as_two_rows()
@@ -332,5 +393,6 @@ function test_dml_e2e()
         test_dml_fixed_master_cost(; smoothing_alpha)
         test_dml_dual_bound_pure_master(; smoothing_alpha)
     end
+    test_dml_dual_bound_fixed_pure_master()
     test_dml_ranged_constraint_as_two_rows()
 end

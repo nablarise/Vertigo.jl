@@ -424,6 +424,10 @@ function _register_pure_master_data!(
                 lb = 0.0
                 ub = 1.0
             end
+            # A fixing is neither a lower nor an upper bound for JuMP.
+            if JuMP.is_fixed(reform_var)
+                lb = ub = JuMP.fix_value(reform_var)
+            end
 
             add_pure_master_variable!(
                 builder, moi_idx, cost, lb, ub, is_int

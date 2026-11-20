@@ -20,6 +20,9 @@ function test_reformulation_pure_master_contribution()
             y -> (set_lower_bound(y, 2); set_upper_bound(y, 7)),
             (6.0, 0.0, -21.0, 0.0),
         ),
+        ("fixed at -2", y -> fix(y, -2), (-6.0, 0.0, 6.0, 0.0)),
+        ("fixed at 0", y -> fix(y, 0), (0.0, 0.0, 0.0, 0.0)),
+        ("fixed at 4", y -> fix(y, 4), (12.0, 0.0, -12.0, 0.0)),
     ]
     for (name, set_bounds!, expected) in cases
         @testset "[pure_master_contribution] $name" begin
