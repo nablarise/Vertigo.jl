@@ -263,13 +263,17 @@ function _oracle_solution(ws::ColGenWorkspace, pricing_sols)
 end
 
 # Value of an oracle solution in the Lagrangian function at `dual_sol`:
-# fₖ + c̄z̄, priced as in `compute_reduced_costs!`. The reduced cost the pricing
-# reported is not it: it also subtracts the convexity duals.
-function _oracle_value(ws::ColGenWorkspace, phase, dual_sol, sp_id, sol)
-    sp_rc = _compute_sp_reduced_costs(
-        ws, dual_sol, sp_id; zero_cost=phase isa Phase1
-    )
+# fₖ + c̄z̄. The reduced cost the pricing reported is not it: it also subtracts
+# the convexity duals.
+function _oracle_value(ws::ColGenWorkspace, ::Union{Phase0,Phase2}, dual_sol, sp_id, sol)
+    sp_rc = _compute_sp_reduced_costs(ws, dual_sol, sp_id)
     return compute_column_reduced_cost(ws.decomp, sp_id, sol, sp_rc, (0.0, 0.0))
+end
+
+# Phase 1 sets every column's cost to zero, its fixed cost included.
+function _oracle_value(ws::ColGenWorkspace, ::Phase1, dual_sol, sp_id, sol)
+    sp_rc = _compute_sp_reduced_costs(ws, dual_sol, sp_id; zero_cost=true)
+    return sum(sp_rc[sp_var] * val for (sp_var, val) in nonzero_entries(sol); init=0.0)
 end
 
 # Subgradient of the Lagrangian function at `sep_dual_sol`, where the

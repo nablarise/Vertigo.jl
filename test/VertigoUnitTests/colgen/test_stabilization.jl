@@ -619,7 +619,8 @@ end
 # The multiplicity of subproblem 1 is the one the dual bound gives it: the
 # convexity bound the sign of fₖ + c̄z̄ at π̃₀ makes binding, without the
 # convexity duals. Its oracle solution is task 1, of cost 4, so its value is
-# fixed_cost + 4 - dual, or fixed_cost - dual in phase 1 (zero costs).
+# fixed_cost + 4 - dual, or -dual in phase 1, which sets every column's cost,
+# fixed cost included, to zero.
 # g on assign[1] is 1 - multiplicity. The reduced cost the pricing reported
 # includes the convexity duals: by its sign, every case would flip.
 function test_lagrangian_subgradient_multiplicity()
@@ -630,6 +631,7 @@ function test_lagrangian_subgradient_multiplicity()
         ("value -1 < 0 though reported non-improving", Phase2(), (0.0, 1.0), 0.0, 5.0, 1.0, 0.0),
         ("fixed cost: 2 + 4 - 5 = 1 > 0", Phase2(), (0.0, 1.0), 2.0, 5.0, -2.0, 1.0),
         ("phase 1: 0 - 3 = -3 < 0", Phase1(), (0.0, 1.0), 0.0, 3.0, 1.0, 0.0),
+        ("phase 1 drops the fixed cost: 0 - 3 = -3 < 0", Phase1(), (0.0, 1.0), 5.0, 3.0, 1.0, 0.0),
         ("value 4 > 0: lower bound 1, not upper bound 2", Phase2(), (1.0, 2.0), 0.0, 0.0, -1.0, 0.0),
     ]
     for (name, phase, (conv_lb, conv_ub), fixed_cost, dual, reported_rc, expected_g) in cases
