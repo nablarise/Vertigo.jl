@@ -102,9 +102,12 @@ function _build_stab_ctx(; alpha=0.5)
 end
 
 # Two machines, two tasks, every assignment of cost 4, coupling rows
-# `assign[t]: x[1,t] + x[2,t] == 1` (EqualTo indices 1 and 2). Nothing is
-# solved, so no optimizer.
-function _build_lagrangian_ctx(; conv_lb=0.0, conv_ub=1.0, fixed_cost=0.0)
+# `assign[t]: x[1,t] + x[2,t] == 1` (EqualTo indices 1 and 2). With
+# `pure_master = (cost, lb, ub)`, a pure master variable y also covers task 1.
+# Nothing is solved, so no optimizer.
+function _build_lagrangian_ctx(;
+    conv_lb=0.0, conv_ub=1.0, fixed_cost=0.0, pure_master=nothing
+)
     K = 1:2
     T = 1:2
     master_jump = JuMP.Model()
@@ -129,6 +132,12 @@ function _build_lagrangian_ctx(; conv_lb=0.0, conv_ub=1.0, fixed_cost=0.0)
     end
     for t in T
         add_coupling_constraint!(builder, JuMP.index(assign[t]), 1.0)
+    end
+    if !isnothing(pure_master)
+        y_cost, y_lb, y_ub = pure_master
+        @variable(master_jump, y)
+        add_pure_master_variable!(builder, JuMP.index(y), y_cost, y_lb, y_ub, false)
+        add_pure_master_coupling!(builder, JuMP.index(y), JuMP.index(assign[1]), 1.0)
     end
     decomp = build(builder)
     set_models!(decomp, JuMP.backend(master_jump), sp_models,
@@ -186,6 +195,7 @@ function test_stabilization()
     end
     @testset "[stabilization] lagrangian_subgradient" begin
         test_lagrangian_subgradient_multiplicity()
+        test_lagrangian_subgradient_pure_master()
     end
 end
 
@@ -642,6 +652,28 @@ function test_lagrangian_subgradient_multiplicity()
             sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual))
             oracle_sols = Dict(sp_id => _SpSolution(sp_id, reported_rc, [(sp_var, 1.0)]))
             g = _lagrangian_subgradient(ws, phase, sep, oracle_sols)
+            @test g[assign1] ≈ expected_g atol=1e-10
+        end
+    end
+end
+
+# y covers task 1 with coefficient 1 and sits at the bound its reduced cost
+# cost - dual points to, the one the dual bound gives it. No oracle solution,
+# so g on assign[1] is 1 - ỹ.
+function test_lagrangian_subgradient_pure_master()
+    # (name, phase, (cost, lb, ub) of y, dual of assign[1], g)
+    cases = [
+        ("rc 2 - 0 > 0: lower bound 1", Phase2(), (2.0, 1.0, 3.0), 0.0, 0.0),
+        ("rc 2 - 5 < 0: upper bound 3", Phase2(), (2.0, 1.0, 3.0), 5.0, -2.0),
+        ("phase 1, rc 0 - 1 < 0: upper bound 3", Phase1(), (2.0, 1.0, 3.0), 1.0, -2.0),
+        ("rc 1e-9 at an infinite bound: 0", Phase2(), (1e-9, -Inf, 3.0), 0.0, 1.0),
+    ]
+    for (name, phase, pure_master, dual, expected_g) in cases
+        @testset "[lagrangian_subgradient] pure master, $name" begin
+            ws = _build_lagrangian_ctx(; pure_master)
+            assign1 = coupling_constraints(ws.decomp)[1][1]
+            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual))
+            g = _lagrangian_subgradient(ws, phase, sep, _NO_ORACLE_SOLS)
             @test g[assign1] ≈ expected_g atol=1e-10
         end
     end

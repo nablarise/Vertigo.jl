@@ -279,10 +279,11 @@ end
 # Subgradient of the Lagrangian function at `sep_dual_sol`, where the
 # subproblems returned `oracle_sols`, on the dualized rows: coupling
 # constraints, robust cuts and branching constraints.
-#     g_i = rhs_i - Σ_k m_k Σ_t A_{i,t}^k z_t^k       (Sadykov 2019, eq. 2.29)
-# m_k is the multiplicity the dual bound gives subproblem k. A column's
-# coefficient in a cut or branching row comes from its original variables, as
-# in `_insert_column!`.
+#     g_i = rhs_i - Σ_k m_k Σ_t A_{i,t}^k z_t^k - Σ_s φ_{i,s} ỹ_s
+#                                                     (Sadykov 2019, eq. 2.29)
+# m_k is the multiplicity the dual bound gives subproblem k, ỹ_s the bound it
+# gives pure master variable s. A column's coefficient in a cut or branching
+# row comes from its original variables, as in `_insert_column!`.
 function _lagrangian_subgradient(ws::ColGenWorkspace, phase, sep_dual_sol, oracle_sols)
     decomp = ws.decomp
     master = master_model(decomp)
@@ -322,8 +323,30 @@ function _lagrangian_subgradient(ws::ColGenWorkspace, phase, sep_dual_sol, oracl
             end
         end
     end
+    _subtract_pure_master_activity!(g, ws, phase, sep_dual_sol)
     return g
 end
+
+# Pure master variables appear in coupling constraints only.
+function _subtract_pure_master_activity!(g, ws::ColGenWorkspace, phase, sep_dual_sol)
+    decomp = ws.decomp
+    for y_var in pure_master_variables(decomp)
+        coeffs = pure_master_coupling_coefficients(decomp, y_var)
+        rc_y = _pure_master_cost(decomp, y_var, phase)
+        for entry in coeffs
+            rc_y -= entry.coefficient * _dual_value(sep_dual_sol, entry.constraint_id)
+        end
+        y = pure_master_lagrangian_value(decomp, y_var, rc_y)
+        for entry in coeffs
+            g[entry.constraint_id] -= entry.coefficient * y
+        end
+    end
+    return g
+end
+
+_pure_master_cost(decomp, y_var, ::Union{Phase0,Phase2}) = pure_master_cost(decomp, y_var)
+# Phase 1 sets the cost of pure master variables to zero.
+_pure_master_cost(_decomp, _y_var, ::Phase1) = 0.0
 
 # ── Iteration logging dispatch ───────────────────────────────────────────────
 

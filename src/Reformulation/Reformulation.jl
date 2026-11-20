@@ -72,7 +72,7 @@ export column_nonzero_entries
 # Derived computations
 export compute_column_original_cost, compute_column_coupling_coefficients
 export compute_sp_reduced_costs, compute_column_reduced_cost
-export compute_dual_bound_pure_master_contribution
+export compute_dual_bound_pure_master_contribution, pure_master_lagrangian_value
 export compute_branching_column_coefficient, project_to_original
 
 end # module Reformulation
