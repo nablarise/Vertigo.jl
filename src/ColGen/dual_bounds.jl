@@ -85,6 +85,14 @@ function compute_dual_bound(
             )
             pure_master_bound_contrib += ub_dual * ub
         end
+        # A fixed variable has a single constraint, y == lb == ub.
+        if lb == ub
+            eq_ci = TaggedCI(y_var.id.value, VI_EQ)
+            eq_dual = get(
+                mast_dual_sol.sol.constraint_duals, eq_ci, 0.0
+            )
+            pure_master_bound_contrib += eq_dual * lb
+        end
     end
 
     # 4. Pure master variable contribution

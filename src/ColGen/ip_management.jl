@@ -26,7 +26,12 @@ end
 function _project_if_integral(mast_primal_sol, ws; tol=INTEGRALITY_TOL)
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     non_zero_continuous = Tuple{MOI.VariableIndex,Float64}[]
-    obj = 0.0
+    # The master objective carries the constant of the original objective;
+    # no phase changes it.
+    obj = MOI.get(
+        master_model(ws.decomp),
+        MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}()
+    ).constant
     for (col_var, rec) in columns(ws.pool)
         val = get(mast_primal_sol.sol.variable_values, col_var, 0.0)
         rounded = round(val)
