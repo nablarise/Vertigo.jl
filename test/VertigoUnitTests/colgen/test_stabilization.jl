@@ -132,7 +132,7 @@ function test_stabilization()
         test_increase_alpha()
         test_angle_reads_robust_cut_row()
         test_angle_reads_branching_row()
-        test_angle_reads_convexity_row()
+        test_angle_ignores_convexity_row()
         test_angle_subtracts_column_activity_in_cut_row()
     end
 end
@@ -401,7 +401,7 @@ function test_increase_alpha()
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end
 
-# The angle test of the α update reads every smoothed row, not only the
+# The angle test of the α update reads every dualized row, not only the
 # coupling constraints (#117). In each case below, the coupling rows alone
 # give a negative product (α would go up), and the other row makes it
 # positive (α goes down), or the reverse for the activity case.
@@ -448,13 +448,16 @@ function test_angle_reads_branching_row()
     @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
 end
 
-function test_angle_reads_convexity_row()
+# The convexity rows are not dualized, so their duals do not enter the
+# Lagrangian function: a change of 0 → 3 on one of them would give +3 and
+# flip the sign if it were read.
+function test_angle_ignores_convexity_row()
     ws = _build_stab_ctx(alpha=0.5)
     conv_ub = convexity_ub_ci(ws.decomp, PricingSubproblemId(1))
-    # convexity row 0 <= 1: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
+    # coupling row 2 alone: -2 ≤ 0, so α goes up: 0.5 + 0.5 * 0.1 = 0.55
     stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], PricingPrimalSolution[])
     update_stabilization_after_iter!(stab, out)
-    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+    @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end
 
 function test_angle_subtracts_column_activity_in_cut_row()

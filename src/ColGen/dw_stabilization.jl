@@ -223,8 +223,9 @@ function update_stabilization_after_iter!(
     # Compute subgradient direction product:
     # Σ_i g^sep_i * (π^out_i - π^in_i)
     # where g^sep_i = rhs_i - Σ_k m_k * Σ_t A_{i,t}^k * z_t^k,
-    # over every row whose dual is smoothed (see _convex_combination):
-    # coupling constraints here, the other rows below.
+    # over the dualized rows: coupling constraints here, robust cuts and
+    # branching constraints below. The convexity rows are not dualized: the
+    # Lagrangian function does not depend on their duals (Sadykov 2019, 2.29).
     direction_product = 0.0
 
     # Compute column contributions per coupling constraint
@@ -274,8 +275,7 @@ function _column_multiplicity(ws::ColGenWorkspace, pricing_sol::PricingPrimalSol
     return (sense * pricing_sol.solution.obj_value < 0) ? conv_ub : conv_lb
 end
 
-# Σ g_i (π^out_i - π^in_i) over the smoothed rows that are not coupling
-# constraints: convexity constraints, robust cuts and branching constraints.
+# Σ g_i (π^out_i - π^in_i) over the robust cuts and branching constraints.
 function _other_rows_direction_product(stab::WentgesSmoothing, out::MasterDualSolution)
     ws = stab.ws
     decomp = ws.decomp
@@ -304,18 +304,6 @@ function _other_rows_direction_product(stab::WentgesSmoothing, out::MasterDualSo
     end
 
     product = 0.0
-    for sp_id in subproblem_ids(decomp)
-        conv_activity = sum(
-            (_column_multiplicity(ws, ps) for ps in columns if ps.sp_id == sp_id);
-            init = 0.0
-        )
-        if has_convexity_lb(decomp, sp_id)
-            product += term(convexity_lb_ci(decomp, sp_id), conv_activity)
-        end
-        if has_convexity_ub(decomp, sp_id)
-            product += term(convexity_ub_ci(decomp, sp_id), conv_activity)
-        end
-    end
     for cut in ws.robust_cuts
         product += term(cut.constraint_index, activity(cut.coefficients))
     end
