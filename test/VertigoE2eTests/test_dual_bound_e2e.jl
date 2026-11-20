@@ -36,7 +36,10 @@ function test_dual_bound_e2e()
         inst = parse_gap_file(get_gap_instance_path('A', 10, 100))
         space = BranchCutPriceWorkspace(
             build_gap_decomp(inst),
-            BranchCutPriceConfig(colgen=ColGenConfig(smoothing_alpha=0.0)),
+            BranchCutPriceConfig(
+                colgen=ColGenConfig(smoothing_alpha=0.0),
+                branching_strategy=BranchOnFirstVariable(),
+            ),
         )
         root = Vertigo.TreeSearch.new_root(space)
         Vertigo.TreeSearch.evaluate!(BPEvaluator(), space, root)

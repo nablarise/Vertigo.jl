@@ -41,3 +41,25 @@ _master_constraints(model, ann) =
     _master_objects(model, ann, JuMP.ConstraintRef)
 _partition_subproblem_constraints(model, ann) =
     _subproblem_objects(model, ann, JuMP.ConstraintRef)
+
+# A constraint the annotation assigns to no model would be silently left out
+# of the decomposition. An anonymous constraint is never even submitted to the
+# annotation: it is not in the object dictionary.
+function _check_all_constraints_assigned(model, master_constrs, sp_constrs_partition)
+    assigned = Set{JuMP.ConstraintRef}()
+    for by_name in Iterators.flatten(((master_constrs,), values(sp_constrs_partition)))
+        for (name, indexes) in by_name, idx in indexes
+            push!(assigned, get_scalar_object(model, name, idx))
+        end
+    end
+    for constr in JuMP.all_constraints(model; include_variable_in_set_constraints=false)
+        if !(constr in assigned)
+            error(
+                "Constraint $constr is assigned to neither the master nor a " *
+                "subproblem. Annotate it; if it is anonymous, name it first: " *
+                "only named constraints can be annotated."
+            )
+        end
+    end
+    return
+end

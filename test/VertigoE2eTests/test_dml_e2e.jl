@@ -300,6 +300,28 @@ function test_dml_dual_bound_pure_master(; smoothing_alpha=0.0)
     end
 end
 
+# 1 <= x[1] + x[2] <= 2 written as two master constraints: the minimum of
+# x[1] + x[2] over binaries is 1.
+function test_dml_ranged_constraint_as_two_rows()
+    @testset "[dml] ranged constraint written as two master constraints" begin
+        model = Model(HiGHS.Optimizer)
+        set_silent(model)
+        @variable(model, x[1:2], Bin)
+        @constraint(model, r_lb, x[1] + x[2] >= 1)
+        @constraint(model, r_ub, x[1] + x[2] <= 2)
+        @objective(model, Min, x[1] + x[2])
+        decomp, _ = @dantzig_wolfe model begin
+            x[i] => subproblem(i)
+            r_lb => master()
+            r_ub => master()
+        end
+        output = run_col_gen(decomp, ColGenConfig(silent=true))
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ 1.0 atol=1e-6
+        @test output.incumbent_dual_bound ≈ 1.0 atol=1e-6
+    end
+end
+
 function test_dml_e2e()
     for smoothing_alpha in (0.0, 0.5)
         test_dml_gap_converges(; smoothing_alpha)
@@ -310,4 +332,5 @@ function test_dml_e2e()
         test_dml_fixed_master_cost(; smoothing_alpha)
         test_dml_dual_bound_pure_master(; smoothing_alpha)
     end
+    test_dml_ranged_constraint_as_two_rows()
 end

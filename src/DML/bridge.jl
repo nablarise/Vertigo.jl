@@ -68,6 +68,9 @@ function dantzig_wolfe_decomposition(
     sp_constrs_partition = _partition_subproblem_constraints(
         model, dw_annotation
     )
+    _check_all_constraints_assigned(
+        model, master_constrs, sp_constrs_partition
+    )
 
     # Create master JuMP model
     master_model = JuMP.Model()
@@ -341,6 +344,8 @@ function _register_coupling_data!(
             orig_constr = get_scalar_object(
                 model, constr_name, idx
             )
+            orig_constr_obj = JuMP.constraint_object(orig_constr)
+            _check_master_set(orig_constr, orig_constr_obj.set)
             reform_constr = constr_mapping[orig_constr]
             cstr_moi = JuMP.index(reform_constr)
             rhs = JuMP.normalized_rhs(reform_constr)
@@ -348,13 +353,23 @@ function _register_coupling_data!(
 
             # Extract coupling coefficients from original
             # constraint (uses original variables)
-            orig_constr_obj = JuMP.constraint_object(orig_constr)
             _add_coupling_from_func!(
                 builder, orig_constr_obj.func, cstr_moi,
                 var_mapping, sp_var_lookup, sp_id_map
             )
         end
     end
+end
+
+# A master constraint has a single right-hand side.
+_check_master_set(_, ::Union{MOI.EqualTo,MOI.LessThan,MOI.GreaterThan}) = nothing
+
+function _check_master_set(constr, ::MOI.Interval)
+    error(
+        "Master constraint $constr has two bounds, which the master does " *
+        "not support. Write it as two named constraints, one with `>=` " *
+        "and one with `<=`."
+    )
 end
 
 function _add_coupling_from_func!(

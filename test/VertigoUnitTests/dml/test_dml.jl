@@ -273,6 +273,56 @@ function test_dml_subproblem_constraint_foreign_variable()
     end
 end
 
+function test_dml_unassigned_constraints()
+    @testset "[dml] an anonymous constraint is not silently left out" begin
+        model = _build_gap_jump_model()
+        x = model[:x]
+        @constraint(model, x[1, 1] + x[2, 1] <= 0)
+        @test_throws ["Constraint ", "assigned to neither the master nor a subproblem"] (
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                assign[_] => master()
+                knapsack[k] => subproblem(k)
+            end
+        )
+    end
+    @testset "[dml] a named constraint assigned to no model is not left out" begin
+        model = _build_gap_jump_model()
+        ann(::Val{:x}, k, _) = dantzig_wolfe_subproblem(k)
+        ann(::Val{:assign}, _) = dantzig_wolfe_master()
+        ann(::Val{:knapsack}, k) = nothing
+        @test_throws ["Constraint knapsack[1]", "assigned to neither the master nor a subproblem"] (
+            dantzig_wolfe_decomposition(model, ann)
+        )
+    end
+end
+
+function test_dml_ranged_master_constraint()
+    @testset "[dml] a ranged master constraint is rejected" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, r, 1 <= x[1] + x[2] <= 2)
+        @test_throws ["Master constraint r ", "two named constraints"] (
+            @dantzig_wolfe model begin
+                x[i] => subproblem(i)
+                r => master()
+            end
+        )
+    end
+    @testset "[dml] a ranged constraint written as two master constraints" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, r_lb, x[1] + x[2] >= 1)
+        @constraint(model, r_ub, x[1] + x[2] <= 2)
+        decomp, _ = @dantzig_wolfe model begin
+            x[i] => subproblem(i)
+            r_lb => master()
+            r_ub => master()
+        end
+        @test length(coupling_constraints(decomp)) == 2
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
@@ -281,4 +331,6 @@ function test_dml()
     test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
     test_dml_subproblem_constraint_foreign_variable()
+    test_dml_unassigned_constraints()
+    test_dml_ranged_master_constraint()
 end
