@@ -242,7 +242,10 @@ function update_stabilization_after_iter!(
         direction_product += g_i * (pi_out - pi_in)
     end
 
-    # Adjust α based on direction product
+    # A positive product means L still increases from π̃ towards π^out: the
+    # step can be longer, so α goes down. This follows the text and figures of
+    # Pessoa et al. (2018, p. 13) and Sadykov (2019, p. 24); the pseudocode of
+    # both (Table 1 Step 4, Step 6) states the opposite.
     if direction_product > 0
         stab.smooth_dual_sol_coeff = max(
             0.0, stab.smooth_dual_sol_coeff - 0.1
