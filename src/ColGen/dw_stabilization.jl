@@ -44,6 +44,9 @@ mutable struct WentgesSmoothing
     smooth_dual_sol_coeff::Float64
     cur_smooth_dual_sol_coeff::Float64
     stab_center::Union{Nothing,MasterDualSolution}
+    # π̂^τ, the center at the start of the iteration. Pricing may move
+    # `stab_center` before the angle test, which measures from here.
+    in_point::Union{Nothing,MasterDualSolution}
     best_lagrangian_bound::Float64
     nb_misprices::Int
     last_phase::Any
@@ -58,7 +61,7 @@ function setup_stabilization!(ws::ColGenWorkspace, _master)
         init_lb = is_minimization(ws) ? -Inf : Inf
         return WentgesSmoothing(
             ws, ws.smoothing_alpha, ws.smoothing_alpha,
-            nothing, init_lb, 0, nothing, nothing, nothing
+            nothing, nothing, init_lb, 0, nothing, nothing, nothing
         )
     end
     return NoStabilization()
@@ -79,8 +82,10 @@ function update_stabilization_after_master_optim!(
     # First iteration with this phase: initialize center
     if isnothing(stab.stab_center)
         stab.stab_center = mast_dual_sol
+        stab.in_point = mast_dual_sol
         return false
     end
+    stab.in_point = stab.stab_center
 
     # Reset misprice state for the new iteration
     stab.cur_smooth_dual_sol_coeff = stab.smooth_dual_sol_coeff
@@ -211,13 +216,13 @@ end
 function update_stabilization_after_iter!(
     stab::WentgesSmoothing, mast_dual_sol::MasterDualSolution
 )
-    isnothing(stab.stab_center) && return nothing
+    isnothing(stab.in_point) && return nothing
     isnothing(stab.last_generated_columns) && return nothing
     isnothing(stab.last_sep_dual_sol) && return nothing
 
     ws = stab.ws
     decomp = ws.decomp
-    center = stab.stab_center
+    center = stab.in_point
     out = mast_dual_sol
 
     # Compute subgradient direction product:
@@ -285,7 +290,7 @@ function _other_rows_direction_product(stab::WentgesSmoothing, out::MasterDualSo
         ci -> _rhs(MOI.get(master, MOI.ConstraintSet(), ci)), tagged
     )
     term(tagged, activity) = (rhs(tagged) - activity) *
-        (_dual_value(out, tagged) - _dual_value(stab.stab_center, tagged))
+        (_dual_value(out, tagged) - _dual_value(stab.in_point, tagged))
     # Activity of the generated columns in a row given by original-variable
     # coefficients.
     function activity(coefficients)

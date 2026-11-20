@@ -134,6 +134,7 @@ function test_stabilization()
         test_angle_reads_branching_row()
         test_angle_ignores_convexity_row()
         test_angle_subtracts_column_activity_in_cut_row()
+        test_angle_measured_from_iteration_in_point()
     end
 end
 
@@ -357,7 +358,7 @@ function test_decrease_alpha()
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
-    stab.stab_center = center_dual
+    stab.in_point = center_dual
 
     # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
     # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
@@ -388,7 +389,7 @@ function test_increase_alpha()
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
-    stab.stab_center = center_dual
+    stab.in_point = center_dual
 
     # Direction product = 1.0 * (1.0 - 3.0) = -2.0 ≤ 0 → increase α
     stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
@@ -422,7 +423,7 @@ function _stab_for_angle(ws, extra_duals_center, extra_duals_out, columns)
     stab = setup_stabilization!(ws, get_master(ws))
     center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
     out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
-    stab.stab_center = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
+    stab.in_point = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
     stab.last_generated_columns = GeneratedColumns(columns)
     stab.last_sep_dual_sol = _make_dual_sol(0.0)
     return stab, MasterDualSolution(DualMoiSolution(0.0, out), TaggedCI[])
@@ -473,4 +474,24 @@ function test_angle_subtracts_column_activity_in_cut_row()
     stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 1.5], [column])
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
+end
+
+# A mispricing sequence ends with α̃ = 0, so the last separation point is the
+# LP dual, and its improved bound makes it the new center. The angle is still
+# measured from the center the iteration started from (Sadykov 2019, Step 6):
+# from the new center, π^out - π^in would be 0 and α would go up.
+function test_angle_measured_from_iteration_in_point()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    center = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 1.0))
+    out = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 3.0))
+    update_stabilization_after_master_optim!(stab, Phase2(), center)
+    update_stabilization_after_master_optim!(stab, Phase2(), out)
+    update_stabilization_after_pricing_optim!(
+        stab, ws, GeneratedColumns(PricingPrimalSolution[]), get_master(ws), 10.0, out
+    )
+    @test stab.stab_center === out
+    # no column: g = rhs = 1 on row 1, 1 * (3 - 1) = 2 > 0: 0.5 - 0.1 = 0.4
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
 end
