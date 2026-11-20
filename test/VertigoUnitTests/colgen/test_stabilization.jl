@@ -11,8 +11,9 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
     Phase0, Phase1, Phase2, TaggedCI,
-    ActiveRobustCut, ActiveBranchingConstraint
-using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var
+    ActiveRobustCut, ActiveBranchingConstraint, _lagrangian_subgradient
+using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var,
+    coupling_constraints
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -100,6 +101,48 @@ function _build_stab_ctx(; alpha=0.5)
     return ws
 end
 
+# Two machines, two tasks, every assignment of cost 4, coupling rows
+# `assign[t]: x[1,t] + x[2,t] == 1` (EqualTo indices 1 and 2). Nothing is
+# solved, so no optimizer.
+function _build_lagrangian_ctx(; conv_lb=0.0, conv_ub=1.0, fixed_cost=0.0)
+    K = 1:2
+    T = 1:2
+    master_jump = JuMP.Model()
+    @constraint(master_jump, assign[t in T], 0 == 1)
+    @constraint(master_jump, conv_lb_row[k in K], 0 >= conv_lb)
+    @constraint(master_jump, conv_ub_row[k in K], 0 <= conv_ub)
+
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    sp_models = Dict{PricingSubproblemId,Any}()
+    for k in K
+        sp_id = PricingSubproblemId(k)
+        sp_jump = JuMP.Model()
+        @variable(sp_jump, z[t in T], Bin)
+        sp_models[sp_id] = JuMP.backend(sp_jump)
+        add_subproblem!(builder, sp_id, fixed_cost, conv_lb, conv_ub)
+        for t in T
+            sp_var = JuMP.index(z[t])
+            add_sp_variable!(builder, sp_id, sp_var, 4.0)
+            add_coupling_coefficient!(builder, sp_id, sp_var, JuMP.index(assign[t]), 1.0)
+            add_mapping!(builder, (k, t), sp_id, sp_var)
+        end
+    end
+    for t in T
+        add_coupling_constraint!(builder, JuMP.index(assign[t]), 1.0)
+    end
+    decomp = build(builder)
+    set_models!(decomp, JuMP.backend(master_jump), sp_models,
+        Dict(PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_ub_row[k])) for k in K),
+        Dict(PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_lb_row[k])) for k in K)
+    )
+    return ColGenWorkspace(decomp, ColumnPool(),
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        ColGenConfig(smoothing_alpha=0.5)
+    )
+end
+
 # ────────────────────────────────────────────────────────────────────────────
 # Tests
 # ────────────────────────────────────────────────────────────────────────────
@@ -140,6 +183,9 @@ function test_stabilization()
         test_angle_ignores_convexity_row()
         test_angle_subtracts_column_activity_in_cut_row()
         test_angle_measured_from_iteration_in_point()
+    end
+    @testset "[stabilization] lagrangian_subgradient" begin
+        test_lagrangian_subgradient_multiplicity()
     end
 end
 
@@ -424,8 +470,12 @@ end
 
 # Stabilization whose center and LP duals differ on coupling row 2 by
 # 3.0 → 1.0 (product 1 * (1 - 3) = -2, no column covers it) and on `extra`.
+# At π̃₀ the dual of row 1 is 5: task 1 has value 4 - 5 = -1 < 0, so an oracle
+# solution of it has multiplicity 1, the convexity upper bound.
 function _stab_for_angle(ws, extra_duals_center, extra_duals_out, oracle_sols)
     stab = setup_stabilization!(ws, get_master(ws))
+    stab.last_phase = Phase2()
+    stab.sep_dual_sol = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 5.0))
     center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
     out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
     stab.in_point = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
@@ -434,7 +484,7 @@ function _stab_for_angle(ws, extra_duals_center, extra_duals_out, oracle_sols)
 end
 
 function test_angle_reads_robust_cut_row()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_lagrangian_ctx()
     cut = _add_empty_geq_row!(ws, 2.0)
     push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
     # cut row: g = 2 (no column), dual 0 → 2: 2 * 2 = 4; total -2 + 4 = 2 > 0
@@ -444,7 +494,7 @@ function test_angle_reads_robust_cut_row()
 end
 
 function test_angle_reads_branching_row()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_lagrangian_ctx()
     row = _add_empty_geq_row!(ws, 1.0)
     push!(ws.branching_constraints, ActiveBranchingConstraint(row, (1, 1)))
     # branching row: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
@@ -457,7 +507,7 @@ end
 # Lagrangian function: a change of 0 → 3 on one of them would give +3 and
 # flip the sign if it were read.
 function test_angle_ignores_convexity_row()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_lagrangian_ctx()
     conv_ub = convexity_ub_ci(ws.decomp, PricingSubproblemId(1))
     # coupling row 2 alone: -2 ≤ 0, so α goes up: 0.5 + 0.5 * 0.1 = 0.55
     stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], _NO_ORACLE_SOLS)
@@ -466,11 +516,11 @@ function test_angle_ignores_convexity_row()
 end
 
 function test_angle_subtracts_column_activity_in_cut_row()
-    ws = _build_stab_ctx(alpha=0.5)
+    ws = _build_lagrangian_ctx()
     cut = _add_empty_geq_row!(ws, 2.0)
     push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
-    # Subproblem 1's oracle solution is task 1, improving: multiplicity 1 (the
-    # convexity upper bound). It covers coupling row 1 (no dual change) and
+    # Subproblem 1's oracle solution is task 1, of value -1 at π̃₀:
+    # multiplicity 1 (the convexity upper bound). It covers coupling row 1 (no dual change) and
     # the cut: g = 2 - 1 = 1, dual 0 → 1.5: 1.5. Total -2 + 1.5 = -0.5 ≤ 0,
     # so α goes up. Without the activity, g = 2 gives +3 and α would go down.
     sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
@@ -564,4 +614,33 @@ function test_oracle_skips_subproblem_without_solution()
     update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
     _price!(stab, ws, _SpSolution[])
     @test isempty(stab.oracle_sols)
+end
+
+# The multiplicity of subproblem 1 is the one the dual bound gives it: the
+# convexity bound the sign of fₖ + c̄z̄ at π̃₀ makes binding, without the
+# convexity duals. Its oracle solution is task 1, of cost 4, so its value is
+# fixed_cost + 4 - dual, or fixed_cost - dual in phase 1 (zero costs).
+# g on assign[1] is 1 - multiplicity. The reduced cost the pricing reported
+# includes the convexity duals: by its sign, every case would flip.
+function test_lagrangian_subgradient_multiplicity()
+    # (name, phase, convexity bounds, fixed_cost, dual of assign[1],
+    #  reported reduced cost, g)
+    cases = [
+        ("value 1 > 0 though reported improving", Phase2(), (0.0, 1.0), 0.0, 3.0, -2.0, 1.0),
+        ("value -1 < 0 though reported non-improving", Phase2(), (0.0, 1.0), 0.0, 5.0, 1.0, 0.0),
+        ("fixed cost: 2 + 4 - 5 = 1 > 0", Phase2(), (0.0, 1.0), 2.0, 5.0, -2.0, 1.0),
+        ("phase 1: 0 - 3 = -3 < 0", Phase1(), (0.0, 1.0), 0.0, 3.0, 1.0, 0.0),
+        ("value 4 > 0: lower bound 1, not upper bound 2", Phase2(), (1.0, 2.0), 0.0, 0.0, -1.0, 0.0),
+    ]
+    for (name, phase, (conv_lb, conv_ub), fixed_cost, dual, reported_rc, expected_g) in cases
+        @testset "[lagrangian_subgradient] $name" begin
+            ws = _build_lagrangian_ctx(; conv_lb, conv_ub, fixed_cost)
+            assign1 = coupling_constraints(ws.decomp)[1][1]
+            sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual))
+            oracle_sols = Dict(sp_id => _SpSolution(sp_id, reported_rc, [(sp_var, 1.0)]))
+            g = _lagrangian_subgradient(ws, phase, sep, oracle_sols)
+            @test g[assign1] ≈ expected_g atol=1e-10
+        end
+    end
 end

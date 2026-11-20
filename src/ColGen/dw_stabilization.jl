@@ -51,8 +51,9 @@ mutable struct WentgesSmoothing
     nb_misprices::Int
     last_phase::Any
     # One pricing solution per subproblem, from the first separation point of
-    # the iteration: the angle test reads the subgradient there (Sadykov 2019,
-    # Step 6), not at the separation points of the mispricings.
+    # the iteration, π̃₀: the angle test reads the subgradient there (Sadykov
+    # 2019, Step 6), not at the separation points of the mispricings.
+    sep_dual_sol::Union{Nothing,MasterDualSolution}
     oracle_sols::Union{Nothing,Dict{PricingSubproblemId,_SpSolution}}
 end
 
@@ -63,7 +64,7 @@ function setup_stabilization!(ws::ColGenWorkspace, _master)
         init_lb = is_minimization(ws) ? -Inf : Inf
         return WentgesSmoothing(
             ws, ws.smoothing_alpha, ws.smoothing_alpha,
-            nothing, nothing, init_lb, 0, nothing, nothing
+            nothing, nothing, init_lb, 0, nothing, nothing, nothing
         )
     end
     return NoStabilization()
@@ -148,6 +149,7 @@ function update_stabilization_after_pricing_optim!(
     sep_mast_dual_sol
 )
     if isnothing(stab.oracle_sols)
+        stab.sep_dual_sol = sep_mast_dual_sol
         # A pricer may return no solution, e.g. none below its threshold: that
         # subproblem is left out of the subgradient, which is exact when its
         # multiplicity is a lower convexity bound of zero.
@@ -230,7 +232,9 @@ function update_stabilization_after_iter!(
     isnothing(stab.in_point) && return nothing
     isnothing(stab.oracle_sols) && return nothing
 
-    g = _lagrangian_subgradient(stab.ws, stab.oracle_sols)
+    g = _lagrangian_subgradient(
+        stab.ws, stab.last_phase, stab.sep_dual_sol, stab.oracle_sols
+    )
     direction_product = 0.0
     for (cstr_id, g_i) in g
         pi_out = _dual_value(mast_dual_sol, cstr_id)
@@ -258,21 +262,24 @@ function _oracle_solution(ws::ColGenWorkspace, pricing_sols)
     return argmin(ps -> sense * ps.solution.obj_value, pricing_sols).solution
 end
 
-# Multiplicity of an oracle solution in the subgradient: the convexity bound
-# its reduced cost makes binding.
-function _oracle_multiplicity(ws::ColGenWorkspace, sp_id, sol)
-    sense = is_minimization(ws) ? 1 : -1
-    conv_lb, conv_ub = convexity_bounds(ws.decomp, sp_id)
-    return (sense * sol.obj_value < 0) ? conv_ub : conv_lb
+# Value of an oracle solution in the Lagrangian function at `dual_sol`:
+# fₖ + c̄z̄, priced as in `compute_reduced_costs!`. The reduced cost the pricing
+# reported is not it: it also subtracts the convexity duals.
+function _oracle_value(ws::ColGenWorkspace, phase, dual_sol, sp_id, sol)
+    sp_rc = _compute_sp_reduced_costs(
+        ws, dual_sol, sp_id; zero_cost=phase isa Phase1
+    )
+    return compute_column_reduced_cost(ws.decomp, sp_id, sol, sp_rc, (0.0, 0.0))
 end
 
-# Subgradient of the Lagrangian function at the separation point where the
+# Subgradient of the Lagrangian function at `sep_dual_sol`, where the
 # subproblems returned `oracle_sols`, on the dualized rows: coupling
 # constraints, robust cuts and branching constraints.
 #     g_i = rhs_i - Σ_k m_k Σ_t A_{i,t}^k z_t^k       (Sadykov 2019, eq. 2.29)
-# A column's coefficient in a cut or branching row comes from its original
-# variables, as in `_insert_column!`.
-function _lagrangian_subgradient(ws::ColGenWorkspace, oracle_sols)
+# m_k is the multiplicity the dual bound gives subproblem k. A column's
+# coefficient in a cut or branching row comes from its original variables, as
+# in `_insert_column!`.
+function _lagrangian_subgradient(ws::ColGenWorkspace, phase, sep_dual_sol, oracle_sols)
     decomp = ws.decomp
     master = master_model(decomp)
     master_rhs(tagged) = with_typed_ci(
@@ -291,7 +298,8 @@ function _lagrangian_subgradient(ws::ColGenWorkspace, oracle_sols)
     end
 
     for (sp_id, sol) in oracle_sols
-        mult = _oracle_multiplicity(ws, sp_id, sol)
+        sp_value = _oracle_value(ws, phase, sep_dual_sol, sp_id, sol)
+        mult = _lagrangian_multiplicity(decomp, sp_id, sp_value)
         for (sp_var, val) in nonzero_entries(sol)
             for entry in coupling_coefficients(decomp, sp_id, sp_var)
                 g[entry.constraint_id] -= mult * entry.coefficient * val
