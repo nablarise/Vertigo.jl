@@ -143,7 +143,7 @@ end
 function update_stabilization_after_pricing_optim!(
     stab::WentgesSmoothing,
     ws::ColGenWorkspace,
-    sp_primal_sols,
+    generated_columns,
     _master,
     pseudo_db,
     sep_mast_dual_sol
@@ -151,11 +151,11 @@ function update_stabilization_after_pricing_optim!(
     if isnothing(stab.oracle_sols)
         stab.sep_dual_sol = sep_mast_dual_sol
         # A pricer may return no solution, e.g. none below its threshold: that
-        # subproblem is left out of the subgradient, which is exact when its
-        # multiplicity is a lower convexity bound of zero.
+        # subproblem is absent and left out of the subgradient, which is exact
+        # when its multiplicity is a lower convexity bound of zero.
         stab.oracle_sols = Dict(
             sp_id => _oracle_solution(ws, sols)
-            for (sp_id, sols) in sp_primal_sols if !isempty(sols)
+            for (sp_id, sols) in generated_columns.sp_solutions
         )
     end
 

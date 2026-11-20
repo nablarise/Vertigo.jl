@@ -11,7 +11,8 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
     Phase0, Phase1, Phase2, TaggedCI,
-    ActiveRobustCut, ActiveBranchingConstraint, _lagrangian_subgradient
+    ActiveRobustCut, ActiveBranchingConstraint, _lagrangian_subgradient,
+    set_of_columns, push_in_set!
 using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var,
     coupling_constraints
 
@@ -314,11 +315,11 @@ function test_bound_improvement_updates_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    sp_sols = Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}()
+    gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # For minimization, improving means pseudo_db > best_lagrangian_bound
     update_stabilization_after_pricing_optim!(
-        stab, ws, sp_sols, master, 10.0, sep_dual
+        stab, ws, gen_cols, master, 10.0, sep_dual
     )
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center.sol.obj_value ≈ 5.0
@@ -333,18 +334,18 @@ function test_no_improvement_keeps_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    sp_sols = Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}()
+    gen_cols = GeneratedColumns(PricingPrimalSolution[])
 
     # First call sets bound to 10.0
     update_stabilization_after_pricing_optim!(
-        stab, ws, sp_sols, master, 10.0, sep_dual
+        stab, ws, gen_cols, master, 10.0, sep_dual
     )
 
     # Second call with worse bound (8.0 < 10.0) shouldn't update
     old_center = stab.stab_center
     sep_dual2 = _make_dual_sol(7.0)
     update_stabilization_after_pricing_optim!(
-        stab, ws, sp_sols, master, 8.0, sep_dual2
+        stab, ws, gen_cols, master, 8.0, sep_dual2
     )
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center === old_center
@@ -552,8 +553,7 @@ function test_angle_measured_from_iteration_in_point()
     update_stabilization_after_master_optim!(stab, Phase2(), center)
     update_stabilization_after_master_optim!(stab, Phase2(), out)
     update_stabilization_after_pricing_optim!(
-        stab, ws, Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}(),
-        get_master(ws), 10.0, out
+        stab, ws, GeneratedColumns(PricingPrimalSolution[]), get_master(ws), 10.0, out
     )
     @test stab.stab_center === out
     # no column: g = rhs = 1 on row 1, 1 * (3 - 1) = 2 > 0: 0.5 - 0.1 = 0.4
@@ -572,9 +572,12 @@ end
 
 function _price!(stab, ws, sols; improving=true)
     sp_id = PricingSubproblemId(1)
-    sp_sols = Dict(sp_id => [PricingPrimalSolution(sp_id, sol, improving) for sol in sols])
+    columns = set_of_columns(ws)
+    for sol in sols
+        push_in_set!(columns, PricingPrimalSolution(sp_id, sol, improving))
+    end
     update_stabilization_after_pricing_optim!(
-        stab, ws, sp_sols, get_master(ws), -Inf, _make_dual_sol(0.0)
+        stab, ws, columns, get_master(ws), -Inf, _make_dual_sol(0.0)
     )
 end
 

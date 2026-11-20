@@ -260,10 +260,6 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
         # The primal bound is used to compute the psueudo dual bound (used by stabilization).
         sps_pb = Dict(sp_id => compute_sp_init_pb(context, sp) for (sp_id, sp) in get_pricing_subprobs(context))
 
-        # Every solution each subproblem returned, improving or not: the stabilization
-        # reads the subgradient of the Lagrangian function from them.
-        sp_primal_sols = Dict()
-
         # Solve pricing subproblems
         pricing_strategy = get_pricing_strategy(context, phase)
         sp_to_solve_it = pricing_strategy_iterate(pricing_strategy)
@@ -285,7 +281,6 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
             end
 
             primal_sols = get_primal_sols(pricing_result)
-            sp_primal_sols[sp_id] = primal_sols
             nb_cols_pushed = 0
             for primal_sol in primal_sols # multi column generation support.
                 # The implementation  is reponsible for checking if the column is a candidate
@@ -315,7 +310,7 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
         # pseudo dual bound is used for stabilization only.
         pseudo_db = compute_dual_bound(context, phase, sps_pb, sep_mast_dual_sol)
 
-        update_stabilization_after_pricing_optim!(stab, context, sp_primal_sols, master, pseudo_db, sep_mast_dual_sol)
+        update_stabilization_after_pricing_optim!(stab, context, generated_columns, master, pseudo_db, sep_mast_dual_sol)
 
         # We have finished to solve all pricing subproblems.
         # If we have stabilization, we need to check if we have misprice, i.e. if smoothing is active 

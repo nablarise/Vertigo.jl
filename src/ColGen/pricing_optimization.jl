@@ -94,22 +94,30 @@ column generation iteration.
 
 Unlike [`PricingSolution`](@ref), which is the raw output of a single
 subproblem call (including infeasibility flags and bounds),
-`GeneratedColumns` retains only the solutions whose reduced cost is
-improving. These are the columns that will be inserted into the
+`GeneratedColumns` retains in `collection` only the solutions whose reduced
+cost is improving. These are the columns that will be inserted into the
 restricted master problem.
 
-Columns are added via [`push_in_set!`](@ref), which silently discards
-non-improving solutions.
+Solutions are added via [`push_in_set!`](@ref), which leaves non-improving
+ones out of `collection`. `sp_solutions` keeps every solution of each
+subproblem, improving or not: the smoothing reads the subgradient of the
+Lagrangian function from them.
 """
 struct GeneratedColumns
     collection::Vector{PricingPrimalSolution}
+    sp_solutions::Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}
 end
+
+GeneratedColumns(collection) = GeneratedColumns(
+    collection, Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}()
+)
 
 function set_of_columns(::ColGenWorkspace)
     return GeneratedColumns(PricingPrimalSolution[])
 end
 
 function push_in_set!(set::GeneratedColumns, sol::PricingPrimalSolution)
+    push!(get!(Vector{PricingPrimalSolution}, set.sp_solutions, sol.sp_id), sol)
     if sol.is_improving
         push!(set.collection, sol)
         return true
