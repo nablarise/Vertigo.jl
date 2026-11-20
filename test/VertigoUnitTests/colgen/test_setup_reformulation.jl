@@ -174,6 +174,29 @@ function test_setup_reformulation_phase0_relaxes_integrality()
     end
 end
 
+function test_setup_reformulation_phase0_relaxes_branching_constraint()
+    @testset "[setup_reformulation] phase 0 relaxes a branching constraint" begin
+        ws, _ = build_phase_test_context()
+        model = master_model(ws.decomp)
+
+        # Branching up on a variable no column of the pool covers: 0 >= 1.
+        br = MOI.add_constraint(
+            model,
+            MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0),
+            MOI.GreaterThan(1.0)
+        )
+        push!(ws.branching_constraints,
+            Vertigo.ColGen.ActiveBranchingConstraint(TaggedCI(br), (1, 1))
+        )
+
+        Vertigo.ColGen.setup_reformulation!(ws, Phase0())
+
+        @test haskey(ws.geq_art_vars, TaggedCI(br))
+        MOI.optimize!(model)
+        @test MOI.get(model, MOI.TerminationStatus()) == MOI.OPTIMAL
+    end
+end
+
 function test_setup_reformulation_phase1_zeroes_costs()
     @testset "[setup_reformulation] phase 1 zeroes all variable costs" begin
         ws, vars = build_phase_test_context()
@@ -306,6 +329,7 @@ end
 
 function test_setup_reformulation()
     test_setup_reformulation_phase0_relaxes_integrality()
+    test_setup_reformulation_phase0_relaxes_branching_constraint()
     test_setup_reformulation_phase1_zeroes_costs()
     test_teardown_reformulation_phase1_restores_costs()
     test_teardown_reformulation_phase1_restores_new_column_cost()
