@@ -232,6 +232,28 @@ function test_ip_project_mixed_columns_and_pure_master()
     end
 end
 
+function test_ip_project_objective_constant()
+    @testset "[ip_management] _project_if_integral counts the objective constant" begin
+        # One machine, one task; the master objective is 0 + 100.
+        inst = GAPInstance(1, 1, fill(1.0, 1, 1), fill(1.0, 1, 1), [1.0])
+        ws = build_gap_context(inst)
+        MOI.modify(
+            master_model(ws.decomp),
+            MOI.ObjectiveFunction{MOI.ScalarAffineFunction{Float64}}(),
+            MOI.ScalarConstantChange(100.0)
+        )
+        mv = _add_test_column!(ws, 740, 1, 7.0)
+        pmv = _add_test_pure_master_var!(ws, 741, 2.0, true)
+
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv => 1.0, pmv => 1.0))
+        result, _ = Vertigo.ColGen._project_if_integral(sol, ws)
+
+        @test !isnothing(result)
+        # 100 + 7.0*1 + 2.0*1
+        @test result.obj_value ≈ 109.0 atol=1e-10
+    end
+end
+
 # ────────────────────────────────────────────────────────────────────────────────────────
 # _has_artificial_vars_in_solution
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -437,6 +459,7 @@ function test_ip_management()
     test_ip_project_fractional_integer_pure_master()
     test_ip_project_with_continuous_pure_master()
     test_ip_project_mixed_columns_and_pure_master()
+    test_ip_project_objective_constant()
     test_ip_has_art_eq_active()
     test_ip_has_art_leq_active()
     test_ip_has_art_geq_active()
