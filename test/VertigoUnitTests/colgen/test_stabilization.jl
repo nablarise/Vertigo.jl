@@ -121,6 +121,11 @@ function test_stabilization()
     @testset "[stabilization] after_pricing_optim" begin
         test_bound_improvement_updates_center()
         test_no_improvement_keeps_center()
+        test_oracle_from_first_separation_point()
+        test_oracle_reset_each_iteration()
+        test_oracle_is_best_pricing_solution()
+        test_oracle_keeps_non_improving_solution()
+        test_oracle_skips_subproblem_without_solution()
     end
     @testset "[stabilization] misprice" begin
         test_misprice_inactive()
@@ -253,11 +258,11 @@ function test_bound_improvement_updates_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(PricingPrimalSolution[])
+    sp_sols = Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}()
 
     # For minimization, improving means pseudo_db > best_lagrangian_bound
     update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 10.0, sep_dual
+        stab, ws, sp_sols, master, 10.0, sep_dual
     )
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center.sol.obj_value ≈ 5.0
@@ -272,18 +277,18 @@ function test_no_improvement_keeps_center()
     update_stabilization_after_master_optim!(stab, Phase0(), dual1)
 
     sep_dual = _make_dual_sol(5.0)
-    gen_cols = GeneratedColumns(PricingPrimalSolution[])
+    sp_sols = Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}()
 
     # First call sets bound to 10.0
     update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 10.0, sep_dual
+        stab, ws, sp_sols, master, 10.0, sep_dual
     )
 
     # Second call with worse bound (8.0 < 10.0) shouldn't update
     old_center = stab.stab_center
     sep_dual2 = _make_dual_sol(7.0)
     update_stabilization_after_pricing_optim!(
-        stab, ws, gen_cols, master, 8.0, sep_dual2
+        stab, ws, sp_sols, master, 8.0, sep_dual2
     )
     @test stab.best_lagrangian_bound ≈ 10.0
     @test stab.stab_center === old_center
@@ -362,8 +367,7 @@ function test_decrease_alpha()
 
     # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
     # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
-    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    stab.oracle_sols = Dict{PricingSubproblemId,_SpSolution}()
 
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
@@ -392,8 +396,7 @@ function test_increase_alpha()
     stab.in_point = center_dual
 
     # Direction product = 1.0 * (1.0 - 3.0) = -2.0 ≤ 0 → increase α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
-    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    stab.oracle_sols = Dict{PricingSubproblemId,_SpSolution}()
 
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
@@ -411,6 +414,8 @@ const _EqCstr = MOI.ConstraintIndex{
     MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
 }
 
+const _NO_ORACLE_SOLS = Dict{PricingSubproblemId,_SpSolution}()
+
 # A master row with no column yet, `lhs >= rhs`.
 function _add_empty_geq_row!(ws, rhs)
     f = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0)
@@ -419,13 +424,12 @@ end
 
 # Stabilization whose center and LP duals differ on coupling row 2 by
 # 3.0 → 1.0 (product 1 * (1 - 3) = -2, no column covers it) and on `extra`.
-function _stab_for_angle(ws, extra_duals_center, extra_duals_out, columns)
+function _stab_for_angle(ws, extra_duals_center, extra_duals_out, oracle_sols)
     stab = setup_stabilization!(ws, get_master(ws))
     center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
     out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
     stab.in_point = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
-    stab.last_generated_columns = GeneratedColumns(columns)
-    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    stab.oracle_sols = oracle_sols
     return stab, MasterDualSolution(DualMoiSolution(0.0, out), TaggedCI[])
 end
 
@@ -434,7 +438,7 @@ function test_angle_reads_robust_cut_row()
     cut = _add_empty_geq_row!(ws, 2.0)
     push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
     # cut row: g = 2 (no column), dual 0 → 2: 2 * 2 = 4; total -2 + 4 = 2 > 0
-    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 2.0], PricingPrimalSolution[])
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 2.0], _NO_ORACLE_SOLS)
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
 end
@@ -444,7 +448,7 @@ function test_angle_reads_branching_row()
     row = _add_empty_geq_row!(ws, 1.0)
     push!(ws.branching_constraints, ActiveBranchingConstraint(row, (1, 1)))
     # branching row: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
-    stab, out = _stab_for_angle(ws, [row => 0.0], [row => 3.0], PricingPrimalSolution[])
+    stab, out = _stab_for_angle(ws, [row => 0.0], [row => 3.0], _NO_ORACLE_SOLS)
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
 end
@@ -456,7 +460,7 @@ function test_angle_ignores_convexity_row()
     ws = _build_stab_ctx(alpha=0.5)
     conv_ub = convexity_ub_ci(ws.decomp, PricingSubproblemId(1))
     # coupling row 2 alone: -2 ≤ 0, so α goes up: 0.5 + 0.5 * 0.1 = 0.55
-    stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], PricingPrimalSolution[])
+    stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], _NO_ORACLE_SOLS)
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end
@@ -465,13 +469,13 @@ function test_angle_subtracts_column_activity_in_cut_row()
     ws = _build_stab_ctx(alpha=0.5)
     cut = _add_empty_geq_row!(ws, 2.0)
     push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
-    # One improving column of subproblem 1 with task 1, multiplicity 1 (the
+    # Subproblem 1's oracle solution is task 1, improving: multiplicity 1 (the
     # convexity upper bound). It covers coupling row 1 (no dual change) and
     # the cut: g = 2 - 1 = 1, dual 0 → 1.5: 1.5. Total -2 + 1.5 = -0.5 ≤ 0,
     # so α goes up. Without the activity, g = 2 gives +3 and α would go down.
     sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
-    column = PricingPrimalSolution(sp_id, _SpSolution(sp_id, -5.0, [(sp_var, 1.0)]), true)
-    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 1.5], [column])
+    oracle_sols = Dict(sp_id => _SpSolution(sp_id, -5.0, [(sp_var, 1.0)]))
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 1.5], oracle_sols)
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
 end
@@ -488,10 +492,76 @@ function test_angle_measured_from_iteration_in_point()
     update_stabilization_after_master_optim!(stab, Phase2(), center)
     update_stabilization_after_master_optim!(stab, Phase2(), out)
     update_stabilization_after_pricing_optim!(
-        stab, ws, GeneratedColumns(PricingPrimalSolution[]), get_master(ws), 10.0, out
+        stab, ws, Dict{PricingSubproblemId,Vector{PricingPrimalSolution}}(),
+        get_master(ws), 10.0, out
     )
     @test stab.stab_center === out
     # no column: g = rhs = 1 on row 1, 1 * (3 - 1) = 2 > 0: 0.5 - 0.1 = 0.4
     update_stabilization_after_iter!(stab, out)
     @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+# The angle test reads the subgradient at the first separation point of the
+# iteration (Sadykov 2019, Step 6), from one solution per subproblem: the
+# pricing optimum, improving or not.
+
+function _sp1_solution(ws, obj_value)
+    sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+    return _SpSolution(sp_id, obj_value, [(sp_var, 1.0)])
+end
+
+function _price!(stab, ws, sols; improving=true)
+    sp_id = PricingSubproblemId(1)
+    sp_sols = Dict(sp_id => [PricingPrimalSolution(sp_id, sol, improving) for sol in sols])
+    update_stabilization_after_pricing_optim!(
+        stab, ws, sp_sols, get_master(ws), -Inf, _make_dual_sol(0.0)
+    )
+end
+
+function test_oracle_from_first_separation_point()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    first_sol = _sp1_solution(ws, -5.0)
+    _price!(stab, ws, [first_sol])
+    _price!(stab, ws, [_sp1_solution(ws, -3.0)])  # after a mispricing
+    @test stab.oracle_sols[PricingSubproblemId(1)] === first_sol
+end
+
+function test_oracle_reset_each_iteration()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    _price!(stab, ws, [_sp1_solution(ws, -5.0)])
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    next_sol = _sp1_solution(ws, -3.0)
+    _price!(stab, ws, [next_sol])
+    @test stab.oracle_sols[PricingSubproblemId(1)] === next_sol
+end
+
+function test_oracle_is_best_pricing_solution()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    best = _sp1_solution(ws, -5.0)
+    _price!(stab, ws, [_sp1_solution(ws, -1.0), best])
+    @test stab.oracle_sols[PricingSubproblemId(1)] === best
+end
+
+function test_oracle_keeps_non_improving_solution()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    sol = _sp1_solution(ws, 3.0)
+    _price!(stab, ws, [sol]; improving=false)
+    @test stab.oracle_sols[PricingSubproblemId(1)] === sol
+end
+
+# A pricer that finds nothing below its threshold returns no solution.
+function test_oracle_skips_subproblem_without_solution()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    _price!(stab, ws, _SpSolution[])
+    @test isempty(stab.oracle_sols)
 end

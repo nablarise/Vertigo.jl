@@ -50,8 +50,10 @@ mutable struct WentgesSmoothing
     best_lagrangian_bound::Float64
     nb_misprices::Int
     last_phase::Any
-    last_generated_columns::Union{Nothing,GeneratedColumns}
-    last_sep_dual_sol::Union{Nothing,MasterDualSolution}
+    # One pricing solution per subproblem, from the first separation point of
+    # the iteration: the angle test reads the subgradient there (Sadykov 2019,
+    # Step 6), not at the separation points of the mispricings.
+    oracle_sols::Union{Nothing,Dict{PricingSubproblemId,_SpSolution}}
 end
 
 # ── Setup ────────────────────────────────────────────────────────────────────
@@ -61,7 +63,7 @@ function setup_stabilization!(ws::ColGenWorkspace, _master)
         init_lb = is_minimization(ws) ? -Inf : Inf
         return WentgesSmoothing(
             ws, ws.smoothing_alpha, ws.smoothing_alpha,
-            nothing, nothing, init_lb, 0, nothing, nothing, nothing
+            nothing, nothing, init_lb, 0, nothing, nothing
         )
     end
     return NoStabilization()
@@ -72,6 +74,8 @@ end
 function update_stabilization_after_master_optim!(
     stab::WentgesSmoothing, phase, mast_dual_sol::MasterDualSolution
 )
+    stab.oracle_sols = nothing
+
     # Phase change: reset center and best bound
     if phase != stab.last_phase
         stab.stab_center = nothing
@@ -138,13 +142,20 @@ end
 function update_stabilization_after_pricing_optim!(
     stab::WentgesSmoothing,
     ws::ColGenWorkspace,
-    generated_columns,
+    sp_primal_sols,
     _master,
     pseudo_db,
     sep_mast_dual_sol
 )
-    stab.last_generated_columns = generated_columns
-    stab.last_sep_dual_sol = sep_mast_dual_sol
+    if isnothing(stab.oracle_sols)
+        # A pricer may return no solution, e.g. none below its threshold: that
+        # subproblem is left out of the subgradient, which is exact when its
+        # multiplicity is a lower convexity bound of zero.
+        stab.oracle_sols = Dict(
+            sp_id => _oracle_solution(ws, sols)
+            for (sp_id, sols) in sp_primal_sols if !isempty(sols)
+        )
+    end
 
     if is_minimization(ws)
         if pseudo_db > stab.best_lagrangian_bound
@@ -217,46 +228,15 @@ function update_stabilization_after_iter!(
     stab::WentgesSmoothing, mast_dual_sol::MasterDualSolution
 )
     isnothing(stab.in_point) && return nothing
-    isnothing(stab.last_generated_columns) && return nothing
-    isnothing(stab.last_sep_dual_sol) && return nothing
+    isnothing(stab.oracle_sols) && return nothing
 
-    ws = stab.ws
-    decomp = ws.decomp
-    center = stab.in_point
-    out = mast_dual_sol
-
-    # Compute subgradient direction product:
-    # Σ_i g^sep_i * (π^out_i - π^in_i)
-    # where g^sep_i = rhs_i - Σ_k m_k * Σ_t A_{i,t}^k * z_t^k,
-    # over the dualized rows: coupling constraints here, robust cuts and
-    # branching constraints below. The convexity rows are not dualized: the
-    # Lagrangian function does not depend on their duals (Sadykov 2019, 2.29).
+    g = _lagrangian_subgradient(stab.ws, stab.oracle_sols)
     direction_product = 0.0
-
-    # Compute column contributions per coupling constraint
-    col_contrib = Dict{Any,Float64}()
-    for pricing_sol in stab.last_generated_columns.collection
-        sp_id = pricing_sol.sp_id
-        sol = pricing_sol.solution
-        mult = _column_multiplicity(ws, pricing_sol)
-
-        for (sp_var, val) in nonzero_entries(sol)
-            for entry in coupling_coefficients(decomp, sp_id, sp_var)
-                cstr = entry.constraint_id
-                col_contrib[cstr] = get(col_contrib, cstr, 0.0) +
-                    entry.coefficient * val * mult
-            end
-        end
+    for (cstr_id, g_i) in g
+        pi_out = _dual_value(mast_dual_sol, cstr_id)
+        pi_in = _dual_value(stab.in_point, cstr_id)
+        direction_product += g_i * (pi_out - pi_in)
     end
-
-    # Iterate coupling constraints to compute direction product
-    for (cstr_id, rhs) in coupling_constraints(decomp)
-        g_sep = rhs - get(col_contrib, cstr_id, 0.0)
-        pi_out = _dual_value(out, cstr_id)
-        pi_in = _dual_value(center, cstr_id)
-        direction_product += g_sep * (pi_out - pi_in)
-    end
-    direction_product += _other_rows_direction_product(stab, out)
 
     # Adjust α based on direction product
     if direction_product > 0
@@ -272,50 +252,65 @@ function update_stabilization_after_iter!(
     return nothing
 end
 
-# Multiplicity of a generated column in the subgradient: the convexity bound
-# its reduced cost makes binding.
-function _column_multiplicity(ws::ColGenWorkspace, pricing_sol::PricingPrimalSolution)
+# The pricing optimum among the solutions a subproblem returned.
+function _oracle_solution(ws::ColGenWorkspace, pricing_sols)
     sense = is_minimization(ws) ? 1 : -1
-    conv_lb, conv_ub = convexity_bounds(ws.decomp, pricing_sol.sp_id)
-    return (sense * pricing_sol.solution.obj_value < 0) ? conv_ub : conv_lb
+    return argmin(ps -> sense * ps.solution.obj_value, pricing_sols).solution
 end
 
-# Σ g_i (π^out_i - π^in_i) over the robust cuts and branching constraints.
-function _other_rows_direction_product(stab::WentgesSmoothing, out::MasterDualSolution)
-    ws = stab.ws
+# Multiplicity of an oracle solution in the subgradient: the convexity bound
+# its reduced cost makes binding.
+function _oracle_multiplicity(ws::ColGenWorkspace, sp_id, sol)
+    sense = is_minimization(ws) ? 1 : -1
+    conv_lb, conv_ub = convexity_bounds(ws.decomp, sp_id)
+    return (sense * sol.obj_value < 0) ? conv_ub : conv_lb
+end
+
+# Subgradient of the Lagrangian function at the separation point where the
+# subproblems returned `oracle_sols`, on the dualized rows: coupling
+# constraints, robust cuts and branching constraints.
+#     g_i = rhs_i - Σ_k m_k Σ_t A_{i,t}^k z_t^k       (Sadykov 2019, eq. 2.29)
+# A column's coefficient in a cut or branching row comes from its original
+# variables, as in `_insert_column!`.
+function _lagrangian_subgradient(ws::ColGenWorkspace, oracle_sols)
     decomp = ws.decomp
     master = master_model(decomp)
-    columns = stab.last_generated_columns.collection
-    rhs(tagged) = with_typed_ci(
+    master_rhs(tagged) = with_typed_ci(
         ci -> _rhs(MOI.get(master, MOI.ConstraintSet(), ci)), tagged
     )
-    term(tagged, activity) = (rhs(tagged) - activity) *
-        (_dual_value(out, tagged) - _dual_value(stab.in_point, tagged))
-    # Activity of the generated columns in a row given by original-variable
-    # coefficients.
-    function activity(coefficients)
-        total = 0.0
-        for pricing_sol in columns
-            col = 0.0
-            for (sp_var, val) in nonzero_entries(pricing_sol.solution)
-                ov = mapped_original_var(decomp, pricing_sol.sp_id, sp_var)
-                if ov !== nothing
-                    col += get(coefficients, ov, 0.0) * val
-                end
-            end
-            total += _column_multiplicity(ws, pricing_sol) * col
-        end
-        return total
-    end
 
-    product = 0.0
+    g = Dict{TaggedCI,Float64}()
+    for (cstr_id, rhs) in coupling_constraints(decomp)
+        g[cstr_id] = rhs
+    end
     for cut in ws.robust_cuts
-        product += term(cut.constraint_index, activity(cut.coefficients))
+        g[cut.constraint_index] = master_rhs(cut.constraint_index)
     end
     for bc in ws.branching_constraints
-        product += term(bc.constraint_index, activity(Dict(bc.orig_var => 1.0)))
+        g[bc.constraint_index] = master_rhs(bc.constraint_index)
     end
-    return product
+
+    for (sp_id, sol) in oracle_sols
+        mult = _oracle_multiplicity(ws, sp_id, sol)
+        for (sp_var, val) in nonzero_entries(sol)
+            for entry in coupling_coefficients(decomp, sp_id, sp_var)
+                g[entry.constraint_id] -= mult * entry.coefficient * val
+            end
+            ov = mapped_original_var(decomp, sp_id, sp_var)
+            if ov !== nothing
+                for cut in ws.robust_cuts
+                    coeff = get(cut.coefficients, ov, 0.0)
+                    g[cut.constraint_index] -= mult * coeff * val
+                end
+                for bc in ws.branching_constraints
+                    if bc.orig_var == ov
+                        g[bc.constraint_index] -= mult * val
+                    end
+                end
+            end
+        end
+    end
+    return g
 end
 
 # ── Iteration logging dispatch ───────────────────────────────────────────────
