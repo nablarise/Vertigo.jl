@@ -119,6 +119,10 @@ function dantzig_wolfe_decomposition(
     end
 
     # Register subproblem constraints
+    _check_subproblem_constraints(
+        model, sp_constrs_partition, sp_jump_models, master_model,
+        var_mapping
+    )
     for (sp_id, constr_by_names) in sp_constrs_partition
         _register_constraints!(
             sp_jump_models[sp_id], constr_mapping,
@@ -236,6 +240,51 @@ function dantzig_wolfe_decomposition(
 
     return (decomp, sp_id_map)
 end
+
+# A subproblem constraint is copied with the terms of its subproblem's
+# variables only: a variable of another subproblem or of the master would
+# silently drop out of it.
+function _check_subproblem_constraints(
+    model, sp_constrs_partition, sp_jump_models, master_model, var_mapping
+)
+    for (sp_id, constr_by_names) in sp_constrs_partition
+        sp_model = get(sp_jump_models, sp_id, nothing)
+        for (constr_name, indexes) in constr_by_names, idx in indexes
+            constr = get_scalar_object(model, constr_name, idx)
+            func = JuMP.constraint_object(constr).func
+            for var in _variables(func)
+                owner = JuMP.owner_model(var_mapping[var])
+                if owner !== sp_model
+                    location = _model_label(
+                        owner, sp_jump_models, master_model
+                    )
+                    error(
+                        "Constraint $(_object_label(constr_name, idx)) " *
+                        "is assigned to subproblem $sp_id but contains " *
+                        "$var, a variable of $location. A subproblem " *
+                        "constraint can only contain variables of its " *
+                        "subproblem: annotate it master()."
+                    )
+                end
+            end
+        end
+    end
+    return
+end
+
+_variables(func::JuMP.AffExpr) =
+    (var for (var, coeff) in func.terms if !iszero(coeff))
+_variables(var::JuMP.VariableRef) = (var,)
+
+function _model_label(model, sp_jump_models, master_model)
+    if model === master_model
+        return "the master"
+    end
+    return "subproblem $(findfirst(m -> m === model, sp_jump_models))"
+end
+
+_object_label(name, ::Tuple{}) = string(name)
+_object_label(name, idx) = string(name, "[", join(idx, ", "), "]")
 
 function _get_optimizer(model::JuMP.Model)
     be = JuMP.backend(model)

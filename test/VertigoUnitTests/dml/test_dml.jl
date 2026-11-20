@@ -218,6 +218,61 @@ function test_dml_containers_real_indices()
     end
 end
 
+# x[1] is in subproblem 1, x[2] in subproblem 2 and y in the master. A
+# subproblem constraint over a variable it does not own would lose that term.
+function test_dml_subproblem_constraint_foreign_variable()
+    @testset "[dml] subproblem constraint with a variable of another subproblem" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, row, x[1] + x[2] <= 0)
+        @test_throws ["Constraint row ", "subproblem 1", "x[2], a variable of subproblem 2"] (
+            @dantzig_wolfe model begin
+                x[i] => subproblem(i)
+                row => subproblem(1)
+            end
+        )
+    end
+    @testset "[dml] indexed subproblem constraint with a variable of another subproblem" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, cap[k in 1:2], x[k] + (k == 1 ? x[2] : 0) <= 1)
+        @test_throws ["Constraint cap[1] ", "x[2], a variable of subproblem 2"] (
+            @dantzig_wolfe model begin
+                x[i] => subproblem(i)
+                cap[k] => subproblem(k)
+            end
+        )
+    end
+    @testset "[dml] subproblem constraint with a master variable" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @variable(model, y)
+        @constraint(model, row, x[1] + y <= 1)
+        @test_throws ["Constraint row ", "y, a variable of the master"] (
+            @dantzig_wolfe model begin
+                x[i] => subproblem(i)
+                y => master()
+                row => subproblem(1)
+            end
+        )
+    end
+    @testset "[dml] the same constraint in the master keeps both variables" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, row, x[1] + x[2] <= 0)
+        decomp, _ = @dantzig_wolfe model begin
+            x[i] => subproblem(i)
+            row => master()
+        end
+        @test length(coupling_constraints(decomp)) == 1
+        for sp_id in subproblem_ids(decomp)
+            sp_var = only(subproblem_variables(decomp, sp_id))
+            entry = only(coupling_coefficients(decomp, sp_id, sp_var))
+            @test entry.coefficient ≈ 1.0 atol=1e-10
+        end
+    end
+end
+
 function test_dml_unassigned_constraints()
     @testset "[dml] an anonymous constraint is not silently left out" begin
         model = _build_gap_jump_model()
@@ -275,6 +330,7 @@ function test_dml()
     test_dml_pure_master_variables()
     test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
+    test_dml_subproblem_constraint_foreign_variable()
     test_dml_unassigned_constraints()
     test_dml_ranged_master_constraint()
 end
