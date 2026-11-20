@@ -242,6 +242,32 @@ function test_dml_unassigned_constraints()
     end
 end
 
+function test_dml_ranged_master_constraint()
+    @testset "[dml] a ranged master constraint is rejected" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, r, 1 <= x[1] + x[2] <= 2)
+        @test_throws ["Master constraint r ", "two named constraints"] (
+            @dantzig_wolfe model begin
+                x[i] => subproblem(i)
+                r => master()
+            end
+        )
+    end
+    @testset "[dml] a ranged constraint written as two master constraints" begin
+        model = Model()
+        @variable(model, x[1:2], Bin)
+        @constraint(model, r_lb, x[1] + x[2] >= 1)
+        @constraint(model, r_ub, x[1] + x[2] <= 2)
+        decomp, _ = @dantzig_wolfe model begin
+            x[i] => subproblem(i)
+            r_lb => master()
+            r_ub => master()
+        end
+        @test length(coupling_constraints(decomp)) == 2
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
@@ -250,4 +276,5 @@ function test_dml()
     test_dml_pure_master_missing_bounds()
     test_dml_solver_parameters()
     test_dml_unassigned_constraints()
+    test_dml_ranged_master_constraint()
 end
