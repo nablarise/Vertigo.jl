@@ -52,6 +52,13 @@ The two bounds correspond to the standard primal/dual pair of the
 - `dual_bound`: best known bound on the subproblem *optimum* (e.g., from
   an internal LP relaxation or branch-and-bound).
 
+Both are values of the subproblem objective `(c - πA)ᵀz̄` alone: they
+exclude the fixed cost `fₖ` and the convexity duals ν, which
+[`compute_dual_bound`](@ref) accounts for itself (Sadykov, *Modern
+Branch-Cut-and-Price*, 2019, §2.2.1). A pricer that works in reduced
+costs, `fₖ` and ν included, removes them before filling the bounds.
+The reduced cost belongs to each column, in `primal_sols`.
+
 When the subproblem is solved to optimality (exact pricing),
 both values are equal.  The distinction matters for **heuristic pricing**,
 where the solver returns a feasible solution without proving optimality.
@@ -189,5 +196,5 @@ function optimize_pricing_problem!(
 
     primal_sol = PricingPrimalSolution(sp_id, sol, is_improving)
 
-    return PricingSolution(false, false, reduced_cost, sp_obj, [primal_sol])
+    return PricingSolution(false, false, sp_obj, sp_obj, [primal_sol])
 end
