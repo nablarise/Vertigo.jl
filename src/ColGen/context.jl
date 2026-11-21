@@ -300,8 +300,12 @@ function setup_reformulation!(ws::ColGenWorkspace, phase::Phase0)
     cost = sense * phase.artificial_var_cost
     convexity_cost = sense * phase.convexity_artificial_var_cost
 
-    # Artificial variables for coupling constraints
-    for (cstr_id, _rhs) in coupling_constraints(ws.decomp)
+    # Artificial variables for coupling and branching constraints. Without one,
+    # a branching constraint that no column of the pool satisfies makes the
+    # master LP infeasible before pricing can generate the columns it needs.
+    coupling_ids = (cstr_id for (cstr_id, _rhs) in coupling_constraints(ws.decomp))
+    branching_ids = (bc.constraint_index for bc in ws.branching_constraints)
+    for cstr_id in Iterators.flatten((coupling_ids, branching_ids))
         kind = cstr_id.kind
         if kind == SAF_EQ || kind == VI_EQ
             s_pos = add_variable!(model;
@@ -655,6 +659,11 @@ function new_output(
             p.incumbent_dual_bound, ip, p.master_lp_primal_sol
         )
     elseif p.colgen_converged
+        # The last master LP was infeasible although artificial variables
+        # relax it: a master constraint has none.
+        if isnothing(p.master_lp_primal_sol)
+            error("Column generation converged on an infeasible master LP: a master constraint has no artificial variable.")
+        end
         return ColGenOutput(
             optimal, p.master_lp_obj,
             p.incumbent_dual_bound, ip, p.master_lp_primal_sol
