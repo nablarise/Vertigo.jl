@@ -225,4 +225,69 @@ function test_branch_and_price()
         @test !isnothing(col_var)
         @test get(coeffs, col_var, 0.0) ≈ 1.0 atol = 1e-10
     end
+
+    # Issue #60. One machine and one task: the only column that prices out
+    # assigns the task to the machine, and the root LP is then integral.
+    @testset "[branch_and_price] a one-task instance generates one column" begin
+        inst = GAPInstance(
+            1, 1, reshape([5.0], 1, 1), reshape([1.0], 1, 1), [1.0]
+        )
+        output = run_branch_and_price(BranchCutPriceWorkspace(
+            build_gap_decomp(inst), BranchCutPriceConfig()
+        ))
+        @test output.status == :optimal
+        @test output.nodes_explored == 1
+        @test output.nb_columns_generated == 1
+    end
+
+    # The toy instance of `examples/gap/instances/toy.json`: its root LP is
+    # fractional, so the tree has more than one node.
+    function toy_gap_space(; kwargs...)
+        cost = Float64[
+            10 12 13 14 15 17;
+            21 22 23 24 25 28;
+            31 32 33 34 35 36
+        ]
+        weight = Float64[
+            6 6 6 6 6 6;
+            4 4 4 4 4 4;
+            2 2 2 2 2 2
+        ]
+        inst = GAPInstance(3, 6, cost, weight, Float64[10, 10, 10])
+        return BranchCutPriceWorkspace(
+            build_gap_decomp(inst),
+            BranchCutPriceConfig(; rmp_heuristic = false, kwargs...)
+        )
+    end
+    nb_pool_columns(space) = length(
+        Vertigo.Reformulation.columns(Vertigo.Branching.bp_pool(space.ws))
+    )
+
+    @testset "[branch_and_price] columns generated are summed over the nodes" begin
+        root = run_branch_and_price(toy_gap_space(node_limit = 1))
+        space = toy_gap_space(node_limit = 1000)
+        output = run_branch_and_price(space)
+        @test output.status == :optimal
+        @test output.nodes_explored > 1
+        @test output.nb_columns_generated > root.nb_columns_generated
+        # Without strong branching, every column comes from a node.
+        @test output.nb_columns_generated == nb_pool_columns(space)
+    end
+
+    @testset "[branch_and_price] columns of strong branching probes are not counted" begin
+        plain = run_branch_and_price(toy_gap_space(node_limit = 1))
+        space = toy_gap_space(
+            node_limit = 1,
+            branching_strategy = Vertigo.Branching.MultiPhaseStrongBranching(
+                max_candidates = 3,
+                phases = [Vertigo.Branching.CGProbePhase(
+                    max_cg_iterations = 5, lookahead = 0
+                )]
+            )
+        )
+        output = run_branch_and_price(space)
+        # The root column generation runs before any probe.
+        @test output.nb_columns_generated == plain.nb_columns_generated
+        @test nb_pool_columns(space) > output.nb_columns_generated
+    end
 end

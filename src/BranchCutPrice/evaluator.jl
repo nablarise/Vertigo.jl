@@ -103,6 +103,16 @@ function _set_incumbent_bound!(space::BranchCutPriceWorkspace)
     return
 end
 
+# Column generation at the node, counting the columns it adds to the pool.
+# The strong branching probes run column generation outside of it.
+function _run_node_column_generation!(space::BranchCutPriceWorkspace)
+    pool = bp_pool(space.ws)
+    nb_columns_before = length(columns(pool))
+    cg_output = ColGen.run_column_generation(space.ws)
+    space.nb_columns_generated += length(columns(pool)) - nb_columns_before
+    return cg_output
+end
+
 function TreeSearch.evaluate!(
     ::BPEvaluator, space::BranchCutPriceWorkspace, node
 )
@@ -112,7 +122,7 @@ function TreeSearch.evaluate!(
     _rebuild_branching_constraints!(space)
 
     # First CG + cut separation (unconditional)
-    cg_output = ColGen.run_column_generation(space.ws)
+    cg_output = _run_node_column_generation!(space)
     nb_cuts = _separate_and_add_cuts!(space, cg_output)
     lp = _master_lp_obj(cg_output)
     round = 0
@@ -126,7 +136,7 @@ function TreeSearch.evaluate!(
         prev_lp = lp
         round += 1
         _set_incumbent_bound!(space)
-        cg_output = ColGen.run_column_generation(space.ws)
+        cg_output = _run_node_column_generation!(space)
         nb_cuts = _separate_and_add_cuts!(space, cg_output)
         lp = _master_lp_obj(cg_output)
     end
