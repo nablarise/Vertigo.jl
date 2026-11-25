@@ -221,7 +221,7 @@ function _one_item_first_subproblem_infeasible(first_conv_lb; smoothing_alpha)
         set_silent(sp_jump)
         @variable(sp_jump, z, Bin)
         @constraint(sp_jump, z <= capacities[k])
-        @objective(sp_jump, Min, z)
+        @objective(sp_jump, Min, 1.0 * z)
         sp_models[sp_ids[k]] = backend(sp_jump)
 
         add_subproblem!(builder, sp_ids[k], 0.0, conv_lbs[k], 1.0)
