@@ -51,6 +51,9 @@ mutable struct BranchCutPriceWorkspace{Ws,B,S<:Union{Nothing,AbstractCutSeparato
     last_ip_incumbent::Union{Nothing,ColGen.MasterIpPrimalSol}
     best_dual_bound::Float64
     open_node_bounds::Dict{Int,Float64}
+    # Nodes whose projection is integral but whose columns are not: no
+    # branching rule applies, so they leave the tree with their bound.
+    unbranchable_node_bounds::Dict{Int,Float64}
     nodes_explored::Int
     root_lp_value::Union{Float64,Nothing}
     node_limit::Int
@@ -104,6 +107,7 @@ function BranchCutPriceWorkspace(decomp, config::BranchCutPriceConfig)
         TreeSearch.NodeIdCounter(),
         nothing, nothing,
         is_minimization(cg_ws) ? -Inf : Inf,
+        Dict{Int,Float64}(),
         Dict{Int,Float64}(),
         0,
         nothing,
@@ -160,24 +164,28 @@ function TreeSearch.stop(space::BranchCutPriceWorkspace, _)
     return space.nodes_explored >= space.node_limit || _time_is_up(space)
 end
 
+function _is_proved_optimal(space::BranchCutPriceWorkspace)
+    inc = space.incumbent
+    return !isnothing(inc) &&
+        abs(inc.obj_value - space.best_dual_bound) < space.tol
+end
+
 # Why a search that is not proven optimal has stopped.
 function _stop_status(space::BranchCutPriceWorkspace)
     return _time_is_up(space) ? :time_limit : :node_limit
 end
 
 function TreeSearch.output(space::BranchCutPriceWorkspace)
-    status = if !isnothing(space.incumbent)
-        db = space.best_dual_bound
-        ub = space.incumbent.obj_value
-        if abs(ub - db) < space.tol
-            :optimal
-        else
-            _stop_status(space)
-        end
+    status = if _is_proved_optimal(space)
+        :optimal
     elseif space.nodes_explored >= space.node_limit || _time_is_up(space)
         _stop_status(space)
-    else
+    elseif !isempty(space.unbranchable_node_bounds)
+        :branching_incomplete
+    elseif isnothing(space.incumbent)
         :infeasible
+    else
+        _stop_status(space)
     end
     return BPOutput(
         status, space.incumbent,
@@ -197,10 +205,18 @@ function TreeSearch.transition!(
 end
 
 function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
-    bounds = space.open_node_bounds
+    # An unbranchable node is never popped again, so this is the only
+    # place where the incumbent can prune it.
+    filter!(
+        node_bound -> !_should_prune(space, node_bound.second),
+        space.unbranchable_node_bounds
+    )
+    bounds = Iterators.flatten(
+        (values(space.open_node_bounds), values(space.unbranchable_node_bounds))
+    )
     if isempty(bounds)
-        # No open node left: the incumbent is proved optimal, or, without
-        # one, the problem is proved infeasible.
+        # No node left: the incumbent is proved optimal, or, without one,
+        # the problem is proved infeasible.
         space.best_dual_bound = if !isnothing(space.incumbent)
             space.incumbent.obj_value
         else
@@ -209,7 +225,7 @@ function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
         return
     end
     space.best_dual_bound = is_minimization(space.ws) ?
-        minimum(values(bounds)) : maximum(values(bounds))
+        minimum(bounds) : maximum(bounds)
     return
 end
 
@@ -223,6 +239,14 @@ function TreeSearch.branch!(space::BranchCutPriceWorkspace, node)
     result = select_branching_variable(
         space.branching_strategy, space, node, primal_values
     )
+    if result.status == all_integral
+        master_sol = node.user_data.cg_output.master_lp_primal_sol
+        if !ColGen.is_master_integral(master_sol, space.ws)
+            # The projection is integral but the columns are not: no
+            # branching rule applies yet, and the node bound is not closed.
+            space.unbranchable_node_bounds[node.id] = node.dual_bound
+        end
+    end
     if result.status == all_integral || result.status == node_infeasible
         _recompute_global_dual_bound!(space)
         return typeof(node)[]
@@ -295,6 +319,9 @@ function TreeSearch.ts_search_status_message(s::BranchCutPriceWorkspace)
     end
     if s.nodes_explored >= s.node_limit
         return "Node limit reached."
+    end
+    if !isempty(s.unbranchable_node_bounds)
+        return "Branching incomplete: unbranchable nodes remain."
     end
     return isnothing(inc) ? "No feasible solution found." :
         "Search complete."
