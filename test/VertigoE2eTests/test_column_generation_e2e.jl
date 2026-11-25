@@ -20,6 +20,8 @@ end
 function gap_infeasible_subproblem()
     # Machine 1 has capacity = -1 → its subproblem constraint
     # Σ weight * z <= -1 is infeasible for z >= 0.
+    # Machine 1 may stay unused (Σλ ≥ 0), and machines 2 and 3 cover at most
+    # 2 × 45/5 = 18 tasks < 30 required.
     n_machines = 3
     n_tasks = 30
     cost = fill(1.0, n_machines, n_tasks)
@@ -188,9 +190,70 @@ function test_gap_infeasible_master_restores_column_costs(; smoothing_alpha=0.0)
 end
 
 function test_gap_infeasible_subproblem(; smoothing_alpha=0.0)
-    @testset "[gap] infeasible subproblem (machine 1 capacity = -1)" begin
+    @testset "[gap] optional infeasible subproblem (machine 1 capacity = -1), master infeasible" begin
         inst = gap_infeasible_subproblem()
         ws = build_gap_context(inst; smoothing_alpha)
+        output = run_column_generation(ws)
+        @test output.status == master_infeasible
+    end
+end
+
+# One item to cover with two subproblems of one binary variable each, both of
+# cost 1 and covering the item. The first has no solution: a bin of capacity
+# -1, z <= -1. Its convexity bounds are (first_conv_lb, 1), those of the
+# second are (0, 1).
+function _one_item_first_subproblem_infeasible(first_conv_lb; smoothing_alpha)
+    sp_ids = [PricingSubproblemId(1), PricingSubproblemId(2)]
+    conv_lbs = [first_conv_lb, 0.0]
+    capacities = [-1.0, 1.0]
+
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+    @constraint(master_jump, cover, 0 >= 1)
+    @constraint(master_jump, conv_lb[k in 1:2], 0 >= conv_lbs[k])
+    @constraint(master_jump, conv_ub[k in 1:2], 0 <= 1)
+    @objective(master_jump, Min, 0)
+
+    builder = DWReformulationBuilder{Int}(minimize=true)
+    sp_models = Dict{PricingSubproblemId,Any}()
+    for k in 1:2
+        sp_jump = Model(HiGHS.Optimizer)
+        set_silent(sp_jump)
+        @variable(sp_jump, z, Bin)
+        @constraint(sp_jump, z <= capacities[k])
+        @objective(sp_jump, Min, z)
+        sp_models[sp_ids[k]] = backend(sp_jump)
+
+        add_subproblem!(builder, sp_ids[k], 0.0, conv_lbs[k], 1.0)
+        add_sp_variable!(builder, sp_ids[k], index(z), 1.0)
+        add_coupling_coefficient!(builder, sp_ids[k], index(z), index(cover), 1.0)
+        add_mapping!(builder, k, sp_ids[k], index(z))
+    end
+    add_coupling_constraint!(builder, index(cover), 1.0)
+    decomp = build(builder)
+    set_models!(
+        decomp, backend(master_jump), sp_models,
+        Dict(sp_ids[k] => TaggedCI(index(conv_ub[k])) for k in 1:2),
+        Dict(sp_ids[k] => TaggedCI(index(conv_lb[k])) for k in 1:2),
+    )
+    config = ColGenConfig(smoothing_alpha=smoothing_alpha)
+    return ColGenLoggerWorkspace(ColGenWorkspace(decomp, config))
+end
+
+function test_optional_infeasible_subproblem(; smoothing_alpha=0.0)
+    @testset "[colgen] infeasible subproblem with lower multiplicity 0 is left out" begin
+        ws = _one_item_first_subproblem_infeasible(0.0; smoothing_alpha)
+        output = run_column_generation(ws)
+        # Only column: the second subproblem's z = 1, of cost 1, by hand.
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ 1.0 atol=1e-6
+        @test output.incumbent_dual_bound ≈ 1.0 atol=1e-6
+    end
+end
+
+function test_mandatory_infeasible_subproblem(; smoothing_alpha=0.0)
+    @testset "[colgen] infeasible subproblem with lower multiplicity 1 stops column generation" begin
+        ws = _one_item_first_subproblem_infeasible(1.0; smoothing_alpha)
         output = run_column_generation(ws)
         @test output.status == subproblem_infeasible
     end
@@ -329,6 +392,8 @@ function test_column_generation_e2e()
         test_gap_infeasible_master(; smoothing_alpha)
         test_gap_infeasible_master_restores_column_costs(; smoothing_alpha)
         test_gap_infeasible_subproblem(; smoothing_alpha)
+        test_optional_infeasible_subproblem(; smoothing_alpha)
+        test_mandatory_infeasible_subproblem(; smoothing_alpha)
         test_gap_maximization(; smoothing_alpha)
         test_gap_two_identical_machines(; smoothing_alpha)
         test_gap_identical_machines(; smoothing_alpha)

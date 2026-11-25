@@ -145,6 +145,20 @@ function _get_convexity_dual(mast_dual_sol::MasterDualSolution, convexity_dict, 
     return _dual_value(mast_dual_sol, convexity_dict[sp_id])
 end
 
+# ── Optional subproblem ───────────────────────────────────────────────────────
+
+"""
+    is_subproblem_optional(ws, sp_id) -> Bool
+
+Return `true` when the lower multiplicity of subproblem `sp_id` is zero: the
+master may leave it unused, so an infeasible pricing does not make the master
+infeasible.
+"""
+function is_subproblem_optional(ws::ColGenWorkspace, sp_id)
+    conv_lb, _ = convexity_bounds(ws.decomp, sp_id)
+    return conv_lb <= 0
+end
+
 # ── optimize_pricing_problem! ─────────────────────────────────────────────────
 
 function optimize_pricing_problem!(
