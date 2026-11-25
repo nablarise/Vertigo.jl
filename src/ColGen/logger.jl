@@ -63,6 +63,7 @@ insert_columns!(lws::ColGenLoggerWorkspace, args...)                  = insert_c
 compute_dual_bound(lws::ColGenLoggerWorkspace, args...)               = compute_dual_bound(lws.inner, args...)
 compute_sp_init_db(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_db(lws.inner, sp)
 compute_sp_init_pb(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lws.inner, sp)
+is_subproblem_optional(lws::ColGenLoggerWorkspace, sp_id)             = is_subproblem_optional(lws.inner, sp_id)
 max_cg_iterations(lws::ColGenLoggerWorkspace)                         = max_cg_iterations(lws.inner)
 set_max_cg_iterations!(lws::ColGenLoggerWorkspace, n::Int)            = set_max_cg_iterations!(lws.inner, n)
 start_timer!(lws::ColGenLoggerWorkspace)                              = start_timer!(lws.inner)
