@@ -57,6 +57,7 @@ update_master_constrs_dual_vals!(lws::ColGenLoggerWorkspace, args...) = update_m
 compute_reduced_costs!(lws::ColGenLoggerWorkspace, args...)           = compute_reduced_costs!(lws.inner, args...)
 update_reduced_costs!(lws::ColGenLoggerWorkspace, args...)            = update_reduced_costs!(lws.inner, args...)
 set_of_columns(lws::ColGenLoggerWorkspace)                            = set_of_columns(lws.inner)
+push_in_set!(lws::ColGenLoggerWorkspace, args...)                     = push_in_set!(lws.inner, args...)
 get_pricing_strategy(lws::ColGenLoggerWorkspace, args...)             = get_pricing_strategy(lws.inner, args...)
 get_pricing_subprobs(lws::ColGenLoggerWorkspace)                      = get_pricing_subprobs(lws.inner)
 insert_columns!(lws::ColGenLoggerWorkspace, args...)                  = insert_columns!(lws.inner, args...)

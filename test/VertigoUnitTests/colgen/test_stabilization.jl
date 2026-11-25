@@ -290,7 +290,7 @@ function test_misprice_inactive()
 
     gen_cols = GeneratedColumns(PricingPrimalSolution[])
     dual = _make_dual_sol(0.0)
-    @test check_misprice(stab, gen_cols, dual) == false
+    @test check_misprice(stab, Phase2(), gen_cols, dual) == false
 end
 
 function test_misprice_deterministic_schedule()

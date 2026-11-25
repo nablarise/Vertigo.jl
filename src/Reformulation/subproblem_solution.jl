@@ -8,7 +8,8 @@
 Concrete subproblem solution with sorted entries for deterministic order and
 cheap deduplication via fingerprint hash.
 
-`obj_value` is the pricing subproblem objective (reduced-cost objective).
+`obj_value` is the value of the pricing subproblem objective `(c - πA)ᵀz̄`
+alone, without the fixed cost `fₖ` and the convexity duals ν.
 """
 struct _SpSolution <: AbstractSubproblemSolution
     sp_id::PricingSubproblemId

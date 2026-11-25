@@ -99,17 +99,6 @@ function _compute_sp_reduced_costs(
     return sp_rc
 end
 
-# Fallback: builds sorted duals per call (used by dw_stabilization.jl).
-function _compute_sp_reduced_costs(
-    ws::ColGenWorkspace, mast_dual_sol::MasterDualSolution, sp_id;
-    zero_cost=false
-)
-    sorted_duals = _build_sorted_duals(mast_dual_sol)
-    return _compute_sp_reduced_costs(
-        ws, mast_dual_sol, sorted_duals, sp_id; zero_cost=zero_cost
-    )
-end
-
 function compute_reduced_costs!(
     ws::ColGenWorkspace, ::Union{Phase0,Phase2},
     mast_dual_sol::MasterDualSolution

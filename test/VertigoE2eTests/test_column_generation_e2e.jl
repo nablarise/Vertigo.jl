@@ -379,6 +379,59 @@ function test_gap_dual_bound_with_pure_master(; smoothing_alpha=0.0)
     end
 end
 
+# One subproblem: a binary `z` of cost 0 and a fixed cost 20001, used at most
+# once, must cover `z >= 1`. The artificial variable of the cover row costs
+# 10000 in Phase 0, below the column, so Phase 1 has to bring the column in
+# (issue #126).
+function _phase1_fixed_cost_context(; smoothing_alpha)
+    sp_id = PricingSubproblemId(1)
+
+    master_jump = Model(HiGHS.Optimizer)
+    set_silent(master_jump)
+    @constraint(master_jump, cover, 0 >= 1)
+    @constraint(master_jump, conv_lb, 0 >= 0)
+    @constraint(master_jump, conv_ub, 0 <= 1)
+    @objective(master_jump, Min, 0)
+
+    sp_jump = Model(HiGHS.Optimizer)
+    set_silent(sp_jump)
+    @variable(sp_jump, z, Bin)
+    @objective(sp_jump, Min, 0 * z)
+
+    builder = DWReformulationBuilder{Int}(minimize=true)
+    add_subproblem!(builder, sp_id, 20001.0, 0.0, 1.0)
+    add_sp_variable!(builder, sp_id, index(z), 0.0)
+    add_coupling_coefficient!(builder, sp_id, index(z), index(cover), 1.0)
+    add_mapping!(builder, 1, sp_id, index(z))
+    add_coupling_constraint!(builder, index(cover), 1.0)
+    decomp = build(builder)
+    set_models!(
+        decomp, backend(master_jump),
+        Dict{PricingSubproblemId,Any}(sp_id => backend(sp_jump)),
+        Dict(sp_id => TaggedCI(index(conv_ub))),
+        Dict(sp_id => TaggedCI(index(conv_lb))),
+    )
+
+    return ColGenWorkspace(
+        decomp, ColumnPool(),
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        ColGenConfig(smoothing_alpha=smoothing_alpha, silent=true),
+    )
+end
+
+function test_phase1_fixed_cost(; smoothing_alpha=0.0)
+    @testset "[colgen] Phase 1 brings in a column with a fixed cost" begin
+        ws = _phase1_fixed_cost_context(; smoothing_alpha)
+        output = run_column_generation(ws)
+        # The only column, z = 1, costs its fixed cost: 20001, by hand.
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ 20001.0 atol=1e-4
+        @test output.incumbent_dual_bound ≈ 20001.0 atol=1e-4
+    end
+end
+
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -402,5 +455,6 @@ function test_column_generation_e2e()
         test_gap_shifted_bounds(; smoothing_alpha)
         test_gap_fixed_master_cost(; smoothing_alpha)
         test_gap_dual_bound_with_pure_master(; smoothing_alpha)
+        test_phase1_fixed_cost(; smoothing_alpha)
     end
 end

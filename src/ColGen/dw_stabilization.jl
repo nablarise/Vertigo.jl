@@ -20,7 +20,7 @@ function update_stabilization_after_pricing_optim!(
     return nothing
 end
 
-check_misprice(::NoStabilization, _, _) = false
+check_misprice(::NoStabilization, _, _, _) = false
 
 update_stabilization_after_misprice!(::NoStabilization, _) = nothing
 
@@ -159,31 +159,34 @@ end
 
 function check_misprice(
     stab::WentgesSmoothing,
+    phase::CGPhase,
     generated_columns::GeneratedColumns,
     mast_dual_sol::MasterDualSolution
 )
     stab.cur_smooth_dual_sol_coeff <= 0.0 && return false
 
     ws = stab.ws
-    decomp = ws.decomp
+
+    # Reduced costs at π^out (the original LP dual, not the smoothed one),
+    # with the costs of the phase.
+    red_costs_at_out = compute_reduced_costs!(ws, phase, mast_dual_sol)
 
     for pricing_sol in generated_columns.collection
         sp_id = pricing_sol.sp_id
-        sol = pricing_sol.solution
+        sp_rc_at_out = red_costs_at_out.values[sp_id]
 
-        # Compute RC at π^out (the original LP dual, not the smoothed one)
-        sp_rc_at_out = _compute_sp_reduced_costs(ws, mast_dual_sol, sp_id)
-
-        ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id)
-        ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
-
-        rc = compute_column_reduced_cost(
-            decomp, sp_id, sol, sp_rc_at_out, (ν_lb, ν_ub)
+        sp_value_at_out = 0.0
+        for (sp_var, val) in nonzero_entries(pricing_sol.solution)
+            sp_value_at_out += sp_rc_at_out[sp_var] * val
+        end
+        rc = _column_reduced_cost(
+            ws, phase, sp_id, sp_value_at_out, mast_dual_sol
         )
 
         # If any column improves at π^out, no misprice
-        is_imp = is_minimization(ws) ? (rc < -RC_IMPROVING_TOL) : (rc > RC_IMPROVING_TOL)
-        is_imp && return false
+        if _is_improving_reduced_cost(ws, rc)
+            return false
+        end
     end
 
     return true
@@ -231,11 +234,9 @@ function update_stabilization_after_iter!(
         sp_id = pricing_sol.sp_id
         sol = pricing_sol.solution
 
-        # Multiplicity: use convexity bound based on RC sign
-        sense = is_minimization(ws) ? 1 : -1
-        rc = sol.obj_value
-        conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        mult = (sense * rc < 0) ? conv_ub : conv_lb
+        # Every generated column has an improving reduced cost, so it
+        # enters at the upper multiplicity.
+        _, mult = convexity_bounds(decomp, sp_id)
 
         for (sp_var, val) in nonzero_entries(sol)
             for entry in coupling_coefficients(decomp, sp_id, sp_var)

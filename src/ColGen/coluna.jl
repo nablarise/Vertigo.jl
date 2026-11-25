@@ -291,7 +291,7 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
                 for primal_sol in primal_sols # multi column generation support.
                     # The implementation  is reponsible for checking if the column is a candidate
                     # for insertion into the master.
-                    if push_in_set!(generated_columns, primal_sol)
+                    if push_in_set!(context, phase, generated_columns, primal_sol, mast_dual_sol)
                         nb_cols_pushed += 1
                     end
                 end
@@ -325,7 +325,7 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
         # If we have misprice, we need to update the stabilization center and the smoothed dual solution 
         # and solve again the pricing subproblems.
         # If we don't have misprice, we can stop the pricing loop.
-        misprice = check_misprice(stab, generated_columns, mast_dual_sol)
+        misprice = check_misprice(stab, phase, generated_columns, mast_dual_sol)
         if misprice
             update_stabilization_after_misprice!(stab, mast_dual_sol)
         end

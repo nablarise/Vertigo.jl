@@ -23,14 +23,14 @@ pricing_strategy_iterate(s::DefaultPricingStrategy, state) = iterate(s.pricing_s
 Primal solution returned by a single pricing subproblem.
 
 Wraps the sparse variable–value pairs (`solution`) together with the
-subproblem identity (`sp_id`) and a flag indicating whether the
-reduced cost is improving (negative for minimization, positive for
-maximization).
+subproblem identity (`sp_id`). The value of `solution` is the subproblem
+objective `(c - πA)ᵀz̄` alone, without the fixed cost `fₖ` and the
+convexity duals ν. The framework adds them to get the reduced cost of the
+column and decides whether it is improving; see [`push_in_set!`](@ref).
 """
 struct PricingPrimalSolution
     sp_id::PricingSubproblemId
     solution::_SpSolution
-    is_improving::Bool
 end
 
 """
@@ -52,12 +52,15 @@ The two bounds correspond to the standard primal/dual pair of the
 - `dual_bound`: best known bound on the subproblem *optimum* (e.g., from
   an internal LP relaxation or branch-and-bound).
 
-Both are values of the subproblem objective `(c - πA)ᵀz̄` alone: they
-exclude the fixed cost `fₖ` and the convexity duals ν, which
-[`compute_dual_bound`](@ref) accounts for itself (Sadykov, *Modern
-Branch-Cut-and-Price*, 2019, §2.2.1). A pricer that works in reduced
-costs, `fₖ` and ν included, removes them before filling the bounds.
-The reduced cost belongs to each column, in `primal_sols`.
+A pricer returns raw subproblem values only: both bounds, and the value
+of each column in `primal_sols`, are values of the subproblem objective
+`(c - πA)ᵀz̄` alone. They exclude the fixed cost `fₖ` and the convexity
+duals ν, which the framework accounts for itself, in
+[`compute_dual_bound`](@ref) and [`push_in_set!`](@ref) (Sadykov,
+*Modern Branch-Cut-and-Price*, 2019, §2.2.1). Only the framework knows
+the phase, and in Phase 1 `fₖ` counts as 0. A pricer that works in
+reduced costs, `fₖ` and ν included, removes them before filling the
+bounds and the columns.
 
 When the subproblem is solved to optimality (exact pricing),
 both values are equal.  The distinction matters for **heuristic pricing**,
@@ -106,7 +109,8 @@ improving. These are the columns that will be inserted into the
 restricted master problem.
 
 Columns are added via [`push_in_set!`](@ref), which silently discards
-non-improving solutions.
+non-improving solutions. Every column in it has an improving reduced
+cost.
 """
 struct GeneratedColumns
     collection::Vector{PricingPrimalSolution}
@@ -116,8 +120,49 @@ function set_of_columns(::ColGenWorkspace)
     return GeneratedColumns(PricingPrimalSolution[])
 end
 
-function push_in_set!(set::GeneratedColumns, sol::PricingPrimalSolution)
-    if sol.is_improving
+"""
+    _column_reduced_cost(ws, phase, sp_id, sp_value, mast_dual_sol) -> Float64
+
+Reduced cost of a column of subproblem `sp_id` whose subproblem objective
+`(c - πA)ᵀz̄` is `sp_value`: `sp_value + fₖ - ν_lb - ν_ub`. The fixed cost
+`fₖ` follows the phase, like the cost of the column in the master.
+"""
+function _column_reduced_cost(
+    ws::ColGenWorkspace, phase::CGPhase, sp_id, sp_value,
+    mast_dual_sol::MasterDualSolution
+)
+    decomp = ws.decomp
+    fk = _objective_cost(phase, subproblem_fixed_cost(decomp, sp_id))
+    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id)
+    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
+    return sp_value + fk - ν_lb - ν_ub
+end
+
+# Minimization: improving when reduced_cost < -ε (min(rc) is very negative).
+# Maximization: improving when reduced_cost > +ε (max(rc) is positive).
+function _is_improving_reduced_cost(ws::ColGenWorkspace, reduced_cost)
+    if is_minimization(ws)
+        return reduced_cost < -RC_IMPROVING_TOL
+    else
+        return reduced_cost > RC_IMPROVING_TOL
+    end
+end
+
+"""
+    push_in_set!(ws, phase, set, sol, mast_dual_sol) -> Bool
+
+Add the column `sol` to `set` if its reduced cost under `phase` is
+improving, and return whether it was added. The reduced cost is computed
+here, from the raw subproblem value the pricer returned.
+"""
+function push_in_set!(
+    ws::ColGenWorkspace, phase::CGPhase, set::GeneratedColumns,
+    sol::PricingPrimalSolution, mast_dual_sol::MasterDualSolution
+)
+    reduced_cost = _column_reduced_cost(
+        ws, phase, sol.sp_id, sol.solution.obj_value, mast_dual_sol
+    )
+    if _is_improving_reduced_cost(ws, reduced_cost)
         push!(set.collection, sol)
         return true
     end
@@ -161,6 +206,17 @@ end
 
 # ── optimize_pricing_problem! ─────────────────────────────────────────────────
 
+"""
+    optimize_pricing_problem!(ws, sp_id, pricing_sp, optimizer, mast_dual_sol, stab_changes_mast_dual_sol) -> PricingSolution
+
+Solve the pricing subproblem `sp_id`, whose objective already holds the
+reduced costs of its variables, and return what the optimizer found.
+
+A pricer returns raw subproblem values only: the bounds and the value of
+each column are values of `(c - πA)ᵀz̄`, without the fixed cost `fₖ` and
+the convexity duals ν. The framework adds `fₖ`, which depends on the
+phase, and ν; see [`PricingSolution`](@ref).
+"""
 function optimize_pricing_problem!(
     ws::ColGenWorkspace,
     sp_id,
@@ -184,19 +240,6 @@ function optimize_pricing_problem!(
 
     sp_obj = MOI.get(sp_model, MOI.ObjectiveValue())
 
-    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ws.decomp), sp_id)
-    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ws.decomp), sp_id)
-    fk = subproblem_fixed_cost(ws.decomp, sp_id)
-    reduced_cost = sp_obj + fk - ν_lb - ν_ub
-
-    # Minimization: improving when reduced_cost < -ε (min(rc) is very negative).
-    # Maximization: improving when reduced_cost > +ε (max(rc) is positive).
-    is_improving = if is_minimization(ws)
-        reduced_cost < -RC_IMPROVING_TOL
-    else
-        reduced_cost > RC_IMPROVING_TOL
-    end
-
     # Extract solution — filter to SP decision variables
     sp_vars = Set(subproblem_variables(ws.decomp, sp_id))
     all_vals = get_primal_solution(sp_model)
@@ -206,9 +249,9 @@ function optimize_pricing_problem!(
             push!(entries, (var, val))
         end
     end
-    sol = _SpSolution(sp_id, reduced_cost, entries)
+    sol = _SpSolution(sp_id, sp_obj, entries)
 
-    primal_sol = PricingPrimalSolution(sp_id, sol, is_improving)
+    primal_sol = PricingPrimalSolution(sp_id, sol)
 
     return PricingSolution(false, false, sp_obj, sp_obj, [primal_sol])
 end

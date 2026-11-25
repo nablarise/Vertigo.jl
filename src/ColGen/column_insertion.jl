@@ -7,7 +7,8 @@
     _objective_cost(::Phase1, col_cost) -> Float64
     _objective_cost(::Phase2, col_cost) -> Float64
 
-Objective coefficient for a new column variable in the master.
+Objective coefficient for a new column variable in the master, or for the
+subproblem fixed cost that is part of it.
 Phase 1 uses zero (only artificial variables carry cost).
 """
 _objective_cost(::Union{Phase0,Phase2}, col_cost::Float64) = col_cost
