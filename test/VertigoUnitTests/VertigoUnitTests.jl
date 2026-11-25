@@ -22,6 +22,7 @@ using Vertigo.Branching: find_fractional_variables,
     BranchingCandidate, MostFractionalRule, LeastFractionalRule,
     select_candidates, MostFractionalBranching, select_branching_variable,
     bp_master_model, most_fractional_original_variable
+using Vertigo.BranchCutPrice: _check_rmp_ip_objective
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # GAP Instance helpers
@@ -200,6 +201,7 @@ include("branching/test_branching_logger.jl")
 
 # BranchCutPrice
 include("branchcutprice/test_branch_and_price.jl")
+include("branchcutprice/test_rmp_heuristic.jl")
 
 # DML
 include("dml/test_dml.jl")
@@ -232,6 +234,7 @@ function run()
     test_kernel()
     test_branching_logger()
     test_branch_and_price()
+    test_rmp_heuristic()
     test_stabilization()
     test_setup_reformulation()
     test_insert_columns()
