@@ -624,6 +624,7 @@ struct ColGenOutput
     incumbent_dual_bound::Union{Nothing,Float64}
     ip_incumbent::Union{Nothing,MasterIpPrimalSol}
     master_lp_primal_sol::Union{Nothing,MasterPrimalSolution}
+    nb_iterations::Int   # restricted master iterations of the run, all phases
 end
 
 """
@@ -645,18 +646,23 @@ function new_output(
     ::Type{ColGenOutput}, ws::ColGenWorkspace, p::ColGenPhaseOutput
 )
     ip = ws.ip_incumbent
+    # The phases number their iterations from 1 and end on the next one.
+    nb_iterations = p.nb_iterations - 1
     if p.subproblem_infeasible
         return ColGenOutput(
-            subproblem_infeasible, nothing, nothing, ip, nothing
+            subproblem_infeasible, nothing, nothing, ip, nothing,
+            nb_iterations
         )
     elseif p.has_artificial_vars && p.colgen_converged
         return ColGenOutput(
-            master_infeasible, nothing, nothing, ip, nothing
+            master_infeasible, nothing, nothing, ip, nothing,
+            nb_iterations
         )
     elseif p.ip_pruned
         return ColGenOutput(
             ip_pruned, p.master_lp_obj,
-            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol,
+            nb_iterations
         )
     elseif p.colgen_converged
         # The last master LP was infeasible although artificial variables
@@ -666,17 +672,20 @@ function new_output(
         end
         return ColGenOutput(
             optimal, p.master_lp_obj,
-            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol,
+            nb_iterations
         )
     elseif time_limit_reached(ws)
         return ColGenOutput(
             time_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol,
+            nb_iterations
         )
     else
         return ColGenOutput(
             iteration_limit, p.master_lp_obj,
-            p.incumbent_dual_bound, ip, p.master_lp_primal_sol
+            p.incumbent_dual_bound, ip, p.master_lp_primal_sol,
+            nb_iterations
         )
     end
 end

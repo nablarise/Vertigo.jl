@@ -54,3 +54,20 @@ function test_gap_lp_dual_bound_matches_primal()
         @test gap <= 1.0  # within 1 unit (tight for LP relaxation)
     end
 end
+
+# Issue #61. One machine and one task: the first iteration prices the only
+# column against the duals of the artificial variables, the second finds
+# no improving column.
+function test_gap_output_counts_iterations()
+    @testset "[gap] output counts the restricted master iterations" begin
+        inst = GAPInstance(
+            1, 1, reshape([5.0], 1, 1), reshape([1.0], 1, 1), [1.0]
+        )
+        ws = build_gap_context(inst)
+
+        output = run_column_generation(ws)
+
+        @test output.status == Vertigo.ColGen.optimal
+        @test output.nb_iterations == 2
+    end
+end

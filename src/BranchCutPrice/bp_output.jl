@@ -15,6 +15,9 @@ Result of a branch-and-price run.
 - `nodes_explored::Int`: Total number of nodes evaluated.
 - `root_lp_value::Union{Float64,Nothing}`: Master LP objective at the
   root node, or `nothing` if the root LP was infeasible or never solved.
+- `nb_rmp_iterations::Int`: Restricted master iterations of the column
+  generation runs of the evaluated nodes. Those of strong branching
+  probes are not counted.
 """
 struct BPOutput
     status::Symbol
@@ -22,4 +25,5 @@ struct BPOutput
     best_dual_bound::Float64
     nodes_explored::Int
     root_lp_value::Union{Float64,Nothing}
+    nb_rmp_iterations::Int
 end

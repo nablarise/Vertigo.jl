@@ -225,4 +225,73 @@ function test_branch_and_price()
         @test !isnothing(col_var)
         @test get(coeffs, col_var, 0.0) ≈ 1.0 atol = 1e-10
     end
+
+    # Issue #61. One machine and one task: the root column generation
+    # prices the only column, then finds no improving one, and its LP is
+    # integral.
+    @testset "[branch_and_price] a one-task instance takes two iterations" begin
+        inst = GAPInstance(
+            1, 1, reshape([5.0], 1, 1), reshape([1.0], 1, 1), [1.0]
+        )
+        output = run_branch_and_price(BranchCutPriceWorkspace(
+            build_gap_decomp(inst), BranchCutPriceConfig()
+        ))
+        @test output.status == :optimal
+        @test output.nodes_explored == 1
+        @test output.nb_rmp_iterations == 2
+    end
+
+    # The toy instance of `examples/gap/instances/toy.json`: its root LP is
+    # fractional, so the tree has more than one node.
+    function toy_gap_instance()
+        cost = Float64[
+            10 12 13 14 15 17;
+            21 22 23 24 25 28;
+            31 32 33 34 35 36
+        ]
+        weight = Float64[
+            6 6 6 6 6 6;
+            4 4 4 4 4 4;
+            2 2 2 2 2 2
+        ]
+        return GAPInstance(3, 6, cost, weight, Float64[10, 10, 10])
+    end
+    function toy_gap_space(; kwargs...)
+        return BranchCutPriceWorkspace(
+            build_gap_decomp(toy_gap_instance()),
+            BranchCutPriceConfig(; rmp_heuristic = false, kwargs...)
+        )
+    end
+
+    @testset "[branch_and_price] the root iterations are those of column generation alone" begin
+        colgen = run_column_generation(build_gap_context(toy_gap_instance()))
+        root = run_branch_and_price(toy_gap_space(node_limit = 1))
+        @test colgen.status == Vertigo.ColGen.optimal
+        @test root.nb_rmp_iterations == colgen.nb_iterations
+    end
+
+    @testset "[branch_and_price] iterations are summed over the nodes" begin
+        root = run_branch_and_price(toy_gap_space(node_limit = 1))
+        output = run_branch_and_price(toy_gap_space(node_limit = 1000))
+        @test output.status == :optimal
+        @test output.nodes_explored > 1
+        @test output.nb_rmp_iterations > root.nb_rmp_iterations
+        # Every node runs at least one iteration.
+        @test output.nb_rmp_iterations >= output.nodes_explored
+    end
+
+    @testset "[branch_and_price] iterations of strong branching probes are not counted" begin
+        plain = run_branch_and_price(toy_gap_space(node_limit = 1))
+        output = run_branch_and_price(toy_gap_space(
+            node_limit = 1,
+            branching_strategy = Vertigo.Branching.MultiPhaseStrongBranching(
+                max_candidates = 3,
+                phases = [Vertigo.Branching.CGProbePhase(
+                    max_cg_iterations = 5, lookahead = 0
+                )]
+            )
+        ))
+        # The root column generation runs before any probe.
+        @test output.nb_rmp_iterations == plain.nb_rmp_iterations
+    end
 end
