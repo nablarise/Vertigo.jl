@@ -186,7 +186,7 @@ function optimize_pricing_problem!(
 
     ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ws.decomp), sp_id)
     ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ws.decomp), sp_id)
-    fk = subproblem_fixed_cost(ws.decomp, sp_id)
+    fk = _objective_cost(ws.pricing_phase, subproblem_fixed_cost(ws.decomp, sp_id))
     reduced_cost = sp_obj + fk - ν_lb - ν_ub
 
     # Minimization: improving when reduced_cost < -ε (min(rc) is very negative).

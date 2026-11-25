@@ -94,6 +94,27 @@ struct ActiveRobustCut{X}
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# PHASE / STAGE TYPES
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+struct ColGenPhaseIterator end
+struct ColGenStageIterator end
+
+struct Phase0
+    artificial_var_cost::Float64
+    convexity_artificial_var_cost::Float64
+    Phase0(ac=10000.0, cc=10000.0) = new(ac, cc)
+end
+
+struct Phase1 end   # Minimise sum of artificial variables (feasibility)
+struct Phase2 end   # Optimise original objective, no artificial variables
+
+const CGPhase = Union{Phase0,Phase1,Phase2}
+
+struct ExactStage end
+struct NoStabilization end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # COLGEN WORKSPACE
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -126,6 +147,9 @@ mutable struct ColGenWorkspace{D<:AbstractDecomposition}
     time_limit::Float64     # seconds allowed to one run
     run_start::Float64      # `time()` at the start of the current run
     deadline::Float64       # absolute `time()` that no run may pass
+    # Phase whose costs the pricing subproblems hold, set with them by
+    # `update_reduced_costs!`: the pricer charges the fixed cost by it.
+    pricing_phase::CGPhase
 end
 
 """
@@ -163,7 +187,7 @@ function ColGenWorkspace(
         ActiveBranchingConstraint[], ActiveRobustCut[],
         config.smoothing_alpha, config.max_cg_iterations,
         config.max_misprice_iterations,
-        config.time_limit, time(), Inf
+        config.time_limit, time(), Inf, Phase0()
     )
 end
 
@@ -236,27 +260,6 @@ function _dual_bound_dominated(ws, dual_bound, ip_bound)
     end
 end
 
-
-# ────────────────────────────────────────────────────────────────────────────────────────
-# PHASE / STAGE TYPES
-# ────────────────────────────────────────────────────────────────────────────────────────
-
-struct ColGenPhaseIterator end
-struct ColGenStageIterator end
-
-struct Phase0
-    artificial_var_cost::Float64
-    convexity_artificial_var_cost::Float64
-    Phase0(ac=10000.0, cc=10000.0) = new(ac, cc)
-end
-
-struct Phase1 end   # Minimise sum of artificial variables (feasibility)
-struct Phase2 end   # Optimise original objective, no artificial variables
-
-const CGPhase = Union{Phase0,Phase1,Phase2}
-
-struct ExactStage end
-struct NoStabilization end
 
 @enum ColGenStatus optimal master_infeasible subproblem_infeasible iteration_limit ip_pruned time_limit
 

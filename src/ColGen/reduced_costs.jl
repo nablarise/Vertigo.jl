@@ -135,7 +135,8 @@ function compute_reduced_costs!(
     ))
 end
 
-function update_reduced_costs!(ws::ColGenWorkspace, ::CGPhase, red_costs::ReducedCosts)
+function update_reduced_costs!(ws::ColGenWorkspace, phase::CGPhase, red_costs::ReducedCosts)
+    ws.pricing_phase = phase
     for (sp_id, sp_rc) in red_costs.values
         spm = sp_model(ws.decomp, sp_id)
         for (var_index, rc_value) in sp_rc
