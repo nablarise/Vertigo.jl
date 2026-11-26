@@ -208,7 +208,7 @@ function test_branch_and_price()
         sol = Vertigo.Reformulation._SpSolution(sp_id, -1.0, [(sp_var, 1.0)])
         col_var = Vertigo.ColGen._insert_column!(
             ws, Vertigo.ColGen.Phase2(),
-            Vertigo.ColGen.PricingPrimalSolution(sp_id, sol, true)
+            Vertigo.ColGen.PricingPrimalSolution(sp_id, sol)
         )
 
         Vertigo.TreeSearch.transition!(space, root, up)

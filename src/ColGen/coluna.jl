@@ -126,9 +126,12 @@ function pricing_strategy_iterate end
 
 function get_pricing_subprob_optimizer end
 function optimize_pricing_problem! end
+function is_subproblem_optional end
 
 function get_primal_sols end
 function push_in_set! end
+function set_best_solution! end
+function column_reduced_cost end
 function get_dual_bound end
 function get_primal_bound end
 function compute_dual_bound end
@@ -269,36 +272,53 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
             optimizer = get_pricing_subprob_optimizer(stage, sp_to_solve)
             pricing_result = optimize_pricing_problem!(context, sp_id, sp_to_solve, optimizer, mast_dual_sol, stab_changes_mast_dual_sol)
 
-            # Iteration continues only if the pricing solution is not infeasible nor unbounded.
+            # Iteration continues only if the pricing solution is not infeasible nor unbounded,
+            # unless the infeasible subproblem has a lower multiplicity of zero.
             if is_infeasible(pricing_result)
-                # TODO: if the lower multiplicity of the subproblem is zero, we can continue.
-                return new_iteration_output(O, is_min_sense, nothing, _inf(is_min_sense), 0, false, false, false, true, false, false, mast_primal_sol, ip_primal_sol, mast_dual_sol)
+                if !is_subproblem_optional(context, sp_id)
+                    return new_iteration_output(O, is_min_sense, nothing, _inf(is_min_sense), 0, false, false, false, true, false, false, mast_primal_sol, ip_primal_sol, mast_dual_sol)
+                end
+                # The subproblem is left out of the master: it generates no column, and
+                # without a bound it contributes nothing to the dual bounds.
+                delete!(sps_db, sp_id)
+                delete!(sps_pb, sp_id)
             elseif is_unbounded(pricing_result)
                 # We do not support unbounded pricing (even if it's theorically possible).
                 # We must stop Coluna here by throwing an exception because we can't claim
                 # the problem is unbounded.
                 throw(UnboundedProblemError("Unbounded subproblem."))
-            end
-
-            primal_sols = get_primal_sols(pricing_result)
-            nb_cols_pushed = 0
-            for primal_sol in primal_sols # multi column generation support.
-                # The implementation  is reponsible for checking if the column is a candidate
-                # for insertion into the master.
-                if push_in_set!(generated_columns, primal_sol)
-                    nb_cols_pushed += 1
+            else
+                primal_sols = get_primal_sols(pricing_result)
+                nb_cols_pushed = 0
+                best_sol = nothing
+                best_rc = 0.0
+                for primal_sol in primal_sols # multi column generation support.
+                    rc = column_reduced_cost(context, phase, primal_sol, mast_dual_sol)
+                    if isnothing(best_sol) || (is_min_sense ? rc < best_rc : rc > best_rc)
+                        best_sol, best_rc = primal_sol, rc
+                    end
+                    # Only a column whose reduced cost improves is a candidate for insertion
+                    # into the master.
+                    if _is_improving(rc, is_min_sense)
+                        if push_in_set!(generated_columns, primal_sol)
+                            nb_cols_pushed += 1
+                        end
+                    end
                 end
-            end
+                if !isnothing(best_sol)
+                    set_best_solution!(generated_columns, sp_id, best_sol)
+                end
 
-            # Updates the initial bound if the pricing subproblem result has a dual bound.
-            sp_db = get_dual_bound(pricing_result)
-            if !isnothing(sp_db)
-                sps_db[sp_id] = sp_db
-            end
+                # Updates the initial bound if the pricing subproblem result has a dual bound.
+                sp_db = get_dual_bound(pricing_result)
+                if !isnothing(sp_db)
+                    sps_db[sp_id] = sp_db
+                end
 
-            sp_pb = get_primal_bound(pricing_result)
-            if !isnothing(sp_pb)
-                sps_pb[sp_id] = sp_pb
+                sp_pb = get_primal_bound(pricing_result)
+                if !isnothing(sp_pb)
+                    sps_pb[sp_id] = sp_pb
+                end
             end
 
             sp_to_solve_it = pricing_strategy_iterate(pricing_strategy, state)

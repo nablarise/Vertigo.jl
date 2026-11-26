@@ -12,7 +12,7 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
     Phase0, Phase1, Phase2, TaggedCI,
     ActiveRobustCut, ActiveBranchingConstraint, _lagrangian_subgradient,
-    set_of_columns, push_in_set!
+    set_of_columns, set_best_solution!
 using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var,
     coupling_constraints
 
@@ -176,8 +176,6 @@ function test_stabilization()
         test_no_improvement_keeps_center()
         test_oracle_from_first_separation_point()
         test_oracle_reset_each_iteration()
-        test_oracle_is_best_pricing_solution()
-        test_oracle_keeps_non_improving_solution()
         test_oracle_skips_subproblem_without_solution()
     end
     @testset "[stabilization] misprice" begin
@@ -486,7 +484,11 @@ end
 function _stab_for_angle(ws, extra_duals_center, extra_duals_out, oracle_sols)
     stab = setup_stabilization!(ws, get_master(ws))
     stab.last_phase = Phase2()
-    stab.sep_dual_sol = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 5.0))
+    # The coupling rows are listed: pricing reads π only on the rows it is given.
+    stab.sep_dual_sol = _make_dual_sol(
+        0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 5.0);
+        cc_ids=[TaggedCI(_EqCstr(1)), TaggedCI(_EqCstr(2))]
+    )
     center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
     out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
     stab.in_point = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
@@ -562,19 +564,21 @@ function test_angle_measured_from_iteration_in_point()
 end
 
 # The angle test reads the subgradient at the first separation point of the
-# iteration (Sadykov 2019, Step 6), from one solution per subproblem: the
-# pricing optimum, improving or not.
+# iteration (Sadykov 2019, Step 6), from one solution per subproblem: the one
+# of best reduced cost, improving or not, chosen by the column generation loop.
 
 function _sp1_solution(ws, obj_value)
     sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
     return _SpSolution(sp_id, obj_value, [(sp_var, 1.0)])
 end
 
-function _price!(stab, ws, sols; improving=true)
+# `best` is the solution the loop records for subproblem 1, or `nothing` when
+# the pricer returned none.
+function _price!(stab, ws, best)
     sp_id = PricingSubproblemId(1)
     columns = set_of_columns(ws)
-    for sol in sols
-        push_in_set!(columns, PricingPrimalSolution(sp_id, sol, improving))
+    if !isnothing(best)
+        set_best_solution!(columns, sp_id, PricingPrimalSolution(sp_id, best))
     end
     update_stabilization_after_pricing_optim!(
         stab, ws, columns, get_master(ws), -Inf, _make_dual_sol(0.0)
@@ -586,8 +590,8 @@ function test_oracle_from_first_separation_point()
     stab = setup_stabilization!(ws, get_master(ws))
     update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
     first_sol = _sp1_solution(ws, -5.0)
-    _price!(stab, ws, [first_sol])
-    _price!(stab, ws, [_sp1_solution(ws, -3.0)])  # after a mispricing
+    _price!(stab, ws, first_sol)
+    _price!(stab, ws, _sp1_solution(ws, -3.0))  # after a mispricing
     @test stab.oracle_sols[PricingSubproblemId(1)] === first_sol
 end
 
@@ -595,29 +599,11 @@ function test_oracle_reset_each_iteration()
     ws = _build_stab_ctx(alpha=0.5)
     stab = setup_stabilization!(ws, get_master(ws))
     update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
-    _price!(stab, ws, [_sp1_solution(ws, -5.0)])
+    _price!(stab, ws, _sp1_solution(ws, -5.0))
     update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
     next_sol = _sp1_solution(ws, -3.0)
-    _price!(stab, ws, [next_sol])
+    _price!(stab, ws, next_sol)
     @test stab.oracle_sols[PricingSubproblemId(1)] === next_sol
-end
-
-function test_oracle_is_best_pricing_solution()
-    ws = _build_stab_ctx(alpha=0.5)
-    stab = setup_stabilization!(ws, get_master(ws))
-    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
-    best = _sp1_solution(ws, -5.0)
-    _price!(stab, ws, [_sp1_solution(ws, -1.0), best])
-    @test stab.oracle_sols[PricingSubproblemId(1)] === best
-end
-
-function test_oracle_keeps_non_improving_solution()
-    ws = _build_stab_ctx(alpha=0.5)
-    stab = setup_stabilization!(ws, get_master(ws))
-    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
-    sol = _sp1_solution(ws, 3.0)
-    _price!(stab, ws, [sol]; improving=false)
-    @test stab.oracle_sols[PricingSubproblemId(1)] === sol
 end
 
 # A pricer that finds nothing below its threshold returns no solution.
@@ -625,7 +611,7 @@ function test_oracle_skips_subproblem_without_solution()
     ws = _build_stab_ctx(alpha=0.5)
     stab = setup_stabilization!(ws, get_master(ws))
     update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
-    _price!(stab, ws, _SpSolution[])
+    _price!(stab, ws, nothing)
     @test isempty(stab.oracle_sols)
 end
 
@@ -652,7 +638,7 @@ function test_lagrangian_subgradient_multiplicity()
             ws = _build_lagrangian_ctx(; conv_lb, conv_ub, fixed_cost)
             assign1 = coupling_constraints(ws.decomp)[1][1]
             sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
-            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual))
+            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual); cc_ids=[assign1])
             oracle_sols = Dict(sp_id => _SpSolution(sp_id, reported_rc, [(sp_var, 1.0)]))
             g = _lagrangian_subgradient(ws, phase, sep, oracle_sols)
             @test g[assign1] ≈ expected_g atol=1e-10

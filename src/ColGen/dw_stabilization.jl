@@ -154,8 +154,8 @@ function update_stabilization_after_pricing_optim!(
         # subproblem is absent and left out of the subgradient, which is exact
         # when its multiplicity is a lower convexity bound of zero.
         stab.oracle_sols = Dict(
-            sp_id => _oracle_solution(ws, sols)
-            for (sp_id, sols) in generated_columns.sp_solutions
+            sp_id => pricing_sol.solution
+            for (sp_id, pricing_sol) in generated_columns.best_solutions
         )
     end
 
@@ -257,12 +257,6 @@ function update_stabilization_after_iter!(
     end
 
     return nothing
-end
-
-# The pricing optimum among the solutions a subproblem returned.
-function _oracle_solution(ws::ColGenWorkspace, pricing_sols)
-    sense = is_minimization(ws) ? 1 : -1
-    return argmin(ps -> sense * ps.solution.obj_value, pricing_sols).solution
 end
 
 # Value of an oracle solution in the Lagrangian function at `dual_sol`:

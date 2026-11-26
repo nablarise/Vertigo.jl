@@ -35,7 +35,7 @@ end
 
 function compute_dual_bound(
     ws::ColGenWorkspace,
-    ::CGPhase,
+    phase::CGPhase,
     sps_db,
     mast_dual_sol::MasterDualSolution
 )
@@ -63,11 +63,11 @@ function compute_dual_bound(
         end
     end
 
-    # 2. Subproblem contribution: Σₖ (SP_db + fₖ) × multiplicity
+    # 2. Subproblem contribution: Σₖ (SP_db + cost_phase(fₖ)) × multiplicity
     sp_contrib = 0.0
     for (sp_id, sp_db) in sps_db
         fk = subproblem_fixed_cost(decomp, sp_id)
-        sp_total = sp_db + fk
+        sp_total = sp_db + _objective_cost(phase, fk)
         sp_contrib += sp_total * _lagrangian_multiplicity(decomp, sp_id, sp_total)
     end
 
