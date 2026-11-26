@@ -4,6 +4,9 @@
 
 _inf(is_min) = is_min ? -Inf : Inf
 
+# Minimization: improving when rc < -ε. Maximization: improving when rc > +ε.
+_is_improving(rc, is_min) = is_min ? rc < -RC_IMPROVING_TOL : rc > RC_IMPROVING_TOL
+
 """
 add_variable!(model; lower_bound, upper_bound, variable_type, constraint_coeffs, objective_coeff)
 

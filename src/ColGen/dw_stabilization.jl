@@ -231,11 +231,9 @@ function update_stabilization_after_iter!(
         sp_id = pricing_sol.sp_id
         sol = pricing_sol.solution
 
-        # Multiplicity: use convexity bound based on RC sign
-        sense = is_minimization(ws) ? 1 : -1
-        rc = sol.obj_value
-        conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        mult = (sense * rc < 0) ? conv_ub : conv_lb
+        # Every kept column improves: its multiplicity is the convexity
+        # upper bound.
+        _, mult = convexity_bounds(decomp, sp_id)
 
         for (sp_var, val) in nonzero_entries(sol)
             for entry in coupling_coefficients(decomp, sp_id, sp_var)

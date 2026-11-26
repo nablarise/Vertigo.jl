@@ -60,6 +60,7 @@ set_of_columns(lws::ColGenLoggerWorkspace)                            = set_of_c
 get_pricing_strategy(lws::ColGenLoggerWorkspace, args...)             = get_pricing_strategy(lws.inner, args...)
 get_pricing_subprobs(lws::ColGenLoggerWorkspace)                      = get_pricing_subprobs(lws.inner)
 insert_columns!(lws::ColGenLoggerWorkspace, args...)                  = insert_columns!(lws.inner, args...)
+column_reduced_cost(lws::ColGenLoggerWorkspace, args...)              = column_reduced_cost(lws.inner, args...)
 compute_dual_bound(lws::ColGenLoggerWorkspace, args...)               = compute_dual_bound(lws.inner, args...)
 compute_sp_init_db(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_db(lws.inner, sp)
 compute_sp_init_pb(lws::ColGenLoggerWorkspace, sp)                    = compute_sp_init_pb(lws.inner, sp)

@@ -25,7 +25,7 @@ end
 
 function compute_dual_bound(
     ws::ColGenWorkspace,
-    ::CGPhase,
+    phase::CGPhase,
     sps_db,
     mast_dual_sol::MasterDualSolution
 )
@@ -53,12 +53,12 @@ function compute_dual_bound(
         end
     end
 
-    # 2. Subproblem contribution: Σₖ (SP_db + fₖ) × multiplicity
+    # 2. Subproblem contribution: Σₖ (SP_db + cost_phase(fₖ)) × multiplicity
     sense = is_minimization(decomp) ? 1 : -1
     sp_contrib = 0.0
     for (sp_id, sp_db) in sps_db
         fk = subproblem_fixed_cost(decomp, sp_id)
-        sp_total = sp_db + fk
+        sp_total = sp_db + _objective_cost(phase, fk)
         conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
         multiplicity = (sense * sp_total < 0) ? conv_ub : conv_lb
         sp_contrib += sp_total * multiplicity

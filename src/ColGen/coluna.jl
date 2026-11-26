@@ -130,6 +130,7 @@ function is_subproblem_optional end
 
 function get_primal_sols end
 function push_in_set! end
+function column_reduced_cost end
 function get_dual_bound end
 function get_primal_bound end
 function compute_dual_bound end
@@ -289,10 +290,13 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
                 primal_sols = get_primal_sols(pricing_result)
                 nb_cols_pushed = 0
                 for primal_sol in primal_sols # multi column generation support.
-                    # The implementation  is reponsible for checking if the column is a candidate
-                    # for insertion into the master.
-                    if push_in_set!(generated_columns, primal_sol)
-                        nb_cols_pushed += 1
+                    # Only a column whose reduced cost improves is a candidate for insertion
+                    # into the master.
+                    rc = column_reduced_cost(context, phase, primal_sol, mast_dual_sol)
+                    if _is_improving(rc, is_min_sense)
+                        if push_in_set!(generated_columns, primal_sol)
+                            nb_cols_pushed += 1
+                        end
                     end
                 end
 
