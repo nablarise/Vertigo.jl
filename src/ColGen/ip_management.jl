@@ -21,9 +21,50 @@ function _has_artificial_vars_in_solution(ws, mast_primal_sol; tol=INTEGRALITY_T
     return false
 end
 
+"""
+    is_master_integral(mast_primal_sol, ws::ColGenWorkspace) -> Bool
+
+Whether the master solution is integral in the master itself: every column
+value and every integer pure master variable is integral, and no artificial
+variable is nonzero.
+
+This is sufficient, not necessary. For a subproblem with upper multiplicity
+1 whose Σλ is 0 or 1, an integral projection onto the original variables is
+already a feasible subproblem solution, even when the columns behind it are
+fractional. Only with upper multiplicity > 1 can fractional columns hide
+behind an integral projection that no integral master solution reproduces.
+"""
+function is_master_integral(mast_primal_sol, ws::ColGenWorkspace)
+    if _has_artificial_vars_in_solution(ws, mast_primal_sol)
+        return false
+    end
+    vars = mast_primal_sol.sol.variable_values
+    for (col_var, _) in columns(ws.pool)
+        if !_is_integral(get(vars, col_var, 0.0))
+            return false
+        end
+    end
+    decomp = ws.decomp
+    for pmv in pure_master_variables(decomp)
+        if pure_master_is_integer(decomp, pmv) &&
+                !_is_integral(get(vars, pmv.id, 0.0))
+            return false
+        end
+    end
+    return true
+end
+
+_is_integral(val) = abs(val - round(val)) <= INTEGRALITY_TOL
+
 # Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
-# Returns (MasterIpPrimalSol, false) if all values are integral, (nothing, false) if not.
-function _project_if_integral(mast_primal_sol, ws; tol=INTEGRALITY_TOL)
+# Returns (MasterIpPrimalSol, false) if the master solution is integral, (nothing, false) if not.
+# The second value answers `new_cut_in_master` in `check_primal_ip_feasibility!`: whether an
+# essential cut violated by the solution was added to the master. Vertigo has no essential
+# cuts, so it is always false.
+function _project_if_integral(mast_primal_sol, ws)
+    if !is_master_integral(mast_primal_sol, ws)
+        return nothing, false
+    end
     non_zero_integral = Tuple{MOI.VariableIndex,Int}[]
     non_zero_continuous = Tuple{MOI.VariableIndex,Float64}[]
     # The master objective carries the constant of the original objective;
@@ -34,9 +75,7 @@ function _project_if_integral(mast_primal_sol, ws; tol=INTEGRALITY_TOL)
     ).constant
     for (col_var, rec) in columns(ws.pool)
         val = get(mast_primal_sol.sol.variable_values, col_var, 0.0)
-        rounded = round(val)
-        abs(val - rounded) > tol && return nothing, false
-        ival = round(Int, rounded)
+        ival = round(Int, val)
         if ival > 0
             push!(non_zero_integral, (col_var, ival))
             obj += column_original_cost(rec) * ival
@@ -47,15 +86,13 @@ function _project_if_integral(mast_primal_sol, ws; tol=INTEGRALITY_TOL)
         val = get(mast_primal_sol.sol.variable_values, pmv.id, 0.0)
         cost = pure_master_cost(decomp, pmv)
         if pure_master_is_integer(decomp, pmv)
-            rounded = round(val)
-            abs(val - rounded) > tol && return nothing, false
-            ival = round(Int, rounded)
+            ival = round(Int, val)
             if ival != 0
                 push!(non_zero_integral, (pmv.id, ival))
                 obj += cost * ival
             end
         else
-            if abs(val) > tol
+            if abs(val) > INTEGRALITY_TOL
                 push!(non_zero_continuous, (pmv.id, val))
                 obj += cost * val
             end
@@ -74,7 +111,6 @@ function check_primal_ip_feasibility!(
     ws::ColGenWorkspace,
     ::CGPhase
 )
-    _has_artificial_vars_in_solution(ws, mast_primal_sol) && return nothing, false
     return _project_if_integral(mast_primal_sol, ws)
 end
 

@@ -169,6 +169,99 @@ function test_branch_and_price()
         @test space.best_dual_bound ≈ 160.0 atol = 1e-10
     end
 
+    # Issue #128: a node whose projection is integral while its columns are
+    # not is unbranchable. No solver runs: on the 2 x 2 GAP of
+    # `root_with_bound`, machine 1 gets the columns {task 1}, {tasks 1, 2}
+    # and {task 2}, and the master LP values are set by hand. With the
+    # three at 0.5, x[1,1] = x[1,2] = 0.5 + 0.5 = 1 while no column is
+    # integral.
+    function unbranchable_root(bound)
+        space, root = root_with_bound(bound)
+        sp_id = PricingSubproblemId(1)
+        z1, z2 = subproblem_variables(space.ws.decomp, sp_id)
+        task_1, both, task_2 = MOI.VariableIndex.((901, 902, 903))
+        for (col_var, entries) in (
+            task_1 => [(z1, 1.0)],
+            both => [(z1, 1.0), (z2, 1.0)],
+            task_2 => [(z2, 1.0)]
+        )
+            sol = Vertigo.Reformulation._SpSolution(sp_id, 0.0, entries)
+            record_column!(space.ws.pool, col_var, sp_id, sol, 0.0)
+        end
+        return space, root, (task_1, both, task_2)
+    end
+    function set_master_lp_values!(root, values)
+        root.user_data.cg_output = Vertigo.ColGen.ColGenOutput(
+            Vertigo.ColGen.optimal, root.dual_bound, root.dual_bound, nothing,
+            MasterPrimalSolution(PrimalMoiSolution(root.dual_bound, values))
+        )
+    end
+
+    @testset "[branch_and_price] fractional columns with an integral projection leave the node unbranchable" begin
+        space, root, (task_1, both, task_2) = unbranchable_root(150.0)
+        set_master_lp_values!(root, Dict(task_1 => 0.5, both => 0.5, task_2 => 0.5))
+        children = TreeSearch.branch!(space, root)
+        output = TreeSearch.output(space)
+        @test output.status == :branching_incomplete
+        @test isempty(children)
+        @test !haskey(space.open_node_bounds, root.id)
+        @test TreeSearch.ts_open_node_count(space) == 0
+        @test space.unbranchable_node_bounds[root.id] ≈ 150.0 atol = 1e-10
+        @test output.best_dual_bound ≈ 150.0 atol = 1e-10
+    end
+
+    @testset "[branch_and_price] integral columns close the node" begin
+        space, root, (task_1, both, task_2) = unbranchable_root(150.0)
+        set_master_lp_values!(root, Dict(task_1 => 1.0, both => 0.0, task_2 => 1.0))
+        children = TreeSearch.branch!(space, root)
+        @test isempty(children)
+        @test !haskey(space.open_node_bounds, root.id)
+        @test isempty(space.unbranchable_node_bounds)
+    end
+
+    @testset "[branch_and_price] a fractional integer pure master variable leaves the node unbranchable" begin
+        space, root, (task_1, both, task_2) = unbranchable_root(150.0)
+        y = _add_test_pure_master_var!(space.ws, 904, 1.0, true)
+        set_master_lp_values!(
+            root, Dict(task_1 => 1.0, both => 0.0, task_2 => 1.0, y => 0.5)
+        )
+        children = TreeSearch.branch!(space, root)
+        @test isempty(children)
+        @test haskey(space.unbranchable_node_bounds, root.id)
+    end
+
+    @testset "[branch_and_price] an incumbent at the bound of an unbranchable node prunes it" begin
+        space, root, (task_1, both, task_2) = unbranchable_root(150.0)
+        set_master_lp_values!(root, Dict(task_1 => 0.5, both => 0.5, task_2 => 0.5))
+        TreeSearch.branch!(space, root)
+        Vertigo.BranchCutPrice._set_improving_incumbent!(space, ip_sol(150.0))
+        Vertigo.BranchCutPrice._recompute_global_dual_bound!(space)
+        output = TreeSearch.output(space)
+        @test output.status == :optimal
+        @test isempty(space.unbranchable_node_bounds)
+        @test output.best_dual_bound ≈ 150.0 atol = 1e-10
+    end
+
+    @testset "[branch_and_price] an incumbent above the bound of an unbranchable node does not prune it" begin
+        space, root, (task_1, both, task_2) = unbranchable_root(150.0)
+        set_master_lp_values!(root, Dict(task_1 => 0.5, both => 0.5, task_2 => 0.5))
+        TreeSearch.branch!(space, root)
+        Vertigo.BranchCutPrice._set_improving_incumbent!(space, ip_sol(160.0))
+        Vertigo.BranchCutPrice._recompute_global_dual_bound!(space)
+        output = TreeSearch.output(space)
+        @test output.status == :branching_incomplete
+        @test haskey(space.unbranchable_node_bounds, root.id)
+        @test output.best_dual_bound ≈ 150.0 atol = 1e-10
+    end
+
+    @testset "[branch_and_price] the global dual bound covers open and unbranchable nodes" begin
+        space, root = root_with_bound(155.0)
+        space.unbranchable_node_bounds[root.id + 1] = 150.0
+        Vertigo.BranchCutPrice._recompute_global_dual_bound!(space)
+        # min(155 open, 150 unbranchable)
+        @test space.best_dual_bound ≈ 150.0 atol = 1e-10
+    end
+
     @testset "[branch_and_price] the dot node label shows the node bound" begin
         io = IOBuffer()
         Vertigo.BranchCutPrice._write_dot_node(

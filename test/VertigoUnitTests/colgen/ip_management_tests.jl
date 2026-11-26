@@ -255,6 +255,62 @@ function test_ip_project_objective_constant()
 end
 
 # ────────────────────────────────────────────────────────────────────────────────────────
+# is_master_integral
+# ────────────────────────────────────────────────────────────────────────────────────────
+
+# One machine, one task; values set by hand, no solver.
+function _one_task_context()
+    return build_gap_context(
+        GAPInstance(1, 1, fill(1.0, 1, 1), fill(1.0, 1, 1), [1.0])
+    )
+end
+
+function test_ip_is_master_integral()
+    @testset "[ip_management] is_master_integral integral columns and pure master" begin
+        ws = _one_task_context()
+        mv = _add_test_column!(ws, 750, 1, 5.0)
+        y = _add_test_pure_master_var!(ws, 751, 3.0, true)
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv => 1.0, y => 2.0))
+        @test Vertigo.ColGen.is_master_integral(sol, ws)
+    end
+
+    @testset "[ip_management] is_master_integral fractional column" begin
+        ws = _one_task_context()
+        mv1 = _add_test_column!(ws, 752, 1, 5.0)
+        mv2 = _add_test_column!(ws, 753, 1, 4.0)
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv1 => 0.5, mv2 => 0.5))
+        @test !Vertigo.ColGen.is_master_integral(sol, ws)
+    end
+
+    @testset "[ip_management] is_master_integral fractional integer pure master" begin
+        ws = _one_task_context()
+        mv = _add_test_column!(ws, 754, 1, 5.0)
+        y = _add_test_pure_master_var!(ws, 755, 3.0, true)
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv => 1.0, y => 0.5))
+        @test !Vertigo.ColGen.is_master_integral(sol, ws)
+    end
+
+    @testset "[ip_management] is_master_integral fractional continuous pure master" begin
+        ws = _one_task_context()
+        mv = _add_test_column!(ws, 756, 1, 5.0)
+        y = _add_test_pure_master_var!(ws, 757, 3.0, false)
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv => 1.0, y => 0.5))
+        @test Vertigo.ColGen.is_master_integral(sol, ws)
+    end
+
+    @testset "[ip_management] is_master_integral nonzero artificial variable" begin
+        ws = _one_task_context()
+        mv = _add_test_column!(ws, 758, 1, 5.0)
+        s_pos = MOI.VariableIndex(759)
+        s_neg = MOI.VariableIndex(760)
+        fake_ci = TaggedCI(MOI.ConstraintIndex{MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}}(87))
+        ws.eq_art_vars[fake_ci] = (s_pos, s_neg)
+        sol = _make_primal_sol(Dict{MOI.VariableIndex,Float64}(mv => 1.0, s_pos => 1.0))
+        @test !Vertigo.ColGen.is_master_integral(sol, ws)
+    end
+end
+
+# ────────────────────────────────────────────────────────────────────────────────────────
 # _has_artificial_vars_in_solution
 # ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -460,6 +516,7 @@ function test_ip_management()
     test_ip_project_with_continuous_pure_master()
     test_ip_project_mixed_columns_and_pure_master()
     test_ip_project_objective_constant()
+    test_ip_is_master_integral()
     test_ip_has_art_eq_active()
     test_ip_has_art_leq_active()
     test_ip_has_art_geq_active()

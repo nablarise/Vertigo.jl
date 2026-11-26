@@ -78,6 +78,9 @@ update_stabilization_after_pricing_optim!(stab, lws::ColGenLoggerWorkspace, args
 check_primal_ip_feasibility!(sol, lws::ColGenLoggerWorkspace, phase) =
     check_primal_ip_feasibility!(sol, lws.inner, phase)
 
+is_master_integral(sol, lws::ColGenLoggerWorkspace) =
+    is_master_integral(sol, lws.inner)
+
 # ── Timing wrappers ──────────────────────────────────────────────────
 
 function optimize_master_lp_problem!(master, lws::ColGenLoggerWorkspace)
