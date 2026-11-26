@@ -16,10 +16,6 @@ Why a branch-and-price run ended.
   columns are not, and their bound is neither closed nor pruned by the
   incumbent. `best_dual_bound` covers them. A node or time limit takes
   precedence over it.
-
-The values are not exported from `Vertigo`, because JuMP exports
-`OPTIMAL`, `INFEASIBLE`, `NODE_LIMIT` and `TIME_LIMIT`: write
-`Vertigo.OPTIMAL`.
 """
 @enum BPStatus begin
     OPTIMAL
