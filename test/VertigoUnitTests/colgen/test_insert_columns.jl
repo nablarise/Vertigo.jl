@@ -153,7 +153,7 @@ function test_insert_columns_single_column()
         # cost = 3.0, c1 = 2.0, c2 = 1.0, branching(x₁) = 1.0
         sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -182,10 +182,10 @@ function test_insert_columns_two_columns()
         sol_b = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 5.0, [(refs.z2, 1.0)])
 
         pricing_a = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol_a, true
+            PricingSubproblemId(1), sol_a
         )
         pricing_b = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol_b, true
+            PricingSubproblemId(1), sol_b
         )
         columns = Vertigo.ColGen.GeneratedColumns(
             [pricing_a, pricing_b]
@@ -226,7 +226,7 @@ function test_insert_columns_duplicate_skipped()
 
         sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
 
         n1 = Vertigo.ColGen.insert_columns!(
@@ -257,7 +257,7 @@ function test_insert_columns_mixed_sp_variables()
             PricingSubproblemId(1), 13.0, [(refs.z1, 1.0), (refs.z2, 2.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -281,7 +281,7 @@ function test_insert_columns_pool_records_original_cost()
 
         sol = Vertigo.Reformulation._SpSolution(PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)])
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
         columns = Vertigo.ColGen.GeneratedColumns([pricing_sol])
 
@@ -320,7 +320,7 @@ function test_insert_column_returns_var()
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
 
         col_var = Vertigo.ColGen._insert_column!(ws, Phase0(), pricing_sol)
@@ -344,7 +344,7 @@ function test_insert_column_duplicate_returns_nothing()
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
 
         col_var1 = Vertigo.ColGen._insert_column!(ws, Phase0(), pricing_sol)
@@ -365,7 +365,7 @@ function test_insert_column_phase1_zero_cost()
             PricingSubproblemId(1), 3.0, [(refs.z1, 1.0)]
         )
         pricing_sol = Vertigo.ColGen.PricingPrimalSolution(
-            PricingSubproblemId(1), sol, true
+            PricingSubproblemId(1), sol
         )
 
         col_var = Vertigo.ColGen._insert_column!(ws, Phase1(), pricing_sol)
