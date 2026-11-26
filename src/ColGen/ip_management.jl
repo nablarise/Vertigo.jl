@@ -24,10 +24,15 @@ end
 """
     is_master_integral(mast_primal_sol, ws::ColGenWorkspace) -> Bool
 
-Whether a master solution is integral in the master itself: every column
+Whether the master solution is integral in the master itself: every column
 value and every integer pure master variable is integral, and no artificial
-variable is nonzero. An integral projection onto the original variables
-is not enough: the column values can be fractional behind it.
+variable is nonzero.
+
+This is sufficient, not necessary. For a subproblem with upper multiplicity
+1 whose Σλ is 0 or 1, an integral projection onto the original variables is
+already a feasible subproblem solution, even when the columns behind it are
+fractional. Only with upper multiplicity > 1 can fractional columns hide
+behind an integral projection that no integral master solution reproduces.
 """
 function is_master_integral(mast_primal_sol, ws::ColGenWorkspace)
     if _has_artificial_vars_in_solution(ws, mast_primal_sol)
