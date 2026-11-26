@@ -19,7 +19,7 @@ mutable struct BenchResult
     instance::String
     n::Int
     m::Int
-    status::Symbol
+    status::BPStatus
     wall_time_s::Float64
     primal_bound::Union{Float64,Nothing}
     dual_bound::Union{Float64,Nothing}
@@ -136,7 +136,7 @@ end
 function result_to_dict(r::BenchResult)
     return Dict(
         "instance" => r.instance, "n" => r.n, "m" => r.m,
-        "status" => String(r.status), "wall_time_s" => r.wall_time_s,
+        "status" => string(r.status), "wall_time_s" => r.wall_time_s,
         "primal_bound" => finite_or_nothing(r.primal_bound),
         "dual_bound" => finite_or_nothing(r.dual_bound),
         "gap_pct" => r.gap_pct, "opt_known" => r.opt_known,
@@ -166,7 +166,7 @@ function print_table(results::Vector{BenchResult}, io::IO=stdout)
         dual = r.dual_bound === nothing ? "—" : @sprintf("%.2f", r.dual_bound)
         gap = r.gap_pct === nothing ? "—" : @sprintf("%.2f", r.gap_pct)
         @printf(io, "%-18s %4d %3d %-12s %10.3f %12s %12s %8s %8d\n",
-            r.instance, r.n, r.m, String(r.status), r.wall_time_s,
+            r.instance, r.n, r.m, string(r.status), r.wall_time_s,
             primal, dual, gap, r.nb_nodes)
     end
 end
@@ -199,7 +199,7 @@ function run_bench(
         flush(stdout)
         r = run_one(path, cfg, meta_lookup)
         push!(results, r)
-        @printf("%s in %.2fs\n", String(r.status), r.wall_time_s)
+        @printf("%s in %.2fs\n", string(r.status), r.wall_time_s)
     end
 
     println()

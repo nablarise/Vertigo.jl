@@ -68,7 +68,7 @@ JSON until the corresponding `BPOutput` accessors land.
 
 `status` and `dual_bound` are also affected by issue #63: when a
 small instance is solved to optimality with the full tree explored,
-`status` is currently reported as `:node_limit` and `dual_bound` as
+`status` is currently reported as `NODE_LIMIT` and `dual_bound` as
 `-Inf` (CSV) / `null` (JSON). The bench captures the values exactly
 as `BPOutput` returns them; the status will normalize once #63 is
 fixed.

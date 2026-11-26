@@ -76,7 +76,7 @@ function test_dual_bound_e2e()
         output = run_branch_and_price(
             BranchCutPriceWorkspace(build_gap_decomp(inst), BranchCutPriceConfig())
         )
-        @test output.status == :optimal
+        @test output.status == Vertigo.OPTIMAL
         @test output.best_dual_bound ≈ output.incumbent.obj_value
     end
 
@@ -86,7 +86,7 @@ function test_dual_bound_e2e()
                 build_gap_decomp(gap_infeasible_master()), BranchCutPriceConfig()
             )
         )
-        @test output.status == :infeasible
+        @test output.status == Vertigo.INFEASIBLE
         @test output.best_dual_bound == Inf
     end
 end

@@ -27,7 +27,7 @@ function test_time_limit_e2e()
             BranchCutPriceConfig(time_limit=0.0)
         )
         output = run_branch_and_price(bcp_ws)
-        @test output.status == :time_limit
+        @test output.status == Vertigo.TIME_LIMIT
         @test isnothing(output.incumbent)
     end
 
@@ -41,7 +41,7 @@ function test_time_limit_e2e()
             )
         )
         elapsed = @elapsed output = run_branch_and_price(bcp_ws)
-        @test output.status in (:time_limit, :optimal)
+        @test output.status in (Vertigo.TIME_LIMIT, Vertigo.OPTIMAL)
         @test elapsed < limit + 10.0
         @test output.best_dual_bound <= 1158 + 1e-4
     end

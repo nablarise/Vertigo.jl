@@ -179,7 +179,7 @@ function test_multi_phase_sb_e2e()
             )
         )
         output = run_branch_and_price(bcp_ws)
-        @test output.status in (:optimal, :node_limit)
+        @test output.status in (Vertigo.OPTIMAL, Vertigo.NODE_LIMIT)
         @test !isnothing(output.incumbent)
     end
 end

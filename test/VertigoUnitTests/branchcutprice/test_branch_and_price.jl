@@ -14,7 +14,7 @@ function test_branch_and_price()
         )
         space = BranchCutPriceWorkspace(build_gap_decomp(inst), config)
         output = run_branch_and_price(space)
-        @test output.status == :node_limit
+        @test output.status == Vertigo.NODE_LIMIT
         @test length(space.open_node_bounds) == 2
         @test isfinite(output.best_dual_bound)
         @test output.best_dual_bound <= output.root_lp_value + 1e-6
@@ -27,7 +27,7 @@ function test_branch_and_price()
             decomp, BranchCutPriceConfig(node_limit = 100)
         )
         output = run_branch_and_price(bcp_ws)
-        @test output.status in (:optimal, :node_limit)
+        @test output.status in (Vertigo.OPTIMAL, Vertigo.NODE_LIMIT)
         @test !isnothing(output.incumbent)
         @test output.nodes_explored >= 1
         @test !isnothing(output.root_lp_value)
@@ -45,10 +45,10 @@ function test_branch_and_price()
         @test output.nodes_explored <= 5
     end
 
-    @testset "[branch_and_price] fully explored tree reports :optimal" begin
+    @testset "[branch_and_price] fully explored tree reports OPTIMAL" begin
         # Regression for #63: when every node is processed, the dual
         # bound must not be reset to -Inf and the status must be
-        # :optimal rather than :node_limit.
+        # OPTIMAL rather than NODE_LIMIT.
         #
         # Uses the toy GAP instance from `examples/gap/instances/toy.json`
         # (3 machines, 6 tasks; optimum = 160 by enumerating the 3^6
@@ -74,7 +74,7 @@ function test_branch_and_price()
             BranchCutPriceConfig(node_limit = 1000, rmp_heuristic = false)
         )
         output = run_branch_and_price(bcp_ws)
-        @test output.status == :optimal
+        @test output.status == Vertigo.OPTIMAL
         @test output.nodes_explored < 1000
         @test !isnothing(output.incumbent)
         @test output.incumbent.obj_value ≈ 160.0 atol = 1e-6
@@ -104,7 +104,7 @@ function test_branch_and_price()
         output = redirect_stdout(devnull) do
             run_branch_and_price(bcp_ws)
         end
-        @test output.status in (:optimal, :node_limit)
+        @test output.status in (Vertigo.OPTIMAL, Vertigo.NODE_LIMIT)
         @test output.nodes_explored >= 1
     end
 
@@ -202,7 +202,7 @@ function test_branch_and_price()
         set_master_lp_values!(root, Dict(task_1 => 0.5, both => 0.5, task_2 => 0.5))
         children = TreeSearch.branch!(space, root)
         output = TreeSearch.output(space)
-        @test output.status == :branching_incomplete
+        @test output.status == Vertigo.BRANCHING_INCOMPLETE
         @test isempty(children)
         @test !haskey(space.open_node_bounds, root.id)
         @test TreeSearch.ts_open_node_count(space) == 0
@@ -237,7 +237,7 @@ function test_branch_and_price()
         Vertigo.BranchCutPrice._set_improving_incumbent!(space, ip_sol(150.0))
         Vertigo.BranchCutPrice._recompute_global_dual_bound!(space)
         output = TreeSearch.output(space)
-        @test output.status == :optimal
+        @test output.status == Vertigo.OPTIMAL
         @test isempty(space.unbranchable_node_bounds)
         @test output.best_dual_bound ≈ 150.0 atol = 1e-10
     end
@@ -249,7 +249,7 @@ function test_branch_and_price()
         Vertigo.BranchCutPrice._set_improving_incumbent!(space, ip_sol(160.0))
         Vertigo.BranchCutPrice._recompute_global_dual_bound!(space)
         output = TreeSearch.output(space)
-        @test output.status == :branching_incomplete
+        @test output.status == Vertigo.BRANCHING_INCOMPLETE
         @test haskey(space.unbranchable_node_bounds, root.id)
         @test output.best_dual_bound ≈ 150.0 atol = 1e-10
     end
