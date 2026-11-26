@@ -205,12 +205,6 @@ function TreeSearch.transition!(
 end
 
 function _recompute_global_dual_bound!(space::BranchCutPriceWorkspace)
-    # An unbranchable node is never popped again, so this is the only
-    # place where the incumbent can prune it.
-    filter!(
-        node_bound -> !_should_prune(space, node_bound.second),
-        space.unbranchable_node_bounds
-    )
     bounds = Iterators.flatten(
         (values(space.open_node_bounds), values(space.unbranchable_node_bounds))
     )

@@ -66,6 +66,17 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
+# An unbranchable node is never popped again, so the new incumbent is the
+# only thing that can prune it.
+function _set_improving_incumbent!(space::BranchCutPriceWorkspace, sol)
+    space.incumbent = sol
+    filter!(
+        node_bound -> !_should_prune(space, node_bound.second),
+        space.unbranchable_node_bounds
+    )
+    return
+end
+
 # Record a new integer solution found by column generation as the incumbent,
 # and return whether it closes the node. Column generation can meet it before
 # converging, so the node is closed only if its bound reaches the incumbent.
@@ -74,7 +85,7 @@ function _close_on_ip_incumbent!(space::BranchCutPriceWorkspace, node, ip_sol)
     if !isnothing(ip_sol) && ip_sol !== space.last_ip_incumbent
         space.last_ip_incumbent = ip_sol
         if _is_improving_incumbent(space, ip_sol)
-            space.incumbent = ip_sol
+            _set_improving_incumbent!(space, ip_sol)
             if _should_prune(space, node.dual_bound)
                 delete!(space.open_node_bounds, node.id)
                 _recompute_global_dual_bound!(space)
@@ -190,7 +201,7 @@ function TreeSearch.evaluate!(
         rmp_sol = solve_restricted_master_ip!(space, cg_output)
         if !isnothing(rmp_sol) &&
                 _is_improving_incumbent(space, rmp_sol)
-            space.incumbent = rmp_sol
+            _set_improving_incumbent!(space, rmp_sol)
             _recompute_global_dual_bound!(space)
         end
     end
