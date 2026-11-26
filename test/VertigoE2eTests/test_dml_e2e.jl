@@ -288,7 +288,7 @@ function test_dml_objective_constant_incumbent()
             bp = run_branch_and_price(BranchCutPriceWorkspace(
                 build_decomp(), BranchCutPriceConfig(rmp_heuristic=false)
             ))
-            @test bp.status == :optimal
+            @test bp.status == Vertigo.OPTIMAL
             @test bp.incumbent.obj_value ≈ expected atol=1e-6
             @test bp.best_dual_bound ≈ expected atol=1e-6
         end

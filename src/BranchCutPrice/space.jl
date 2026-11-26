@@ -172,18 +172,18 @@ end
 
 # Why a search that is not proven optimal has stopped.
 function _stop_status(space::BranchCutPriceWorkspace)
-    return _time_is_up(space) ? :time_limit : :node_limit
+    return _time_is_up(space) ? TIME_LIMIT : NODE_LIMIT
 end
 
 function TreeSearch.output(space::BranchCutPriceWorkspace)
     status = if _is_proved_optimal(space)
-        :optimal
+        OPTIMAL
     elseif space.nodes_explored >= space.node_limit || _time_is_up(space)
         _stop_status(space)
     elseif !isempty(space.unbranchable_node_bounds)
-        :branching_incomplete
+        BRANCHING_INCOMPLETE
     elseif isnothing(space.incumbent)
-        :infeasible
+        INFEASIBLE
     else
         _stop_status(space)
     end

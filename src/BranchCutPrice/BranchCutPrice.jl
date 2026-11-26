@@ -30,6 +30,8 @@ include("rmp_heuristic.jl")
 include("dot_logger.jl")
 
 export BPEvaluator, BPOutput
+export BPStatus, OPTIMAL, INFEASIBLE, NODE_LIMIT, TIME_LIMIT,
+    BRANCHING_INCOMPLETE
 export BranchCutPriceConfig, BranchCutPriceWorkspace
 export run_branch_and_price
 export BPDotLoggerContext

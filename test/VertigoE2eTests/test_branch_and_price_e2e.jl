@@ -32,7 +32,7 @@ function test_bp_gap_a_instances()
             )
             output = run_branch_and_price(bcp_ws)
 
-            @test output.status in (:optimal, :node_limit)
+            @test output.status in (Vertigo.OPTIMAL, Vertigo.NODE_LIMIT)
 
             # Dual bound must be valid (≤ optimal for min)
             @test output.best_dual_bound <= optimal + 1e-4
@@ -47,7 +47,7 @@ function test_bp_gap_a_instances()
                     output.incumbent.obj_value + 1e-4
             end
 
-            if output.status == :optimal
+            if output.status == Vertigo.OPTIMAL
                 @test !isnothing(output.incumbent)
                 @test abs(output.incumbent.obj_value - optimal) <=
                     1e-4

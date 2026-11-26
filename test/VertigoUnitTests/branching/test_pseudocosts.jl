@@ -224,7 +224,7 @@ function test_pseudocosts()
             )
         )
         output = run_branch_and_price(bcp_ws)
-        @test output.status in (:optimal, :node_limit)
+        @test output.status in (Vertigo.OPTIMAL, Vertigo.NODE_LIMIT)
         @test !isnothing(output.incumbent)
         @test !isempty(rb.pseudocosts.records)
     end
