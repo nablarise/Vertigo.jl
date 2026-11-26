@@ -58,6 +58,9 @@ _is_integral(val) = abs(val - round(val)) <= INTEGRALITY_TOL
 
 # Vanderbeck (2009) IP check: iterate all column variables, verify integer multiplicities.
 # Returns (MasterIpPrimalSol, false) if the master solution is integral, (nothing, false) if not.
+# The second value answers `new_cut_in_master` in `check_primal_ip_feasibility!`: whether an
+# essential cut violated by the solution was added to the master. Vertigo has no essential
+# cuts, so it is always false.
 function _project_if_integral(mast_primal_sol, ws)
     if !is_master_integral(mast_primal_sol, ws)
         return nothing, false

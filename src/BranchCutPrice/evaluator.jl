@@ -66,10 +66,10 @@ function _is_improving_incumbent(
     return sol.obj_value > space.incumbent.obj_value + space.tol
 end
 
-# An unbranchable node is never popped again, so the new incumbent is the
-# only thing that can prune it.
 function _set_improving_incumbent!(space::BranchCutPriceWorkspace, sol)
     space.incumbent = sol
+    # An unbranchable node is never popped again, so the new incumbent is
+    # the only thing that can prune it.
     filter!(
         node_bound -> !_should_prune(space, node_bound.second),
         space.unbranchable_node_bounds
