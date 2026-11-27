@@ -61,7 +61,7 @@ function probe_candidate(
     bctx::BranchingContext, phase::LPProbePhase, space,
     candidate::BranchingCandidate, parent_lp::Float64
 )
-    snapshot = _capture_probe_state(space.ws, space)
+    snapshot = _capture_probe_state(space.ws)
     try
         before_probe(bctx, phase, candidate, :left)
         left = _run_one_lp_direction(
@@ -70,7 +70,7 @@ function probe_candidate(
         )
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
-        _restore_probe_state!(space.ws, space, snapshot)
+        _restore_probe_state!(space.ws, snapshot)
         before_probe(bctx, phase, candidate, :right)
         right = _run_one_lp_direction(
             space, candidate,
@@ -81,6 +81,6 @@ function probe_candidate(
             candidate, parent_lp, left, right
         )
     finally
-        _restore_probe_state!(space.ws, space, snapshot)
+        _restore_probe_state!(space.ws, snapshot)
     end
 end

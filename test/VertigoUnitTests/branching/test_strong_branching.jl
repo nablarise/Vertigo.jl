@@ -184,6 +184,29 @@ function test_multi_phase_sb_e2e()
     end
 end
 
+function test_multi_phase_sb_e2e_2_machines_5_tasks()
+    @testset "[MultiPhaseStrongBranching] e2e 2x5 GAP solved with CG probes" begin
+        inst = random_gap_instance(2, 5; seed=10)
+        decomp = build_gap_decomp(inst)
+        bcp_ws = BranchCutPriceWorkspace(
+            decomp,
+            BranchCutPriceConfig(
+                node_limit=100,
+                branching_strategy=MultiPhaseStrongBranching(
+                    max_candidates=3,
+                    phases=[CGProbePhase(
+                        max_cg_iterations=5, lookahead=0
+                    )]
+                )
+            )
+        )
+        output = run_branch_and_price(bcp_ws)
+        @test output.status == :optimal
+        # Brute force over the 2^5 machine assignments of this instance.
+        @test output.incumbent.obj_value ≈ 49.0 atol=1e-6
+    end
+end
+
 function test_multi_phase_sb_selects_variable()
     @testset "[MultiPhaseStrongBranching] selects branching variable" begin
         inst = random_gap_instance(2, 5; seed=10)
@@ -225,5 +248,6 @@ function test_strong_branching()
     test_run_sb_probe_returns_dual_bounds()
     test_run_sb_probe_restores_state()
     test_multi_phase_sb_e2e()
+    test_multi_phase_sb_e2e_2_machines_5_tasks()
     test_multi_phase_sb_selects_variable()
 end

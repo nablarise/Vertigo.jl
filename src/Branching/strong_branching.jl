@@ -101,44 +101,22 @@ end
 # PROBE EXECUTION
 # ────────────────────────────────────────────────────────────────────────────────────────
 
-function _try_capture_basis(backend)
-    try
-        return MathOptState.capture_basis(backend)
-    catch
-        return nothing
-    end
-end
-
-function _capture_probe_state(ws, space)
+function _capture_probe_state(ws)
     return (
         max_iter = ColGen.max_cg_iterations(ws),
         ip_inc = bp_ip_incumbent(ws),
         ip_bound = bp_ip_primal_bound(ws),
         bcs = copy(bp_branching_constraints(ws)),
-        basis = _try_capture_basis(space.backend),
     )
 end
 
-function _restore_probe_state!(ws, space, snapshot)
+function _restore_probe_state!(ws, snapshot)
     bcs = bp_branching_constraints(ws)
     empty!(bcs)
     append!(bcs, snapshot.bcs)
     ColGen.set_max_cg_iterations!(ws, snapshot.max_iter)
     bp_set_ip_primal_bound!(ws, snapshot.ip_bound)
     bp_set_ip_incumbent!(ws, snapshot.ip_inc)
-    if !isnothing(snapshot.basis)
-        try
-            MathOptState.apply_change!(
-                space.backend,
-                MathOptState.LPBasisDiff(snapshot.basis),
-                nothing
-            )
-        catch
-            # Basis restore failed (e.g., variable mismatch
-            # after Phase 0/2 artificial variable lifecycle).
-            # Fall through — solver will re-solve from scratch.
-        end
-    end
     return
 end
 
@@ -173,8 +151,8 @@ end
 
 Run strong branching probes in both directions (floor/ceil) for
 the given candidate. Captures and restores context state (iteration
-limit, IP incumbent, primal bound, branching constraints, LP basis)
-around both probes. Returns `SBCandidateResult`.
+limit, IP incumbent, primal bound, branching constraints) around
+both probes. Returns `SBCandidateResult`.
 """
 function run_sb_probe(
     bctx::BranchingContext,
@@ -182,7 +160,7 @@ function run_sb_probe(
     candidate::BranchingCandidate,
     max_cg_iterations::Int, parent_lp_obj::Float64
 )
-    snapshot = _capture_probe_state(space.ws, space)
+    snapshot = _capture_probe_state(space.ws)
     try
         before_probe(bctx, phase, candidate, :left)
         left = _run_one_direction(
@@ -192,7 +170,7 @@ function run_sb_probe(
         )
         after_probe(bctx, phase, candidate, :left, left)
         # Restore state so the right probe starts clean.
-        _restore_probe_state!(space.ws, space, snapshot)
+        _restore_probe_state!(space.ws, snapshot)
         before_probe(bctx, phase, candidate, :right)
         right = _run_one_direction(
             space, candidate,
@@ -204,7 +182,7 @@ function run_sb_probe(
             candidate, parent_lp_obj, left, right
         )
     finally
-        _restore_probe_state!(space.ws, space, snapshot)
+        _restore_probe_state!(space.ws, snapshot)
     end
 end
 
