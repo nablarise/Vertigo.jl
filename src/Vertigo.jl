@@ -37,6 +37,7 @@ using .DML
 # DML (Decomposition Modeling Language)
 export @dantzig_wolfe, dantzig_wolfe_decomposition
 export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export identical
 
 # Decomposition builder
 export PricingSubproblemId

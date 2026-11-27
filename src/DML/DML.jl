@@ -18,6 +18,7 @@ using ..Reformulation
 
 include("annotations.jl")
 include("indexes.jl")
+include("identical.jl")
 include("partition.jl")
 include("models.jl")
 include("bridge.jl")
@@ -26,5 +27,6 @@ include("macro.jl")
 export @dantzig_wolfe
 export dantzig_wolfe_decomposition
 export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export identical
 
 end # module DML

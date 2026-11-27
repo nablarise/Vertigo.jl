@@ -206,6 +206,7 @@ include("branchcutprice/test_rmp_heuristic.jl")
 
 # DML
 include("dml/test_dml.jl")
+include("dml/test_identical.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # Entry point
@@ -243,6 +244,7 @@ function run()
     test_build_cut_saf()
     test_column_pool()
     test_dml()
+    test_identical()
 end
 
 end # module VertigoUnitTests
