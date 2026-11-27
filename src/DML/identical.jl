@@ -1,4 +1,4 @@
-# Copyright (c) 2025 Nablarise. All rights reserved.
+# Copyright (c) 2026 Nablarise. All rights reserved.
 # Author: Guillaume Marques <guillaume@nablarise.com>
 # SPDX-License-Identifier: MIT
 
@@ -6,37 +6,40 @@
     IdenticalBlock
 
 The one element of an index set built by [`identical`](@ref): a name and the
-bounds on the number of copies of the block a solution uses.
+lower and upper multiplicities, the smallest and largest number of copies of
+the block a solution uses.
 """
 struct IdenticalBlock
     name::Symbol
-    lb::Int
-    ub::Int
+    lm::Int
+    um::Int
 end
 
-Base.show(io::IO, k::IdenticalBlock) = print(io, k.name, "{", k.lb, "..", k.ub, "}")
+Base.show(io::IO, k::IdenticalBlock) = print(io, k.name, "{", k.lm, "..", k.um, "}")
 
 # The DML sorts subproblem ids.
 function Base.isless(a::IdenticalBlock, b::IdenticalBlock)
-    return isless((a.name, a.lb, a.ub), (b.name, b.lb, b.ub))
+    return isless((a.name, a.lm, a.um), (b.name, b.lm, b.um))
 end
 
 """
-    identical(name, ub; lb = 0) -> Vector{IdenticalBlock}
+    identical(name, um; lm = 0) -> Vector{IdenticalBlock}
 
-Return an index set with one element, standing for between `lb` and `ub`
+Return an index set with one element, standing for between `lm` and `um`
 identical copies of a subproblem.
 
 Inputs:
 - `name`: a `Symbol` telling this set apart from another one with the same
-  bounds; two sets with the same name and bounds are the same subproblem
-- `ub`: the largest number of copies, a finite integer
-- `lb`: the smallest number of copies, a nonnegative integer
+  multiplicities; two sets with the same name and multiplicities are the same
+  subproblem
+- `um`: the upper multiplicity, the largest number of copies, a finite integer
+- `lm`: the lower multiplicity, the smallest number of copies, a nonnegative
+  integer
 
-Throws an `ArgumentError` unless `0 <= lb <= ub < Inf` and both are integers.
+Throws an `ArgumentError` unless `0 <= lm <= um < Inf` and both are integers.
 
 The model is written for one representative copy, and a subproblem annotated
-with the element of this set gets the convexity bounds `(lb, ub)`:
+with the element of this set gets the multiplicities `(lm, um)`:
 
 ```julia
 K = identical(:bins, nb_items)
@@ -56,24 +59,24 @@ bin, which is not the problem the decomposition solves.
 # Examples
 
 ```jldoctest
-julia> identical(:bins, 4; lb = 1)
+julia> identical(:bins, 4; lm = 1)
 1-element Vector{Vertigo.DML.IdenticalBlock}:
  bins{1..4}
 ```
 """
-function identical(name::Symbol, ub; lb = 0)
-    if !(_is_finite_integer(lb) && _is_finite_integer(ub) && 0 <= lb <= ub)
+function identical(name::Symbol, um; lm = 0)
+    if !(_is_finite_integer(lm) && _is_finite_integer(um) && 0 <= lm <= um)
         throw(ArgumentError(
-            "identical($(repr(name)), $ub; lb = $lb): lb and ub must be " *
-            "finite integers with 0 <= lb <= ub"
+            "identical($(repr(name)), $um; lm = $lm): lm and um must be " *
+            "finite integers with 0 <= lm <= um"
         ))
     end
-    return [IdenticalBlock(name, Int(lb), Int(ub))]
+    return [IdenticalBlock(name, Int(lm), Int(um))]
 end
 
 _is_finite_integer(n) = isfinite(n) && isinteger(n)
 
-# The convexity bounds of a subproblem: the number of copies of an identical
-# block, exactly one copy of any other subproblem.
-_convexity_bounds(id::IdenticalBlock) = (Float64(id.lb), Float64(id.ub))
-_convexity_bounds(_) = (1.0, 1.0)
+# The lower and upper multiplicities of a subproblem: the number of copies of
+# an identical block, exactly one copy of any other subproblem.
+_multiplicity(id::IdenticalBlock) = (Float64(id.lm), Float64(id.um))
+_multiplicity(_) = (1.0, 1.0)
