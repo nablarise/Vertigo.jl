@@ -469,7 +469,7 @@ end
 function test_dml_gap_identical_machines(; smoothing_alpha=0.0)
     @testset "[dml] GAP on identical machines (2 types, 7 tasks) dual ≈ 32.0" begin
         inst = gap_identical_machines()
-        K = [only(identical(Symbol(:type, m), inst.multiplicity[m]))
+        K = [identical(Symbol(:type, m), inst.multiplicity[m])
              for m in 1:inst.n_machine_types]
         type_of = Dict(k => m for (m, k) in enumerate(K))
         T = 1:inst.n_tasks

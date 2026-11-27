@@ -3,26 +3,37 @@
 # SPDX-License-Identifier: MIT
 
 function test_dml_identical_index_set()
-    @testset "[identical] one element carrying the multiplicities" begin
+    @testset "[identical] a block carrying the multiplicities" begin
         K = identical(:bins, 4; lm = 1)
+        @test K.name == :bins
+        @test K.lm == 1
+        @test K.um == 4
+    end
+    @testset "[identical] an index set whose one element is itself" begin
+        K = identical(:bins, 4)
         @test length(K) == 1
-        @test only(K).name == :bins
-        @test only(K).lm == 1
-        @test only(K).um == 4
+        @test collect(K) == [K]
+    end
+    @testset "[identical] the block indexes a JuMP container as a variable" begin
+        K = identical(:bins, 4)
+        model = Model()
+        @variable(model, x[k in K, i in 1:2])
+        @test x[K, 1] isa VariableRef
+        @test [x[k, 1] for k in K] == [x[K, 1]]
     end
     @testset "[identical] lm defaults to 0" begin
-        @test only(identical(:bins, 4)).lm == 0
+        @test identical(:bins, 4).lm == 0
     end
     @testset "[identical] sets with the same name and multiplicities are equal" begin
-        @test only(identical(:bins, 4)) == only(identical(:bins, 4))
-        @test hash(only(identical(:bins, 4))) == hash(only(identical(:bins, 4)))
+        @test identical(:bins, 4) == identical(:bins, 4)
+        @test hash(identical(:bins, 4)) == hash(identical(:bins, 4))
     end
     @testset "[identical] sets with different names are different" begin
-        @test only(identical(:small, 4)) != only(identical(:large, 4))
+        @test identical(:small, 4) != identical(:large, 4)
     end
     @testset "[identical] sorted by name" begin
-        a = only(identical(:a, 9))
-        b = only(identical(:b, 1))
+        a = identical(:a, 9)
+        b = identical(:b, 1)
         @test sort([b, a]) == [a, b]
     end
     for (case, um, lm) in [
@@ -40,7 +51,7 @@ end
 
 function test_dml_identical_multiplicity()
     @testset "[identical] _multiplicity" begin
-        @test Vertigo.DML._multiplicity(only(identical(:bins, 3; lm = 1))) == (1.0, 3.0)
+        @test Vertigo.DML._multiplicity(identical(:bins, 3; lm = 1)) == (1.0, 3.0)
         @test Vertigo.DML._multiplicity(2) == (1.0, 1.0)
         @test Vertigo.DML._multiplicity((:machine, "a")) == (1.0, 1.0)
     end
@@ -50,8 +61,8 @@ _convexity_set(decomp, ci) =
     with_typed_ci(c -> MOI.get(master_model(decomp), MOI.ConstraintSet(), c), ci)
 
 function test_dml_identical_decomposition_bounds()
-    big = only(identical(:big, 3; lm = 1))
-    small = only(identical(:small, 2))
+    big = identical(:big, 3; lm = 1)
+    small = identical(:small, 2)
     K = [big, small]
     model = Model()
     @variable(model, x[k in K, i in 1:2], Bin)
@@ -104,7 +115,7 @@ function test_dml_single_variable_objective()
         end
         saf = MOI.ScalarAffineFunction{Float64}
         @test MOI.get(master_model(decomp), MOI.ObjectiveFunctionType()) == saf
-        @test MOI.get(sp_model(decomp, sp_map[only(K)]), MOI.ObjectiveFunctionType()) == saf
+        @test MOI.get(sp_model(decomp, sp_map[K]), MOI.ObjectiveFunctionType()) == saf
     end
 end
 
