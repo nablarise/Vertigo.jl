@@ -148,17 +148,30 @@ function compute_dual_bound_pure_master_contribution(decomp::AbstractDecompositi
         for entry in pure_master_coupling_coefficients(decomp, y_var)
             rc_y -= entry.coefficient * dual_values(entry.constraint_id)
         end
-        lb, ub = pure_master_bounds(decomp, y_var)
-        # The minimum is reached at the bound the reduced cost points to.
-        bound = rc_y > 0 ? lb : ub
-        # Below 1e-6, a reduced cost is solver noise on a basic variable;
-        # times an infinite bound, it would make the dual bound ±Inf, or NaN
-        # as 0 * Inf.
-        if isfinite(bound) || abs(rc_y) > 1e-6
-            contrib += rc_y * bound
-        end
+        contrib += rc_y * pure_master_lagrangian_value(decomp, y_var, rc_y)
     end
     return contrib
+end
+
+"""
+    pure_master_lagrangian_value(decomp, y_var, rc_y) -> Float64
+
+Value ỹ of pure master variable `y_var` in the Lagrangian subproblem, given
+its reduced cost `rc_y`: the bound the reduced cost points to.
+
+A reduced cost within 1e-6 of zero pointing to an infinite bound gives 0.
+"""
+function pure_master_lagrangian_value(decomp::AbstractDecomposition, y_var, rc_y)
+    lb, ub = pure_master_bounds(decomp, y_var)
+    # The minimum is reached at the bound the reduced cost points to.
+    bound = rc_y > 0 ? lb : ub
+    # Below 1e-6, a reduced cost is solver noise on a basic variable;
+    # times an infinite bound, it would make the dual bound ±Inf, or NaN
+    # as 0 * Inf.
+    if isfinite(bound) || abs(rc_y) > 1e-6
+        return bound
+    end
+    return 0.0
 end
 
 """

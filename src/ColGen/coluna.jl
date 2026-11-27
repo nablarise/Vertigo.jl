@@ -130,6 +130,7 @@ function is_subproblem_optional end
 
 function get_primal_sols end
 function push_in_set! end
+function set_best_solution! end
 function column_reduced_cost end
 function get_dual_bound end
 function get_primal_bound end
@@ -289,15 +290,23 @@ function run_colgen_iteration!(context, phase, stage, ip_primal_sol, stab)
             else
                 primal_sols = get_primal_sols(pricing_result)
                 nb_cols_pushed = 0
+                best_sol = nothing
+                best_rc = 0.0
                 for primal_sol in primal_sols # multi column generation support.
+                    rc = column_reduced_cost(context, phase, primal_sol, mast_dual_sol)
+                    if isnothing(best_sol) || (is_min_sense ? rc < best_rc : rc > best_rc)
+                        best_sol, best_rc = primal_sol, rc
+                    end
                     # Only a column whose reduced cost improves is a candidate for insertion
                     # into the master.
-                    rc = column_reduced_cost(context, phase, primal_sol, mast_dual_sol)
                     if _is_improving(rc, is_min_sense)
                         if push_in_set!(generated_columns, primal_sol)
                             nb_cols_pushed += 1
                         end
                     end
+                end
+                if !isnothing(best_sol)
+                    set_best_solution!(generated_columns, sp_id, best_sol)
                 end
 
                 # Updates the initial bound if the pricing subproblem result has a dual bound.

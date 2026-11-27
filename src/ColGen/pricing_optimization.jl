@@ -103,16 +103,25 @@ column generation iteration.
 
 Unlike [`PricingSolution`](@ref), which is the raw output of a single
 subproblem call (including infeasibility flags and bounds),
-`GeneratedColumns` retains only the solutions whose reduced cost is
-improving. These are the columns that will be inserted into the
+`GeneratedColumns` retains in `collection` only the solutions whose reduced
+cost is improving. These are the columns that will be inserted into the
 restricted master problem.
 
 Columns are added via [`push_in_set!`](@ref). The column generation loop
 calls it only for columns whose [`column_reduced_cost`](@ref) improves.
+
+`best_solutions` holds, for each subproblem, the pricing solution of best
+reduced cost, improving or not, set with [`set_best_solution!`](@ref). The
+smoothing reads the subgradient of the Lagrangian function from them.
 """
 struct GeneratedColumns
     collection::Vector{PricingPrimalSolution}
+    best_solutions::Dict{PricingSubproblemId,PricingPrimalSolution}
 end
+
+GeneratedColumns(collection) = GeneratedColumns(
+    collection, Dict{PricingSubproblemId,PricingPrimalSolution}()
+)
 
 function set_of_columns(::ColGenWorkspace)
     return GeneratedColumns(PricingPrimalSolution[])
@@ -129,6 +138,17 @@ It does not filter: the column generation loop decides beforehand, from
 function push_in_set!(set::GeneratedColumns, sol::PricingPrimalSolution)
     push!(set.collection, sol)
     return true
+end
+
+"""
+    set_best_solution!(set, sp_id, sol)
+
+Record `sol` as the pricing solution of best reduced cost of subproblem
+`sp_id` in this iteration.
+"""
+function set_best_solution!(set::GeneratedColumns, sp_id, sol::PricingPrimalSolution)
+    set.best_solutions[sp_id] = sol
+    return nothing
 end
 
 # ── Pricing subproblem optimizer ──────────────────────────────────────────────

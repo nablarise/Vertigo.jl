@@ -10,7 +10,11 @@ using Vertigo.ColGen: WentgesSmoothing, NoStabilization,
     MasterDualSolution, DualMoiSolution, GeneratedColumns,
     PricingPrimalSolution, _SpSolution, get_master,
     _get_convexity_dual, _dual_value, _compute_sp_reduced_costs,
-    Phase0, Phase1, Phase2, TaggedCI
+    Phase0, Phase1, Phase2, TaggedCI,
+    ActiveRobustCut, ActiveBranchingConstraint, _lagrangian_subgradient,
+    set_of_columns, set_best_solution!
+using Vertigo.Reformulation: master_model, convexity_ub_ci, mapped_subproblem_var,
+    coupling_constraints
 
 # ────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -98,6 +102,57 @@ function _build_stab_ctx(; alpha=0.5)
     return ws
 end
 
+# Two machines, two tasks, every assignment of cost 4, coupling rows
+# `assign[t]: x[1,t] + x[2,t] == 1` (EqualTo indices 1 and 2). With
+# `pure_master = (cost, lb, ub)`, a pure master variable y also covers task 1.
+# Nothing is solved, so no optimizer.
+function _build_lagrangian_ctx(;
+    conv_lb=0.0, conv_ub=1.0, fixed_cost=0.0, pure_master=nothing
+)
+    K = 1:2
+    T = 1:2
+    master_jump = JuMP.Model()
+    @constraint(master_jump, assign[t in T], 0 == 1)
+    @constraint(master_jump, conv_lb_row[k in K], 0 >= conv_lb)
+    @constraint(master_jump, conv_ub_row[k in K], 0 <= conv_ub)
+
+    builder = DWReformulationBuilder{Tuple{Int,Int}}(minimize=true)
+    sp_models = Dict{PricingSubproblemId,Any}()
+    for k in K
+        sp_id = PricingSubproblemId(k)
+        sp_jump = JuMP.Model()
+        @variable(sp_jump, z[t in T], Bin)
+        sp_models[sp_id] = JuMP.backend(sp_jump)
+        add_subproblem!(builder, sp_id, fixed_cost, conv_lb, conv_ub)
+        for t in T
+            sp_var = JuMP.index(z[t])
+            add_sp_variable!(builder, sp_id, sp_var, 4.0)
+            add_coupling_coefficient!(builder, sp_id, sp_var, JuMP.index(assign[t]), 1.0)
+            add_mapping!(builder, (k, t), sp_id, sp_var)
+        end
+    end
+    for t in T
+        add_coupling_constraint!(builder, JuMP.index(assign[t]), 1.0)
+    end
+    if !isnothing(pure_master)
+        y_cost, y_lb, y_ub = pure_master
+        @variable(master_jump, y)
+        add_pure_master_variable!(builder, JuMP.index(y), y_cost, y_lb, y_ub, false)
+        add_pure_master_coupling!(builder, JuMP.index(y), JuMP.index(assign[1]), 1.0)
+    end
+    decomp = build(builder)
+    set_models!(decomp, JuMP.backend(master_jump), sp_models,
+        Dict(PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_ub_row[k])) for k in K),
+        Dict(PricingSubproblemId(k) => TaggedCI(JuMP.index(conv_lb_row[k])) for k in K)
+    )
+    return ColGenWorkspace(decomp, ColumnPool(),
+        Dict{TaggedCI,Tuple{MOI.VariableIndex,MOI.VariableIndex}}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        Dict{TaggedCI,MOI.VariableIndex}(),
+        ColGenConfig(smoothing_alpha=0.5)
+    )
+end
+
 # ────────────────────────────────────────────────────────────────────────────
 # Tests
 # ────────────────────────────────────────────────────────────────────────────
@@ -119,6 +174,9 @@ function test_stabilization()
     @testset "[stabilization] after_pricing_optim" begin
         test_bound_improvement_updates_center()
         test_no_improvement_keeps_center()
+        test_oracle_from_first_separation_point()
+        test_oracle_reset_each_iteration()
+        test_oracle_skips_subproblem_without_solution()
     end
     @testset "[stabilization] misprice" begin
         test_misprice_inactive()
@@ -128,6 +186,15 @@ function test_stabilization()
     @testset "[stabilization] iter_update" begin
         test_decrease_alpha()
         test_increase_alpha()
+        test_angle_reads_robust_cut_row()
+        test_angle_reads_branching_row()
+        test_angle_ignores_convexity_row()
+        test_angle_subtracts_column_activity_in_cut_row()
+        test_angle_measured_from_iteration_in_point()
+    end
+    @testset "[stabilization] lagrangian_subgradient" begin
+        test_lagrangian_subgradient_multiplicity()
+        test_lagrangian_subgradient_pure_master()
     end
 end
 
@@ -351,12 +418,11 @@ function test_decrease_alpha()
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
-    stab.stab_center = center_dual
+    stab.in_point = center_dual
 
     # Empty columns → g^sep_i = rhs_i (all 1.0 for GAP).
     # direction_product = 1.0 * (3.0 - 1.0) = 2.0 > 0 → decrease α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
-    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    stab.oracle_sols = Dict{PricingSubproblemId,_SpSolution}()
 
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
@@ -382,15 +448,222 @@ function test_increase_alpha()
     center_dual = MasterDualSolution(DualMoiSolution(0.0, d_center), TaggedCI[])
     out_dual = MasterDualSolution(DualMoiSolution(0.0, d_out), TaggedCI[])
 
-    stab.stab_center = center_dual
+    stab.in_point = center_dual
 
     # Direction product = 1.0 * (1.0 - 3.0) = -2.0 ≤ 0 → increase α
-    stab.last_generated_columns = GeneratedColumns(PricingPrimalSolution[])
-    stab.last_sep_dual_sol = _make_dual_sol(0.0)
+    stab.oracle_sols = Dict{PricingSubproblemId,_SpSolution}()
 
     old_alpha = stab.smooth_dual_sol_coeff
     update_stabilization_after_iter!(stab, out_dual)
     @test stab.smooth_dual_sol_coeff > old_alpha
     # α = 0.5 + (1.0 - 0.5) * 0.1 = 0.55
     @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
+end
+
+# The angle test of the α update reads every dualized row, not only the
+# coupling constraints (#117). In each case below, the coupling rows alone
+# give a negative product (α would go up), and the other row makes it
+# positive (α goes down), or the reverse for the activity case.
+
+const _EqCstr = MOI.ConstraintIndex{
+    MOI.ScalarAffineFunction{Float64},MOI.EqualTo{Float64}
+}
+
+const _NO_ORACLE_SOLS = Dict{PricingSubproblemId,_SpSolution}()
+
+# A master row with no column yet, `lhs >= rhs`.
+function _add_empty_geq_row!(ws, rhs)
+    f = MOI.ScalarAffineFunction(MOI.ScalarAffineTerm{Float64}[], 0.0)
+    return TaggedCI(MOI.add_constraint(master_model(ws.decomp), f, MOI.GreaterThan(rhs)))
+end
+
+# Stabilization whose center and LP duals differ on coupling row 2 by
+# 3.0 → 1.0 (product 1 * (1 - 3) = -2, no column covers it) and on `extra`.
+# At π̃₀ the dual of row 1 is 5: task 1 has value 4 - 5 = -1 < 0, so an oracle
+# solution of it has multiplicity 1, the convexity upper bound.
+function _stab_for_angle(ws, extra_duals_center, extra_duals_out, oracle_sols)
+    stab = setup_stabilization!(ws, get_master(ws))
+    stab.last_phase = Phase2()
+    # The coupling rows are listed: pricing reads π only on the rows it is given.
+    stab.sep_dual_sol = _make_dual_sol(
+        0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 5.0);
+        cc_ids=[TaggedCI(_EqCstr(1)), TaggedCI(_EqCstr(2))]
+    )
+    center = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 3.0, extra_duals_center...)
+    out = Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(2)) => 1.0, extra_duals_out...)
+    stab.in_point = MasterDualSolution(DualMoiSolution(0.0, center), TaggedCI[])
+    stab.oracle_sols = oracle_sols
+    return stab, MasterDualSolution(DualMoiSolution(0.0, out), TaggedCI[])
+end
+
+function test_angle_reads_robust_cut_row()
+    ws = _build_lagrangian_ctx()
+    cut = _add_empty_geq_row!(ws, 2.0)
+    push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
+    # cut row: g = 2 (no column), dual 0 → 2: 2 * 2 = 4; total -2 + 4 = 2 > 0
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 2.0], _NO_ORACLE_SOLS)
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+function test_angle_reads_branching_row()
+    ws = _build_lagrangian_ctx()
+    row = _add_empty_geq_row!(ws, 1.0)
+    push!(ws.branching_constraints, ActiveBranchingConstraint(row, (1, 1)))
+    # branching row: g = 1, dual 0 → 3: 1 * 3 = 3; total -2 + 3 = 1 > 0
+    stab, out = _stab_for_angle(ws, [row => 0.0], [row => 3.0], _NO_ORACLE_SOLS)
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+# The convexity rows are not dualized, so their duals do not enter the
+# Lagrangian function: a change of 0 → 3 on one of them would give +3 and
+# flip the sign if it were read.
+function test_angle_ignores_convexity_row()
+    ws = _build_lagrangian_ctx()
+    conv_ub = convexity_ub_ci(ws.decomp, PricingSubproblemId(1))
+    # coupling row 2 alone: -2 ≤ 0, so α goes up: 0.5 + 0.5 * 0.1 = 0.55
+    stab, out = _stab_for_angle(ws, [conv_ub => 0.0], [conv_ub => 3.0], _NO_ORACLE_SOLS)
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
+end
+
+function test_angle_subtracts_column_activity_in_cut_row()
+    ws = _build_lagrangian_ctx()
+    cut = _add_empty_geq_row!(ws, 2.0)
+    push!(ws.robust_cuts, ActiveRobustCut(cut, Dict((1, 1) => 1.0)))
+    # Subproblem 1's oracle solution is task 1, of value -1 at π̃₀:
+    # multiplicity 1 (the convexity upper bound). It covers coupling row 1 (no dual change) and
+    # the cut: g = 2 - 1 = 1, dual 0 → 1.5: 1.5. Total -2 + 1.5 = -0.5 ≤ 0,
+    # so α goes up. Without the activity, g = 2 gives +3 and α would go down.
+    sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+    oracle_sols = Dict(sp_id => _SpSolution(sp_id, -5.0, [(sp_var, 1.0)]))
+    stab, out = _stab_for_angle(ws, [cut => 0.0], [cut => 1.5], oracle_sols)
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.55 atol=1e-9
+end
+
+# A mispricing sequence ends with α̃ = 0, so the last separation point is the
+# LP dual, and its improved bound makes it the new center. The angle is still
+# measured from the center the iteration started from (Sadykov 2019, Step 6):
+# from the new center, π^out - π^in would be 0 and α would go up.
+function test_angle_measured_from_iteration_in_point()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    center = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 1.0))
+    out = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(TaggedCI(_EqCstr(1)) => 3.0))
+    update_stabilization_after_master_optim!(stab, Phase2(), center)
+    update_stabilization_after_master_optim!(stab, Phase2(), out)
+    update_stabilization_after_pricing_optim!(
+        stab, ws, GeneratedColumns(PricingPrimalSolution[]), get_master(ws), 10.0, out
+    )
+    @test stab.stab_center === out
+    # no column: g = rhs = 1 on row 1, 1 * (3 - 1) = 2 > 0: 0.5 - 0.1 = 0.4
+    update_stabilization_after_iter!(stab, out)
+    @test stab.smooth_dual_sol_coeff ≈ 0.4 atol=1e-9
+end
+
+# The angle test reads the subgradient at the first separation point of the
+# iteration (Sadykov 2019, Step 6), from one solution per subproblem: the one
+# of best reduced cost, improving or not, chosen by the column generation loop.
+
+function _sp1_solution(ws, obj_value)
+    sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+    return _SpSolution(sp_id, obj_value, [(sp_var, 1.0)])
+end
+
+# `best` is the solution the loop records for subproblem 1, or `nothing` when
+# the pricer returned none.
+function _price!(stab, ws, best)
+    sp_id = PricingSubproblemId(1)
+    columns = set_of_columns(ws)
+    if !isnothing(best)
+        set_best_solution!(columns, sp_id, PricingPrimalSolution(sp_id, best))
+    end
+    update_stabilization_after_pricing_optim!(
+        stab, ws, columns, get_master(ws), -Inf, _make_dual_sol(0.0)
+    )
+end
+
+function test_oracle_from_first_separation_point()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    first_sol = _sp1_solution(ws, -5.0)
+    _price!(stab, ws, first_sol)
+    _price!(stab, ws, _sp1_solution(ws, -3.0))  # after a mispricing
+    @test stab.oracle_sols[PricingSubproblemId(1)] === first_sol
+end
+
+function test_oracle_reset_each_iteration()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    _price!(stab, ws, _sp1_solution(ws, -5.0))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    next_sol = _sp1_solution(ws, -3.0)
+    _price!(stab, ws, next_sol)
+    @test stab.oracle_sols[PricingSubproblemId(1)] === next_sol
+end
+
+# A pricer that finds nothing below its threshold returns no solution.
+function test_oracle_skips_subproblem_without_solution()
+    ws = _build_stab_ctx(alpha=0.5)
+    stab = setup_stabilization!(ws, get_master(ws))
+    update_stabilization_after_master_optim!(stab, Phase2(), _make_dual_sol(0.0))
+    _price!(stab, ws, nothing)
+    @test isempty(stab.oracle_sols)
+end
+
+# The multiplicity of subproblem 1 is the one the dual bound gives it: the
+# convexity bound the sign of fₖ + c̄z̄ at π̃₀ makes binding, without the
+# convexity duals. Its oracle solution is task 1, of cost 4, so its value is
+# fixed_cost + 4 - dual, or -dual in phase 1, which sets every column's cost,
+# fixed cost included, to zero.
+# g on assign[1] is 1 - multiplicity. The reduced cost the pricing reported
+# includes the convexity duals: by its sign, every case would flip.
+function test_lagrangian_subgradient_multiplicity()
+    # (name, phase, convexity bounds, fixed_cost, dual of assign[1],
+    #  reported reduced cost, g)
+    cases = [
+        ("value 1 > 0 though reported improving", Phase2(), (0.0, 1.0), 0.0, 3.0, -2.0, 1.0),
+        ("value -1 < 0 though reported non-improving", Phase2(), (0.0, 1.0), 0.0, 5.0, 1.0, 0.0),
+        ("fixed cost: 2 + 4 - 5 = 1 > 0", Phase2(), (0.0, 1.0), 2.0, 5.0, -2.0, 1.0),
+        ("phase 1: 0 - 3 = -3 < 0", Phase1(), (0.0, 1.0), 0.0, 3.0, 1.0, 0.0),
+        ("phase 1 drops the fixed cost: 0 - 3 = -3 < 0", Phase1(), (0.0, 1.0), 5.0, 3.0, 1.0, 0.0),
+        ("value 4 > 0: lower bound 1, not upper bound 2", Phase2(), (1.0, 2.0), 0.0, 0.0, -1.0, 0.0),
+    ]
+    for (name, phase, (conv_lb, conv_ub), fixed_cost, dual, reported_rc, expected_g) in cases
+        @testset "[lagrangian_subgradient] $name" begin
+            ws = _build_lagrangian_ctx(; conv_lb, conv_ub, fixed_cost)
+            assign1 = coupling_constraints(ws.decomp)[1][1]
+            sp_id, sp_var = mapped_subproblem_var(ws.decomp, (1, 1))
+            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual); cc_ids=[assign1])
+            oracle_sols = Dict(sp_id => _SpSolution(sp_id, reported_rc, [(sp_var, 1.0)]))
+            g = _lagrangian_subgradient(ws, phase, sep, oracle_sols)
+            @test g[assign1] ≈ expected_g atol=1e-10
+        end
+    end
+end
+
+# y covers task 1 with coefficient 1 and sits at the bound its reduced cost
+# cost - dual points to, the one the dual bound gives it. No oracle solution,
+# so g on assign[1] is 1 - ỹ.
+function test_lagrangian_subgradient_pure_master()
+    # (name, phase, (cost, lb, ub) of y, dual of assign[1], g)
+    cases = [
+        ("rc 2 - 0 > 0: lower bound 1", Phase2(), (2.0, 1.0, 3.0), 0.0, 0.0),
+        ("rc 2 - 5 < 0: upper bound 3", Phase2(), (2.0, 1.0, 3.0), 5.0, -2.0),
+        ("phase 1, rc 0 - 1 < 0: upper bound 3", Phase1(), (2.0, 1.0, 3.0), 1.0, -2.0),
+        ("rc 1e-9 at an infinite bound: 0", Phase2(), (1e-9, -Inf, 3.0), 0.0, 1.0),
+    ]
+    for (name, phase, pure_master, dual, expected_g) in cases
+        @testset "[lagrangian_subgradient] pure master, $name" begin
+            ws = _build_lagrangian_ctx(; pure_master)
+            assign1 = coupling_constraints(ws.decomp)[1][1]
+            sep = _make_dual_sol(0.0, Dict{TaggedCI,Float64}(assign1 => dual))
+            g = _lagrangian_subgradient(ws, phase, sep, _NO_ORACLE_SOLS)
+            @test g[assign1] ≈ expected_g atol=1e-10
+        end
+    end
 end
