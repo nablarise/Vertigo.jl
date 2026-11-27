@@ -40,16 +40,20 @@ function compute_dual_bound(
     )
 
     # 1. Convexity contribution: Σₖ (ν⁺·W̄ₖ + ν⁻·Wₖ)
+    #    A subproblem with a setup variable keeps its term: ν is in the
+    #    reduced cost of the setup variable, hence in its SP_db.
     convexity_contrib = 0.0
     for sp_id in subproblem_ids(decomp)
-        conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
-        if has_convexity_ub(decomp, sp_id)
-            ν_ub = dual_values(convexity_ub_ci(decomp, sp_id))
-            convexity_contrib += ν_ub * conv_ub
-        end
-        if has_convexity_lb(decomp, sp_id)
-            ν_lb = dual_values(convexity_lb_ci(decomp, sp_id))
-            convexity_contrib += ν_lb * conv_lb
+        if !has_setup_variable(decomp, sp_id)
+            conv_lb, conv_ub = convexity_bounds(decomp, sp_id)
+            if has_convexity_ub(decomp, sp_id)
+                ν_ub = dual_values(convexity_ub_ci(decomp, sp_id))
+                convexity_contrib += ν_ub * conv_ub
+            end
+            if has_convexity_lb(decomp, sp_id)
+                ν_lb = dual_values(convexity_lb_ci(decomp, sp_id))
+                convexity_contrib += ν_lb * conv_lb
+            end
         end
     end
 

@@ -20,6 +20,7 @@ function subproblem_ids end
 function subproblem_variables end
 function subproblem_fixed_cost end
 function convexity_bounds end
+function has_setup_variable end
 function nb_subproblem_multiplicity end
 
 # ── Pure master variable queries ──────────────────────────────────────────────

@@ -174,8 +174,15 @@ function check_misprice(
         # Compute RC at π^out (the original LP dual, not the smoothed one)
         sp_rc_at_out = _compute_sp_reduced_costs(ws, mast_dual_sol, sp_id)
 
-        ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id)
-        ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
+        # The reduced cost of a setup variable already holds ν.
+        ν_lb, ν_ub = if has_setup_variable(decomp, sp_id)
+            (0.0, 0.0)
+        else
+            (
+                _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(decomp), sp_id),
+                _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(decomp), sp_id)
+            )
+        end
 
         rc = compute_column_reduced_cost(
             decomp, sp_id, sol, sp_rc_at_out, (ν_lb, ν_ub)

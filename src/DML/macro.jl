@@ -9,10 +9,14 @@ end
 struct MasterAssignment
 end
 
+struct SetupAssignment
+    id_expr::Any
+end
+
 struct PatternRule
     name::Symbol
     indices::Vector{Symbol}
-    assignment::Union{SubproblemAssignment,MasterAssignment}
+    assignment::Union{SubproblemAssignment,MasterAssignment,SetupAssignment}
 end
 
 """
@@ -31,6 +35,10 @@ Macro for declarative Dantzig-Wolfe decomposition specification.
 # Assignment Syntax
 - `subproblem(id)` — assign to subproblem with given ID
 - `master()` — assign to master problem
+- `setup(id)` — assign a variable to subproblem `id` as its setup variable:
+  its value is the column's coefficient in the convexity rows of `id`, and
+  its cost replaces the implicit fixed cost. It must be binary or fixed to 1,
+  and `0` must force an empty column, or the master LP may be unbounded.
 
 # Example
 ```julia
@@ -118,6 +126,11 @@ function parse_assignment(assignment::Expr)
                 "master() takes no arguments"
             )
             return MasterAssignment()
+        elseif func_name == :setup
+            length(assignment.args) == 2 || error(
+                "setup() requires exactly one argument"
+            )
+            return SetupAssignment(assignment.args[2])
         else
             error("Unknown assignment function: $func_name")
         end
@@ -158,4 +171,8 @@ end
 
 function generate_assignment_expr(::MasterAssignment)
     return :(dantzig_wolfe_master())
+end
+
+function generate_assignment_expr(a::SetupAssignment)
+    return :(dantzig_wolfe_setup($(a.id_expr)))
 end

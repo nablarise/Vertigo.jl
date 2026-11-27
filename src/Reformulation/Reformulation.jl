@@ -48,6 +48,7 @@ export ColumnRecord, ColumnPool
 # Builder
 export DWReformulationBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
+export add_setup_variable!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
@@ -58,7 +59,7 @@ export AbstractCutSeparator, SeparatedCut, separate, CustomCutSeparator
 export original_cost, coupling_coefficients
 export mapped_original_var, mapped_subproblem_var, original_variables, orig_var_type
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost
-export convexity_bounds, nb_subproblem_multiplicity
+export convexity_bounds, nb_subproblem_multiplicity, has_setup_variable
 export pure_master_variables, pure_master_cost, pure_master_bounds
 export pure_master_is_integer, pure_master_coupling_coefficients
 export coupling_constraints, is_minimization

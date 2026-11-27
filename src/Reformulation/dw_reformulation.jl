@@ -64,6 +64,10 @@ function convexity_bounds(d::DWReformulation, sp_id)
     return (sp.convexity_lb, sp.convexity_ub)
 end
 
+function has_setup_variable(d::DWReformulation, sp_id)
+    return !isnothing(d.subproblems[sp_id].setup_variable)
+end
+
 nb_subproblem_multiplicity(d::DWReformulation, sp_id) = d.subproblems[sp_id].convexity_ub
 
 # Pure master variable queries

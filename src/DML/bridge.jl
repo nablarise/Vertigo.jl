@@ -215,9 +215,9 @@ function dantzig_wolfe_decomposition(
         orig_costs
     )
 
-    decomp = build(builder)
-
-    # Add convexity constraints to master
+    # Add convexity constraints to master, before the build: a setup
+    # variable has coupling coefficients in them.
+    setup_vars = _setup_variables(model, dw_annotation)
     conv_ub_map = Dict{PricingSubproblemId,TaggedCI}()
     conv_lb_map = Dict{PricingSubproblemId,TaggedCI}()
 
@@ -228,7 +228,16 @@ function dantzig_wolfe_decomposition(
         conv_ub_ref = @JuMP.constraint(master_model, 0 <= um)
         conv_lb_map[sp_id] = TaggedCI(JuMP.index(conv_lb_ref))
         conv_ub_map[sp_id] = TaggedCI(JuMP.index(conv_ub_ref))
+        if haskey(setup_vars, id)
+            setup_var = JuMP.index(var_mapping[setup_vars[id]])
+            add_setup_variable!(
+                builder, sp_id, setup_var,
+                JuMP.index(conv_lb_ref), JuMP.index(conv_ub_ref)
+            )
+        end
     end
+
+    decomp = build(builder)
 
     # Wire MOI backends
     sp_backends = Dict{PricingSubproblemId,Any}(

@@ -206,6 +206,7 @@ end
 
 function get_master(ws::ColGenWorkspace)
     cc_ids = TaggedCI[cid for (cid, _) in coupling_constraints(ws.decomp)]
+    append!(cc_ids, _setup_convexity_ids(ws.decomp))
     return Master(
         master_model(ws.decomp),
         convexity_ub_pairs(ws.decomp),
@@ -215,6 +216,18 @@ function get_master(ws::ColGenWorkspace)
         ws.geq_art_vars,
         cc_ids
     )
+end
+
+# The convexity rows of the subproblems with a setup variable. Its coefficients
+# in them make it pay ν_lb + ν_ub in its reduced cost, as for a coupling row.
+function _setup_convexity_ids(decomp)
+    ids = TaggedCI[]
+    for sp_id in subproblem_ids(decomp)
+        if has_setup_variable(decomp, sp_id)
+            push!(ids, convexity_lb_ci(decomp, sp_id), convexity_ub_ci(decomp, sp_id))
+        end
+    end
+    return ids
 end
 
 function get_pricing_subprobs(ws::ColGenWorkspace)

@@ -49,6 +49,7 @@ include("test_time_limit_e2e.jl")
 include("test_artificial_vars_e2e.jl")
 include("test_dual_bound_e2e.jl")
 include("test_pricing_optimization_e2e.jl")
+include("test_setup_variable_e2e.jl")
 
 # ────────────────────────────────────────────────────────────────────────────────────────
 # ────────────────────────────────────────────────────────────────────────────────────────
@@ -64,6 +65,7 @@ function run()
     test_dual_bound_e2e()
     test_artificial_vars_e2e()
     test_pricing_optimization_e2e()
+    test_setup_variable_e2e()
 end
 
 end # module VertigoE2eTests

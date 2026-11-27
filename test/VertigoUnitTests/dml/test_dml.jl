@@ -326,6 +326,94 @@ function test_dml_ranged_master_constraint()
     end
 end
 
+# Two bins at most, two items; `y` is used by `knapsack`, and `declare_y`
+# decides how `y` is declared.
+function _build_setup_model(declare_y)
+    K = identical(:bins, 2)
+    model = Model()
+    @variable(model, x[k in K, i in 1:2], Bin)
+    @variable(model, y[k in K])
+    declare_y(y[K])
+    @constraint(model, knapsack[k in K], x[k, 1] + x[k, 2] <= 2 * y[k])
+    @constraint(model, cover[i in 1:2], sum(x[k, i] for k in K) >= 1)
+    @objective(model, Min, sum(y[k] for k in K))
+    return model, K
+end
+
+function test_dml_setup_variable()
+    @testset "[dml] a setup variable has coefficient 1 in the convexity rows" begin
+        model, K = _build_setup_model(set_binary)
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            y[k] => setup(k)
+            knapsack[k] => subproblem(k)
+            cover[_] => master()
+        end
+        sp_id = sp_map[K]
+        _, y = Vertigo.Reformulation.mapped_subproblem_var(decomp, model[:y][K])
+        coeffs = Dict(
+            e.constraint_id => e.coefficient
+            for e in coupling_coefficients(decomp, sp_id, y)
+        )
+        @test has_setup_variable(decomp, sp_id)
+        @test coeffs[convexity_lb_ci(decomp, sp_id)] ≈ 1.0 atol=1e-10
+        @test coeffs[convexity_ub_ci(decomp, sp_id)] ≈ 1.0 atol=1e-10
+    end
+    @testset "[dml] a subproblem without setup() has none" begin
+        model, K = _build_setup_model(set_binary)
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            y[k] => subproblem(k)
+            knapsack[k] => subproblem(k)
+            cover[_] => master()
+        end
+        @test !has_setup_variable(decomp, sp_map[K])
+    end
+    @testset "[dml] a setup variable fixed to 1 is accepted" begin
+        model, K = _build_setup_model(y -> fix(y, 1))
+        decomp, sp_map = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            y[k] => setup(k)
+            knapsack[k] => subproblem(k)
+            cover[_] => master()
+        end
+        @test has_setup_variable(decomp, sp_map[K])
+    end
+    @testset "[dml] a continuous setup variable is rejected" begin
+        model, _ = _build_setup_model(y -> set_upper_bound(y, 1))
+        @test_throws "must be binary or fixed to 1" (
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                y[k] => setup(k)
+                knapsack[k] => subproblem(k)
+                cover[_] => master()
+            end
+        )
+    end
+    @testset "[dml] two setup variables in one subproblem are rejected" begin
+        model, _ = _build_setup_model(set_binary)
+        @test_throws "has two setup variables" (
+            @dantzig_wolfe model begin
+                x[k, _] => setup(k)
+                y[k] => setup(k)
+                knapsack[k] => subproblem(k)
+                cover[_] => master()
+            end
+        )
+    end
+    @testset "[dml] setup() on a constraint is rejected" begin
+        model, _ = _build_setup_model(set_binary)
+        @test_throws "only a variable can be a setup variable" (
+            @dantzig_wolfe model begin
+                x[k, _] => subproblem(k)
+                y[k] => setup(k)
+                knapsack[k] => setup(k)
+                cover[_] => master()
+            end
+        )
+    end
+end
+
 function test_dml()
     test_dml_macro_basic_gap()
     test_dml_annotation_function()
@@ -336,4 +424,5 @@ function test_dml()
     test_dml_subproblem_constraint_foreign_variable()
     test_dml_unassigned_constraints()
     test_dml_ranged_master_constraint()
+    test_dml_setup_variable()
 end
