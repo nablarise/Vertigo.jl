@@ -224,7 +224,10 @@ function _register_objective!(
     reform_model, model, var_mapping::VariableMapping;
     is_master::Bool=false
 )
-    original_obj_func = JuMP.objective_function(model)
+    # An objective that is a single variable, `y[k]` for `k` in an identical
+    # set, would be copied as a `VariableIndex` objective, whose coefficients
+    # column generation cannot modify.
+    original_obj_func = JuMP.objective_function(model, JuMP.AffExpr)
     original_obj_sense = JuMP.objective_sense(model)
     reform_obj_func = _replace_vars_in_func(
         original_obj_func, reform_model, var_mapping;

@@ -418,6 +418,86 @@ function test_dml_ranged_constraint_as_two_rows()
     end
 end
 
+# Three items of weight 5 and bins of capacity 10: a bin holds two items.
+# Hand computation: every column covers at most two of the three items, so
+# the LP needs at least 3 / 2 = 1.5 bins, reached by the three pairs at 1/2.
+function _build_dml_bin_packing(nb_bins)
+    weight = [5.0, 5.0, 5.0]
+    capacity = 10.0
+    items = eachindex(weight)
+    K = identical(:bins, nb_bins)
+
+    model = Model(HiGHS.Optimizer)
+    set_silent(model)
+    @variable(model, x[k in K, i in items], Bin)
+    @variable(model, y[k in K], Bin)
+    @constraint(model, knapsack[k in K],
+        sum(weight[i] * x[k, i] for i in items) <= capacity * y[k])
+    @constraint(model, cover[i in items], sum(x[k, i] for k in K) >= 1)
+    # A single variable: the DML must still give the models an affine objective.
+    @objective(model, Min, sum(y[k] for k in K))
+
+    decomp, _ = @dantzig_wolfe model begin
+        x[k, _] => subproblem(k)
+        y[k] => subproblem(k)
+        knapsack[k] => subproblem(k)
+        cover[_] => master()
+    end
+    return decomp
+end
+
+function test_dml_bin_packing_identical(; smoothing_alpha=0.0)
+    @testset "[dml] bin packing on identical bins, root bound 1.5" begin
+        decomp = _build_dml_bin_packing(3)
+        config = ColGenConfig(smoothing_alpha=smoothing_alpha, silent=true)
+        output = run_col_gen(decomp, config)
+        @test output.status == optimal
+        @test output.master_lp_obj ≈ 1.5 atol=1e-6
+        @test output.incumbent_dual_bound ≈ 1.5 atol=1e-6
+    end
+end
+
+function test_dml_bin_packing_too_few_bins()
+    @testset "[dml] bin packing with one bin for three items is infeasible" begin
+        # One bin holds two of the three items.
+        decomp = _build_dml_bin_packing(1)
+        output = run_col_gen(decomp, ColGenConfig(silent=true))
+        @test output.status == master_infeasible
+    end
+end
+
+function test_dml_gap_identical_machines(; smoothing_alpha=0.0)
+    @testset "[dml] GAP on identical machines (2 types, 7 tasks) dual ≈ 32.0" begin
+        inst = gap_identical_machines()
+        K = [identical(Symbol(:type, m), inst.multiplicity[m])
+             for m in 1:inst.n_machine_types]
+        type_of = Dict(k => m for (m, k) in enumerate(K))
+        T = 1:inst.n_tasks
+
+        model = Model(HiGHS.Optimizer)
+        set_silent(model)
+        @variable(model, x[k in K, t in T], Bin)
+        @constraint(model, assign[t in T], sum(x[k, t] for k in K) == 1)
+        @constraint(model, knapsack[k in K],
+            sum(inst.weight[type_of[k], t] * x[k, t] for t in T) <=
+            inst.capacity[type_of[k]])
+        @objective(model, Min,
+            sum(inst.cost[type_of[k], t] * x[k, t] for k in K, t in T))
+
+        decomp, _ = @dantzig_wolfe model begin
+            x[k, _] => subproblem(k)
+            assign[_] => master()
+            knapsack[k] => subproblem(k)
+        end
+        config = ColGenConfig(smoothing_alpha=smoothing_alpha, silent=true)
+        output = run_col_gen(decomp, config)
+        @test output.status == optimal
+        # Same root bound as the decomposition built by hand,
+        # test_gap_identical_machines.
+        @test output.incumbent_dual_bound ≈ 32.0 atol=1e-4
+    end
+end
+
 function test_dml_e2e()
     for smoothing_alpha in (0.0, 0.5)
         test_dml_gap_converges(; smoothing_alpha)
@@ -427,8 +507,11 @@ function test_dml_e2e()
         test_dml_with_penalty_cardinality(; smoothing_alpha)
         test_dml_fixed_master_cost(; smoothing_alpha)
         test_dml_dual_bound_pure_master(; smoothing_alpha)
+        test_dml_bin_packing_identical(; smoothing_alpha)
+        test_dml_gap_identical_machines(; smoothing_alpha)
     end
     test_dml_objective_constant_incumbent()
     test_dml_dual_bound_fixed_pure_master()
     test_dml_ranged_constraint_as_two_rows()
+    test_dml_bin_packing_too_few_bins()
 end
