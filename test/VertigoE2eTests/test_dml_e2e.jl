@@ -418,7 +418,8 @@ function test_dml_ranged_constraint_as_two_rows()
     end
 end
 
-# Three items of weight 5 and bins of capacity 10: a bin holds two items.
+# Three items of weight 5 and bins of capacity 10: a bin holds two items, and
+# y is the setup variable of a bin.
 # Hand computation: every column covers at most two of the three items, so
 # the LP needs at least 3 / 2 = 1.5 bins, reached by the three pairs at 1/2.
 function _build_dml_bin_packing(nb_bins)
@@ -439,7 +440,7 @@ function _build_dml_bin_packing(nb_bins)
 
     decomp, _ = @dantzig_wolfe model begin
         x[k, _] => subproblem(k)
-        y[k] => subproblem(k)
+        y[k] => setup(k)
         knapsack[k] => subproblem(k)
         cover[_] => master()
     end

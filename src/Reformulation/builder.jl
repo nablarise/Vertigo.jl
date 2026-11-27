@@ -14,6 +14,7 @@ mutable struct DWReformulationBuilder{X}
     sp_coupling_entries::Dict{PricingSubproblemId,Vector{Tuple{_VI,TaggedCI,Float64}}}
     sp_fixed_costs::Dict{PricingSubproblemId,Float64}
     sp_conv_bounds::Dict{PricingSubproblemId,Tuple{Float64,Float64}}
+    sp_setup_variables::Dict{PricingSubproblemId,_VI}
     pm_vars::Vector{PureMasterVariableData}
     pm_coupling_accum::Dict{_VI,Vector{CouplingEntry}}
     pm_data_accum::Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}
@@ -31,6 +32,7 @@ function DWReformulationBuilder{X}(; minimize::Bool=true) where {X}
         Dict{PricingSubproblemId,Vector{Tuple{_VI,TaggedCI,Float64}}}(),
         Dict{PricingSubproblemId,Float64}(),
         Dict{PricingSubproblemId,Tuple{Float64,Float64}}(),
+        Dict{PricingSubproblemId,_VI}(),
         PureMasterVariableData[],
         Dict{_VI,Vector{CouplingEntry}}(),
         Dict{_VI,Tuple{Float64,Float64,Float64,Bool}}(),
@@ -71,6 +73,33 @@ function add_coupling_coefficient!(
 )
     tagged = TaggedCI(cstr_id)
     push!(get!(Vector{Tuple{_VI,TaggedCI,Float64}}, b.sp_coupling_entries, sp_id), (sp_var, tagged, coeff))
+    return nothing
+end
+
+"""
+    add_setup_variable!(builder, sp_id, sp_var, conv_lb_id, conv_ub_id)
+
+Declare `sp_var` the setup variable of subproblem `sp_id`: its value is the
+column's coefficient in the convexity rows `conv_lb_id` and `conv_ub_id`,
+in place of the implicit setup variable `y_k = 1`.
+
+Inputs:
+- `sp_var`: a variable already added with [`add_sp_variable!`](@ref)
+- `conv_lb_id`, `conv_ub_id`: the master convexity rows of `sp_id`
+
+The cost of `sp_var` replaces the fixed cost: [`build`](@ref) rejects a
+subproblem with both a setup variable and a nonzero fixed cost.
+"""
+function add_setup_variable!(
+    b::DWReformulationBuilder, sp_id::PricingSubproblemId,
+    sp_var::_VI, conv_lb_id, conv_ub_id
+)
+    if haskey(b.sp_setup_variables, sp_id)
+        error("Subproblem $sp_id already has a setup variable.")
+    end
+    b.sp_setup_variables[sp_id] = sp_var
+    add_coupling_coefficient!(b, sp_id, sp_var, conv_lb_id, 1.0)
+    add_coupling_coefficient!(b, sp_id, sp_var, conv_ub_id, 1.0)
     return nothing
 end
 
@@ -162,10 +191,18 @@ function build(b::DWReformulationBuilder{X}) where {X}
             variables, raw_entries
         )
         conv_lb, conv_ub = b.sp_conv_bounds[sp_id]
+        setup_variable = get(b.sp_setup_variables, sp_id, nothing)
+        fixed_cost = b.sp_fixed_costs[sp_id]
+        if !isnothing(setup_variable) && !iszero(fixed_cost)
+            error(
+                "Subproblem $sp_id has a setup variable and a fixed cost " *
+                "$fixed_cost: the cost of the setup variable is its fixed cost."
+            )
+        end
 
         subproblems[sp_id] = SubproblemData(
             variables, original_costs, coupling_coeffs,
-            b.sp_fixed_costs[sp_id], conv_lb, conv_ub
+            fixed_cost, conv_lb, conv_ub, setup_variable
         )
     end
 

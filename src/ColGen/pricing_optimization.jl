@@ -162,16 +162,24 @@ A pricer returns raw subproblem values; the framework adds the fixed cost
 `y_k = 1` adds its own reduced cost to the raw value:
 `sol.solution.obj_value + cost_phase(fₖ) − ν_lb − ν_ub`, with ν read from
 `mast_dual_sol`.
+
+A subproblem with a declared setup variable (see
+[`has_setup_variable`](@ref)) has no fixed cost, and the reduced cost of its
+setup variable already holds `−ν_lb − ν_ub`: the raw value is returned as is.
 """
 function column_reduced_cost(
     ws::ColGenWorkspace, phase::CGPhase, sol::PricingPrimalSolution,
     mast_dual_sol::MasterDualSolution
 )
     sp_id = sol.sp_id
-    ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ws.decomp), sp_id)
-    ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ws.decomp), sp_id)
-    fk = subproblem_fixed_cost(ws.decomp, sp_id)
-    return sol.solution.obj_value + _objective_cost(phase, fk) - ν_lb - ν_ub
+    if has_setup_variable(ws.decomp, sp_id)
+        return sol.solution.obj_value
+    else
+        ν_lb = _get_convexity_dual(mast_dual_sol, convexity_lb_pairs(ws.decomp), sp_id)
+        ν_ub = _get_convexity_dual(mast_dual_sol, convexity_ub_pairs(ws.decomp), sp_id)
+        fk = subproblem_fixed_cost(ws.decomp, sp_id)
+        return sol.solution.obj_value + _objective_cost(phase, fk) - ν_lb - ν_ub
+    end
 end
 
 # ── Optional subproblem ───────────────────────────────────────────────────────

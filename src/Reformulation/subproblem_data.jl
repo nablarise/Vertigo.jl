@@ -9,6 +9,9 @@ struct SubproblemData
     fixed_cost::Float64
     convexity_lb::Float64
     convexity_ub::Float64
+    # The subproblem variable whose value is the column's coefficient in the
+    # convexity rows, or `nothing` for the implicit setup variable `y_k = 1`.
+    setup_variable::Union{Nothing,_VI}
 end
 
 struct PureMasterVariableData

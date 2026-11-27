@@ -26,7 +26,7 @@ include("macro.jl")
 
 export @dantzig_wolfe
 export dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export dantzig_wolfe_subproblem, dantzig_wolfe_master, dantzig_wolfe_setup
 export identical
 
 end # module DML

@@ -36,13 +36,14 @@ using .DML
 
 # DML (Decomposition Modeling Language)
 export @dantzig_wolfe, dantzig_wolfe_decomposition
-export dantzig_wolfe_subproblem, dantzig_wolfe_master
+export dantzig_wolfe_subproblem, dantzig_wolfe_master, dantzig_wolfe_setup
 export identical
 
 # Decomposition builder
 export PricingSubproblemId
 export DWReformulation, DWReformulationBuilder
 export add_subproblem!, add_sp_variable!, add_coupling_coefficient!
+export add_setup_variable!
 export add_mapping!, add_pure_master_variable!, add_pure_master_coupling!
 export add_coupling_constraint!, build
 
@@ -60,6 +61,7 @@ export WentgesSmoothing, NoStabilization
 
 # Decomposition interface query functions
 export subproblem_ids, subproblem_variables, subproblem_fixed_cost, convexity_bounds
+export has_setup_variable
 export coupling_constraints, is_minimization, original_cost, coupling_coefficients
 export pure_master_variables, pure_master_cost, pure_master_bounds
 export nonzero_entries, solution_value, subproblem_id

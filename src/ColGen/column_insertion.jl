@@ -67,11 +67,15 @@ function _insert_column!(
         end
     end
 
-    if has_convexity_ub(decomp, sp_id)
-        all_coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
-    end
-    if has_convexity_lb(decomp, sp_id)
-        all_coeffs[convexity_lb_ci(decomp, sp_id)] = 1.0
+    # A setup variable already gave the column its value in the convexity rows,
+    # through its coupling coefficients.
+    if !has_setup_variable(decomp, sp_id)
+        if has_convexity_ub(decomp, sp_id)
+            all_coeffs[convexity_ub_ci(decomp, sp_id)] = 1.0
+        end
+        if has_convexity_lb(decomp, sp_id)
+            all_coeffs[convexity_lb_ci(decomp, sp_id)] = 1.0
+        end
     end
 
     obj_coeff = _objective_cost(phase, col_cost)
